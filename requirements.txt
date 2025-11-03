@@ -1,0 +1,44 @@
+# Bitcoin Trading Strategy Backtesting Tool - Requirements
+# Core dependencies for data processing and analysis
+
+# Data manipulation and analysis
+pandas>=1.5.0
+numpy>=1.21.0
+
+# Technical analysis and indicators
+scipy>=1.9.0
+
+# Visualization
+plotly>=5.0.0
+kaleido>=0.2.1  # For static image export
+
+# Testing
+pytest>=7.0.0
+pytest-cov>=4.0.0
+pytest-asyncio>=0.21.0
+
+# Development and code quality
+black>=22.0.0
+flake8>=5.0.0
+mypy>=1.0.0
+
+# FastAPI and web framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.0.0
+python-multipart>=0.0.6
+httpx>=0.25.0
+
+# Database
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+alembic>=1.12.0
+
+# Authentication
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+authlib>=1.2.0
+
+# Optional: For enhanced data sources
+# yfinance>=0.2.0
+# ccxt>=4.0.0
