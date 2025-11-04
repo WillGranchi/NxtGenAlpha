@@ -1,0 +1,5 @@
+# Ignore Dockerfiles for Railway (Railway should use Nixpacks)
+Dockerfile*
+docker-compose.yml
+.dockerignore
+

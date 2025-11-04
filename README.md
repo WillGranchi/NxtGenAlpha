@@ -49,6 +49,28 @@ A comprehensive web application for building, testing, and saving Bitcoin tradin
 
 ## Production Deployment
 
+For deploying to Railway with your domain `nxtgenalpha.com`, see:
+
+- **[RAILWAY_DEPLOYMENT.md](./RAILWAY_DEPLOYMENT.md)** - Step-by-step Railway deployment guide
+- **[RAILWAY_ENV_CHECKLIST.md](./RAILWAY_ENV_CHECKLIST.md)** - Environment variables setup checklist
+- **[DEPLOYMENT_READINESS.md](./DEPLOYMENT_READINESS.md)** - Pre-deployment verification summary
+
+### Quick Railway Deployment Checklist
+
+1. ✅ Code pushed to GitHub
+2. ✅ Procfile created
+3. ⬜ Create Railway project and connect repo
+4. ⬜ Add PostgreSQL database
+5. ⬜ Configure environment variables
+6. ⬜ Set up Google OAuth production credentials
+7. ⬜ Configure domain nxtgenalpha.com
+8. ⬜ Run database migrations
+9. ⬜ Test deployment
+
+See **RAILWAY_DEPLOYMENT.md** for detailed instructions.
+
+## Production Deployment (General)
+
 For production deployment, see the comprehensive [DEPLOYMENT.md](./DEPLOYMENT.md) guide which covers:
 - Environment configuration
 - SSL/HTTPS setup
