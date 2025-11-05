@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { getCurrentUser, logout as logoutApi, updateTheme as updateThemeApi } from '../services/api';
+import { TradingAPI } from '../services/api';
 
 interface User {
   id: number;
@@ -72,7 +72,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const loadUser = async () => {
     try {
       setIsLoading(true);
-      const response = await getCurrentUser();
+      const response = await TradingAPI.getCurrentUser();
       
       if (response.authenticated && response.user) {
         setUser(response.user);
@@ -121,7 +121,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     try {
-      await logoutApi();
+      await TradingAPI.logout();
       localStorage.removeItem('auth_token');
       setUser(null);
       // Redirect to home or reload
@@ -137,7 +137,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const updateTheme = async (theme: 'light' | 'dark') => {
     try {
       if (user) {
-        await updateThemeApi(theme);
+        await TradingAPI.updateTheme(theme);
         setUser({ ...user, theme });
       }
       localStorage.setItem('theme', theme);

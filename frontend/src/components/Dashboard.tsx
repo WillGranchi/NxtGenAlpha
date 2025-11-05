@@ -3,7 +3,7 @@
  */
 
 import React, { useEffect, useCallback, useState } from 'react';
-import { StrategySelector } from './strategy/StrategySelector';
+import StrategySelector from './strategy/StrategySelector';
 import { PriceChart } from './charts/PriceChart';
 import { EquityChart } from './charts/EquityChart';
 import { TradeLogTable } from './TradeLogTable';
