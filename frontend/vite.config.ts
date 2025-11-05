@@ -12,7 +12,23 @@ export default defineConfig({
   },
   server: {
     port: 3000,
-    host: true
+    host: true,
+    allowedHosts: [
+      'nxtgenalpha.com',
+      'www.nxtgenalpha.com',
+      '.railway.app',
+      'localhost'
+    ]
+  },
+  preview: {
+    port: 3000,
+    host: true,
+    allowedHosts: [
+      'nxtgenalpha.com',
+      'www.nxtgenalpha.com',
+      '.railway.app',
+      'localhost'
+    ]
   },
   build: {
     outDir: 'dist',
