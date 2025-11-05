@@ -3,7 +3,6 @@
  */
 
 import React, { useEffect, useCallback, useState } from 'react';
-import StrategySelector from './strategy/StrategySelector';
 import { PriceChart } from './charts/PriceChart';
 import { EquityChart } from './charts/EquityChart';
 import { TradeLogTable } from './TradeLogTable';
@@ -479,11 +478,19 @@ export const Dashboard: React.FC = () => {
 
           {/* Strategy Configuration */}
           {mode === 'simple' ? (
-            <StrategySelector
-              strategies={strategies?.strategies || null}
-              onRunBacktest={handleRunBacktest}
-              loading={legacyLoading}
-            />
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+              <div className="text-center py-8">
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                  Simple mode is no longer available. Please use Advanced mode to build and test your strategies.
+                </p>
+                <button
+                  onClick={() => setMode('advanced')}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Switch to Advanced Mode
+                </button>
+              </div>
+            </div>
           ) : (
             <div className="space-y-6">
               {/* Indicator Catalog */}
