@@ -21,8 +21,9 @@ export default defineConfig({
     ]
   },
   preview: {
-    port: 3000,
-    host: true,
+    port: process.env.PORT ? parseInt(process.env.PORT) : 3000,
+    host: '0.0.0.0',
+    strictPort: false,
     allowedHosts: [
       'nxtgenalpha.com',
       'www.nxtgenalpha.com',
