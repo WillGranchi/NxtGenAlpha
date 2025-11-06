@@ -385,7 +385,7 @@ export const Dashboard: React.FC = () => {
               </p>
             </div>
             <div className="flex items-center space-x-4">
-              {dataInfo && (
+              {dataInfo?.data_info && (
                 <div className="text-sm text-gray-500 dark:text-gray-400">
                   <span className="font-medium">{dataInfo.data_info.total_records.toLocaleString()}</span> records
                   <span className="mx-2">•</span>
@@ -462,7 +462,7 @@ export const Dashboard: React.FC = () => {
           </div>
 
           {/* Date Range Picker */}
-          {dataInfo && (
+          {dataInfo?.data_info && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Backtest Date Range</h2>
               <DateRangePicker
