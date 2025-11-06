@@ -20,11 +20,13 @@ const api = axios.create({
 // Request interceptor for logging
 api.interceptors.request.use(
   (config) => {
-    console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
+    const fullUrl = `${config.baseURL}${config.url}`;
+    console.log(`[API] ${config.method?.toUpperCase()} ${fullUrl}`);
+    console.log(`[API] Base URL: ${config.baseURL || 'DEFAULT'}`);
     return config;
   },
   (error) => {
-    console.error('API Request Error:', error);
+    console.error('[API] Request Error:', error);
     return Promise.reject(error);
   }
 );
@@ -33,7 +35,16 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.error('API Response Error:', error.response?.data || error.message);
+    const fullUrl = error.config ? `${error.config.baseURL}${error.config.url}` : 'unknown';
+    console.error('[API] Response Error:', {
+      url: fullUrl,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      message: error.message,
+      data: error.response?.data,
+      isNetworkError: !error.response,
+      isCorsError: error.message?.includes('CORS') || error.message?.includes('Network Error'),
+    });
     return Promise.reject(error);
   }
 );
