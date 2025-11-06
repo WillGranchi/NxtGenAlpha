@@ -108,18 +108,40 @@ VITE_API_URL=https://nxtgenalpha.com
 
 ### Step 6: Run Database Migrations (5 minutes)
 
+**Option A: Using Railway CLI (Recommended)**
+
+1. Make sure you're logged in and linked:
+   ```bash
+   railway login
+   railway link
+   ```
+
+2. Run migrations:
+   ```bash
+   railway run --service web python -m alembic -c backend/alembic.ini upgrade head
+   ```
+
+   **Or use the migration script:**
+   ```bash
+   railway run --service web bash scripts/run_migrations.sh
+   ```
+
+**Option B: Using Railway Shell (if available)**
+
 1. In Railway, open your backend service
 2. Go to "Deployments" tab
 3. Click on the latest deployment
-4. Click "Shell" tab (or use Railway CLI)
+4. Click "Shell" tab
 5. Run:
    ```bash
-   alembic upgrade head
+   python -m alembic -c backend/alembic.ini upgrade head
    ```
-6. Verify tables created:
-   ```bash
-   psql $DATABASE_URL -c "\dt"
-   ```
+
+**Verify migrations succeeded:**
+
+You can verify tables were created by checking the backend logs, or by testing the API endpoints that require database access.
+
+**Note:** If you get "No module named alembic", the packages might not be installed. In that case, Railway should auto-install from requirements.txt during build. If issues persist, check the build logs.
 
 ### Step 7: Configure Domain (15-30 minutes)
 
