@@ -85,18 +85,28 @@ VITE_API_URL = https://web-production-776f1.up.railway.app
 
 1. Visit: `https://nxtgenalpha.com`
 2. Open browser console: Press **F12** → Click **Console** tab
-3. Run this command:
-   ```javascript
-   console.log('VITE_API_URL:', import.meta.env.VITE_API_URL);
-   ```
+3. **Method 1: Check API Logs (Recommended)**
+   - The app automatically makes API calls when it loads
+   - Look for log messages that start with `[API] Base URL:`
+   - You should see: `[API] Base URL: https://web-production-776f1.up.railway.app`
+   
+4. **Method 2: Check Network Tab**
+   - Open **Network** tab in DevTools (F12 → Network)
+   - Refresh the page
+   - Look for API requests (they'll have names like `/api/auth/me`, `/api/data/info`, etc.)
+   - Click on any API request
+   - Check the **Request URL** - it should start with `https://web-production-776f1.up.railway.app`
+
+5. **Method 3: Trigger an API Call**
+   - If no API calls are visible, try logging in or navigating to a page that makes API calls
+   - The console will show `[API] Base URL: ...` for each request
 
 **Expected result:**
-```
-VITE_API_URL: https://web-production-776f1.up.railway.app
-```
+- Console logs should show: `[API] Base URL: https://web-production-776f1.up.railway.app`
+- Network requests should go to: `https://web-production-776f1.up.railway.app/api/...`
 
 **If it shows:**
-- `undefined` → Frontend hasn't redeployed yet (wait longer)
+- `[API] Base URL: DEFAULT` or `http://localhost:8000` → Frontend hasn't redeployed yet (wait longer) or variable not set
 - `https://nxtgenalpha.com` → Wrong value (check Railway variables again)
 - Old URL → Frontend hasn't redeployed yet (wait longer)
 
@@ -191,7 +201,8 @@ After completing Step 1, verify:
 - [ ] Value is exactly: `https://web-production-776f1.up.railway.app`
 - [ ] Frontend redeployed after setting variable (check Deployments tab)
 - [ ] Latest deployment status is "Deployed" (green)
-- [ ] Browser console shows correct URL: `import.meta.env.VITE_API_URL`
+- [ ] Browser console shows correct URL in `[API] Base URL:` logs
+- [ ] Network tab shows API requests going to correct backend URL
 - [ ] Hard refreshed browser after redeploy
 
 ## Next Steps

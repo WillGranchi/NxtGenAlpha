@@ -17,12 +17,20 @@ const api = axios.create({
   withCredentials: true, // Important for cookies (JWT tokens)
 });
 
-// Request interceptor for logging
+// Request interceptor for logging and adding auth token
 api.interceptors.request.use(
   (config) => {
     const fullUrl = `${config.baseURL}${config.url}`;
     console.log(`[API] ${config.method?.toUpperCase()} ${fullUrl}`);
     console.log(`[API] Base URL: ${config.baseURL || 'DEFAULT'}`);
+    
+    // Add token from localStorage to Authorization header as fallback
+    // (Backend also checks cookies, but this ensures it works if cookies fail)
+    const token = localStorage.getItem('auth_token');
+    if (token && !config.headers.Authorization) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
     return config;
   },
   (error) => {

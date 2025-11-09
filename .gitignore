@@ -58,6 +58,8 @@ outputs/*
 # Backend data (keep structure but ignore CSV)
 backend/data/*
 !backend/data/.gitkeep
+# Allow Bitcoin data file for deployment
+!backend/data/Bitcoin Historical Data4.csv
 
 # Misc
 *.pyc

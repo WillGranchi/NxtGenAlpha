@@ -150,6 +150,16 @@ async def google_callback(
         if environment == "production" and not cookie_secure:
             cookie_secure = True
         
+        # For cross-site redirects (OAuth flow), use SameSite=None with Secure
+        # This allows the cookie to be sent when redirecting from Google back to our site
+        if cookie_secure:
+            # If secure is True (HTTPS), we can use SameSite=None for cross-site cookies
+            cookie_samesite = "none"
+        elif environment == "production":
+            # Production should always use secure cookies
+            cookie_secure = True
+            cookie_samesite = "none"
+        
         # Set HTTP-only cookie with token
         redirect_response.set_cookie(
             key="token",
@@ -158,7 +168,8 @@ async def google_callback(
             secure=cookie_secure,
             samesite=cookie_samesite,
             max_age=7 * 24 * 60 * 60,  # 7 days
-            path="/"
+            path="/",
+            domain=None  # Let browser set domain automatically
         )
         
         return redirect_response
