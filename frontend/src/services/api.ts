@@ -7,6 +7,33 @@ import type { AxiosResponse } from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+// Validate API URL for mixed content issues
+const validateApiUrl = () => {
+  const isProduction = window.location.protocol === 'https:';
+  const isHttpUrl = API_BASE_URL.startsWith('http://');
+  
+  if (isProduction && isHttpUrl) {
+    const errorMsg = `[CRITICAL] Mixed Content Error: API URL is HTTP but page is HTTPS. ` +
+      `This will cause requests to be blocked by the browser. ` +
+      `Please set VITE_API_URL to HTTPS (currently: ${API_BASE_URL})`;
+    console.error(errorMsg);
+    // Show user-friendly error
+    if (typeof window !== 'undefined') {
+      console.error('API Configuration Error:', {
+        currentUrl: window.location.href,
+        apiUrl: API_BASE_URL,
+        issue: 'HTTP API URL on HTTPS page - requests will be blocked',
+        fix: 'Set VITE_API_URL environment variable to HTTPS URL'
+      });
+    }
+  } else if (isHttpUrl) {
+    console.warn(`[WARNING] API URL is HTTP: ${API_BASE_URL}. In production, this should be HTTPS.`);
+  }
+};
+
+// Run validation on module load
+validateApiUrl();
+
 // Create axios instance with default config
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -44,15 +71,34 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const fullUrl = error.config ? `${error.config.baseURL}${error.config.url}` : 'unknown';
-    console.error('[API] Response Error:', {
+    const isNetworkError = !error.response;
+    const isCorsError = error.message?.includes('CORS') || error.message?.includes('Network Error');
+    const isMixedContent = window.location.protocol === 'https:' && 
+                           error.config?.baseURL?.startsWith('http://');
+    
+    // Enhanced error logging with specific guidance
+    const errorDetails: any = {
       url: fullUrl,
       status: error.response?.status,
       statusText: error.response?.statusText,
       message: error.message,
       data: error.response?.data,
-      isNetworkError: !error.response,
-      isCorsError: error.message?.includes('CORS') || error.message?.includes('Network Error'),
-    });
+      isNetworkError,
+      isCorsError,
+      isMixedContent,
+    };
+    
+    // Add specific error messages based on error type
+    if (isMixedContent) {
+      errorDetails.mixedContentError = 'HTTP API URL blocked on HTTPS page. Set VITE_API_URL to HTTPS.';
+      console.error('[API] Mixed Content Error:', errorDetails);
+    } else if (isCorsError || isNetworkError) {
+      errorDetails.corsNetworkError = 'CORS or Network Error. Check: 1) API URL is HTTPS, 2) CORS_ORIGINS includes frontend domain, 3) Backend is running.';
+      console.error('[API] CORS/Network Error:', errorDetails);
+    } else {
+      console.error('[API] Response Error:', errorDetails);
+    }
+    
     return Promise.reject(error);
   }
 );

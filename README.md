@@ -53,7 +53,7 @@ For deploying to Railway with your domain `nxtgenalpha.com`, see:
 
 - **[RAILWAY_DEPLOYMENT.md](./RAILWAY_DEPLOYMENT.md)** - Step-by-step Railway deployment guide
 - **[RAILWAY_ENV_CHECKLIST.md](./RAILWAY_ENV_CHECKLIST.md)** - Environment variables setup checklist
-- **[DEPLOYMENT_READINESS.md](./DEPLOYMENT_READINESS.md)** - Pre-deployment verification summary
+- **[DEPLOYMENT_VERIFICATION.md](./DEPLOYMENT_VERIFICATION.md)** - Complete verification checklist
 
 ### Quick Railway Deployment Checklist
 
@@ -81,9 +81,19 @@ For production deployment, see the comprehensive [DEPLOYMENT.md](./DEPLOYMENT.md
 
 ## Documentation
 
+### Setup & Deployment
 - **[GOOGLE_OAUTH_SETUP.md](./GOOGLE_OAUTH_SETUP.md)** - Step-by-step guide for configuring Google OAuth
-- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Production deployment guide with SSL, database, and monitoring setup
+- **[RAILWAY_DEPLOYMENT.md](./RAILWAY_DEPLOYMENT.md)** - Railway deployment guide
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - General production deployment guide
 - **[DOCKER_SETUP.md](./DOCKER_SETUP.md)** - Docker installation and troubleshooting guide
+- **[RAILWAY_ENV_CHECKLIST.md](./RAILWAY_ENV_CHECKLIST.md)** - Environment variables reference
+
+### Verification & Troubleshooting
+- **[DEPLOYMENT_VERIFICATION.md](./DEPLOYMENT_VERIFICATION.md)** - Complete deployment verification checklist
+- **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** - Common issues and solutions
+
+### Testing
+- **[TESTING.md](./TESTING.md)** - Testing documentation and test scripts
 
 ## Authentication & User Accounts
 
@@ -397,6 +407,8 @@ Once the backend is running, visit:
 
 ## 🛠️ Troubleshooting
 
+For detailed troubleshooting guides, see **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)**.
+
 ### Common Issues
 
 1. **Port already in use**
@@ -408,10 +420,12 @@ Once the backend is running, visit:
 2. **Data file not found**
    - Ensure `Bitcoin Historical Data4.csv` is in `backend/data/`
    - Check file permissions
+   - See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md#data-file-issues)
 
 3. **Frontend not connecting to backend**
    - Verify backend is running on port 8000
    - Check CORS settings in `backend/api/main.py`
+   - See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md#cors-issues)
 
 4. **Docker build fails**
    ```bash
@@ -419,6 +433,10 @@ Once the backend is running, visit:
    docker system prune -a
    docker-compose build --no-cache
    ```
+
+5. **Authentication not working**
+   - See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md#authentication-issues)
+   - See [DEPLOYMENT_VERIFICATION.md](./DEPLOYMENT_VERIFICATION.md#step-5-verify-authentication)
 
 ### Debug Mode
 
