@@ -1,0 +1,60 @@
+# Frontend Dockerfile for Bitcoin Trading Strategy Dashboard
+# This Dockerfile is designed to work when Railway's root directory is set to frontend/
+FROM node:18-alpine as build
+
+# Set working directory
+WORKDIR /app
+
+# Accept VITE_API_URL as build argument (Railway will pass this from environment variables)
+# Must be declared before it's used
+ARG VITE_API_URL
+
+# Set VITE_API_URL as environment variable for the build process
+ENV VITE_API_URL=$VITE_API_URL
+
+# Copy package files (build context is already frontend/, so no need for frontend/ prefix)
+COPY package*.json ./
+
+# Install dependencies
+# Clear any existing cache to avoid EBUSY errors with Railway's cache mounts
+RUN rm -rf /app/node_modules/.cache 2>/dev/null || true
+RUN rm -rf node_modules/.cache 2>/dev/null || true
+RUN npm ci --cache /tmp/.npm 2>/dev/null || npm ci
+
+# Copy source code (build context is already frontend/, so copy everything)
+COPY . ./
+
+# Build the application
+# VITE_API_URL is now available to Vite during the build
+RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
+
+# Production stage
+FROM nginx:alpine
+
+# Install gettext for envsubst (to substitute environment variables in nginx.conf)
+RUN apk add --no-cache gettext
+
+# Copy built files from build stage
+COPY --from=build /app/dist /usr/share/nginx/html
+
+# Copy nginx configuration template from build stage
+COPY --from=build /app/nginx.conf /etc/nginx/nginx.conf.template
+
+# Create startup script to substitute PORT and BACKEND_URL environment variables
+RUN echo '#!/bin/sh' > /docker-entrypoint.sh && \
+    echo 'export PORT=${PORT:-80}' >> /docker-entrypoint.sh && \
+    echo 'export BACKEND_URL=${BACKEND_URL:-http://localhost:8000}' >> /docker-entrypoint.sh && \
+    echo 'envsubst '"'"'$PORT $BACKEND_URL'"'"' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf' && \
+    echo 'exec nginx -g "daemon off;"' >> /docker-entrypoint.sh && \
+    chmod +x /docker-entrypoint.sh
+
+# Expose port (Railway will set PORT environment variable)
+EXPOSE ${PORT:-80}
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-80}/ || exit 1
+
+# Start nginx with environment variable substitution
+CMD ["/docker-entrypoint.sh"]
+
