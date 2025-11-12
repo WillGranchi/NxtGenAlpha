@@ -41,9 +41,11 @@ COPY --from=build /app/dist /usr/share/nginx/html
 COPY --from=build /app/nginx.conf /etc/nginx/nginx.conf.template
 
 # Create startup script to substitute PORT and BACKEND_URL environment variables
+# Strip trailing slash from BACKEND_URL to avoid double slashes in proxy_pass
 RUN echo '#!/bin/sh' > /docker-entrypoint.sh && \
     echo 'export PORT=${PORT:-80}' >> /docker-entrypoint.sh && \
-    echo 'export BACKEND_URL=${BACKEND_URL:-http://localhost:8000}' >> /docker-entrypoint.sh && \
+    echo 'BACKEND_URL_RAW=${BACKEND_URL:-http://localhost:8000}' >> /docker-entrypoint.sh && \
+    echo 'export BACKEND_URL=$(echo "$BACKEND_URL_RAW" | sed "s|/*$||")' >> /docker-entrypoint.sh && \
     echo 'envsubst '"'"'$PORT $BACKEND_URL'"'"' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf' && \
     echo 'exec nginx -g "daemon off;"' >> /docker-entrypoint.sh && \
     chmod +x /docker-entrypoint.sh
