@@ -32,10 +32,41 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 @router.options("/{path:path}")
 async def options_handler(request: Request, path: str):
     """Handle CORS preflight OPTIONS requests."""
+    # Get allowed origins from environment (same as main.py)
+    import os
+    cors_origins_env = os.getenv("CORS_ORIGINS", "")
+    if cors_origins_env:
+        allowed_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
+    else:
+        allowed_origins = [
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:3001",
+            "http://127.0.0.1:3001",
+        ]
+    
+    frontend_url = os.getenv("FRONTEND_URL", "")
+    if frontend_url and frontend_url not in allowed_origins:
+        allowed_origins.append(frontend_url)
+    
+    # Get origin from request
+    origin = request.headers.get("origin", "")
+    
+    # Validate origin is in allowed list
+    if origin and origin in allowed_origins:
+        allow_origin = origin
+    elif not origin:
+        # No origin header (same-origin request)
+        allow_origin = "*"
+    else:
+        # Origin not allowed - still return 200 but with no CORS headers
+        # (CORS middleware will handle this, but we return early)
+        return JSONResponse(content={}, status_code=200)
+    
     return JSONResponse(
         content={},
         headers={
-            "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
+            "Access-Control-Allow-Origin": allow_origin,
             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
             "Access-Control-Allow-Headers": "*",
             "Access-Control-Allow-Credentials": "true",
@@ -63,6 +94,7 @@ class LoginRequest(BaseModel):
 async def signup(
     request: SignupRequest,
     response: Response,
+    http_request: Request,
     db: Session = Depends(get_db)
 ):
     """
@@ -142,6 +174,23 @@ async def signup(
             max_age=7 * 24 * 60 * 60,  # 7 days
             path="/",
         )
+        
+        # Add CORS headers explicitly for signup response
+        origin = http_request.headers.get("origin", "")
+        if origin:
+            # Check if origin is allowed (same logic as OPTIONS handler)
+            cors_origins_env = os.getenv("CORS_ORIGINS", "")
+            if cors_origins_env:
+                allowed_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
+            else:
+                allowed_origins = []
+            frontend_url = os.getenv("FRONTEND_URL", "")
+            if frontend_url and frontend_url not in allowed_origins:
+                allowed_origins.append(frontend_url)
+            
+            if origin in allowed_origins:
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Credentials"] = "true"
         
         return {
             "message": "User created successfully",
