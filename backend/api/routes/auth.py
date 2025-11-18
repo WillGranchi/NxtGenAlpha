@@ -28,6 +28,21 @@ logger = get_logger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
+# Handle OPTIONS requests explicitly for CORS preflight
+@router.options("/{path:path}")
+async def options_handler(request: Request, path: str):
+    """Handle CORS preflight OPTIONS requests."""
+    return JSONResponse(
+        content={},
+        headers={
+            "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "3600",
+        }
+    )
+
 # Store OAuth state temporarily (in production, use Redis or similar)
 oauth_states = {}
 
