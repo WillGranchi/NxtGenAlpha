@@ -24,7 +24,7 @@ import { useAuth } from '../hooks/useAuth';
 import { DateRangePicker } from './DateRangePicker';
 
 export const Dashboard: React.FC = () => {
-  const [mode] = useState<'simple' | 'advanced'>('advanced');
+  const [mode, setMode] = useState<'simple' | 'advanced'>('advanced');
   const [initialCapital, setInitialCapital] = useState(10000);
   const [startDate, setStartDate] = useState<string>('2018-01-01');
   const [endDate, setEndDate] = useState<string>('');

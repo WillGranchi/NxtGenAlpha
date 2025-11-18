@@ -167,7 +167,7 @@ export const EquityChart: React.FC<EquityChartProps> = ({
       title: 'Portfolio Value ($)',
       tickformat: '$,.0f',
       // Allow negative values for long_short mode
-      ...(strategyType === 'long_short' ? {} : { rangemode: 'tozero' }),
+      ...(strategyType === 'long_short' ? {} : { rangemode: 'tozero' as const }),
     },
     hovermode: 'x unified' as const,
     showlegend: true,

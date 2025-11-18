@@ -246,7 +246,7 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
                 const metadata = availableIndicators?.[node.indicatorId];
                 if (!metadata) return null;
 
-                const isConnectingTo = connectingFrom && connectingFrom.nodeId !== node.id;
+                const isConnectingTo = connectingFrom ? connectingFrom.nodeId !== node.id : false;
                 const isConnectingFromNode = connectingFrom?.nodeId === node.id;
 
                 return (
