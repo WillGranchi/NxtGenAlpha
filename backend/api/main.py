@@ -72,7 +72,10 @@ async def startup_event():
         init_db()
         logger.info("Database initialized successfully")
     except Exception as e:
-        logger.error(f"Failed to initialize database: {e}")
+        logger.error(f"Failed to initialize database: {e}", exc_info=True)
+        # Don't crash the app - database operations will fail later with proper error messages
+        # This allows the app to start even if DB isn't ready yet (e.g., during Railway deployment)
+        logger.warning("Application will continue without database initialization. Database operations may fail until connection is established.")
 
 # Include routers
 app.include_router(data.router)
