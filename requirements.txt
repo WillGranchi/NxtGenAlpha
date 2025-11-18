@@ -26,6 +26,7 @@ mypy>=1.0.0
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 pydantic>=2.0.0
+pydantic[email]>=2.0.0  # Includes email-validator for EmailStr validation
 python-multipart>=0.0.6
 httpx>=0.25.0
 
