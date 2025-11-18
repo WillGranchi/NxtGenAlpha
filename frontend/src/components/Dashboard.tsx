@@ -6,14 +6,14 @@ import React, { useEffect, useCallback, useState } from 'react';
 import { PriceChart } from './charts/PriceChart';
 import { EquityChart } from './charts/EquityChart';
 import { TradeLogTable } from './TradeLogTable';
-import MetricsCard from './MetricsCard';
+import EnhancedMetrics from './results/EnhancedMetrics';
 import ErrorBoundary from './ErrorBoundary';
 import { useBacktest } from '../hooks/useBacktest';
 import { useModularBacktest } from '../hooks/useModularBacktest';
 import { useIndicatorCatalog } from '../hooks/useIndicatorCatalog';
 import IndicatorCatalog from './strategy/IndicatorCatalog';
 import StrategyMakeup from './strategy/StrategyMakeup';
-import PerformanceMetrics from './results/PerformanceMetrics';
+import { StrategyBuilder } from './builder/StrategyBuilder';
 import IndicatorTileGrid from './results/IndicatorTileGrid';
 import ResultsSection from './ResultsSection';
 import { ToastContainer } from './Toast';
@@ -24,7 +24,7 @@ import { useAuth } from '../hooks/useAuth';
 import { DateRangePicker } from './DateRangePicker';
 
 export const Dashboard: React.FC = () => {
-  const [mode, setMode] = useState<'simple' | 'advanced'>('simple');
+  const [mode] = useState<'simple' | 'advanced'>('advanced');
   const [initialCapital, setInitialCapital] = useState(10000);
   const [startDate, setStartDate] = useState<string>('2018-01-01');
   const [endDate, setEndDate] = useState<string>('');
@@ -117,9 +117,28 @@ export const Dashboard: React.FC = () => {
       ? (strategyType === 'long_short' ? shortExpression : longExpression) 
       : expression;
     
+    // If expression is empty, try to generate a default one from indicators
+    let finalExpression = effectiveExpression;
     if (mode === 'advanced' && (!effectiveExpression || !effectiveExpression.trim())) {
-      toast.error('Please enter a strategy expression before running the backtest.');
-      return;
+      // Try to generate a default expression from available conditions
+      const conditions = getAvailableConditions();
+      const indicatorConditions = selectedIndicators
+        .map(ind => {
+          // Find first condition for this indicator
+          const condKey = Object.keys(conditions).find(key => 
+            key.toLowerCase().startsWith(ind.id.toLowerCase())
+          );
+          return condKey ? conditions[condKey] : null;
+        })
+        .filter(Boolean);
+      
+      if (indicatorConditions.length > 0) {
+        finalExpression = indicatorConditions.join(' AND ');
+        console.log('Generated default expression:', finalExpression);
+      } else {
+        toast.error('Please add indicators and build your strategy expression before running the backtest.');
+        return;
+      }
     }
     
     if (useSeparateExpressions && strategyType === 'long_short' && (!shortExpression || !shortExpression.trim())) {
@@ -152,10 +171,26 @@ export const Dashboard: React.FC = () => {
       };
     } else {
       // Use single expression (legacy or simple mode)
-      const effectiveExpression = mode === 'advanced' ? expression : getSimpleExpression();
+      let effectiveExpression = mode === 'advanced' ? finalExpression : getSimpleExpression();
+      
+      // If still empty, try to generate from conditions
       if (!effectiveExpression || !effectiveExpression.trim()) {
-        toast.error('Please enter a strategy expression. Add indicators and build your expression using the builder above.');
-        return;
+        const conditions = getAvailableConditions();
+        const indicatorConditions = selectedIndicators
+          .map(ind => {
+            const condKey = Object.keys(conditions).find(key => 
+              key.toLowerCase().startsWith(ind.id.toLowerCase())
+            );
+            return condKey ? conditions[condKey] : null;
+          })
+          .filter(Boolean);
+        
+        if (indicatorConditions.length > 0) {
+          effectiveExpression = indicatorConditions.join(' AND ');
+        } else {
+          toast.error('Please add indicators and build your strategy expression before running the backtest.');
+          return;
+        }
       }
       
       request = {
@@ -428,39 +463,6 @@ export const Dashboard: React.FC = () => {
             </div>
           )}
 
-          {/* Mode Toggle */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Strategy Mode</h2>
-              <div className="flex items-center space-x-2">
-                <span className={`text-sm ${mode === 'simple' ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
-                  Simple
-                </span>
-                <button
-                  onClick={() => setMode(mode === 'simple' ? 'advanced' : 'simple')}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    mode === 'advanced' ? 'bg-blue-600' : 'bg-gray-200'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      mode === 'advanced' ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-                <span className={`text-sm ${mode === 'advanced' ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
-                  Advanced
-                </span>
-              </div>
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {mode === 'simple' 
-                ? 'Use pre-built strategies with simple parameter configuration.'
-                : 'Build custom strategies by combining technical indicators with boolean expressions.'
-              }
-            </p>
-          </div>
-
           {/* Date Range Picker */}
           {dataInfo?.data_info && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
@@ -476,65 +478,123 @@ export const Dashboard: React.FC = () => {
             </div>
           )}
 
-          {/* Strategy Configuration */}
-          {mode === 'simple' ? (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-              <div className="text-center py-8">
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Simple mode is no longer available. Please use Advanced mode to build and test your strategies.
+          {/* Strategy Type Toggle */}
+          <div className="bg-bg-tertiary rounded-xl border border-border-default p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-text-primary mb-2">
+                  Strategy Type
+                </h3>
+                <p className="text-sm text-text-secondary">
+                  {strategyType === 'long_cash' 
+                    ? 'Long/Cash: Strategy can go long or hold cash. Returns stay at or above initial capital.'
+                    : 'Long/Short: Strategy can go long or short. Returns can go negative with short positions.'
+                  }
                 </p>
+              </div>
+              <div className="flex items-center space-x-4">
                 <button
-                  onClick={() => setMode('advanced')}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  onClick={() => setStrategyType('long_cash')}
+                  className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+                    strategyType === 'long_cash'
+                      ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/50'
+                      : 'bg-bg-secondary text-text-secondary hover:bg-bg-elevated border border-border-default'
+                  }`}
                 >
-                  Switch to Advanced Mode
+                  Long/Cash
+                </button>
+                <button
+                  onClick={() => setStrategyType('long_short')}
+                  className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+                    strategyType === 'long_short'
+                      ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/50'
+                      : 'bg-bg-secondary text-text-secondary hover:bg-bg-elevated border border-border-default'
+                  }`}
+                >
+                  Long/Short
                 </button>
               </div>
             </div>
-          ) : (
-            <div className="space-y-6">
-              {/* Indicator Catalog */}
-              <IndicatorCatalog
-                availableIndicators={availableIndicators}
-                onAddIndicator={addIndicator}
-                selectedIndicatorIds={selectedIndicators.map(ind => ind.id)}
-                isLoading={catalogLoading}
-              />
+          </div>
 
-              {/* Strategy Makeup */}
-              <StrategyMakeup
-                selectedIndicators={selectedIndicators}
-                availableIndicators={availableIndicators}
-                onUpdateIndicatorParams={updateIndicatorParams}
-                onUpdateIndicatorShowOnChart={updateIndicatorShowOnChart}
-                onRemoveIndicator={removeIndicator}
-                onUpdateExpression={setExpression}
-                onUpdateLongExpression={setLongExpression}
-                onUpdateCashExpression={setCashExpression}
-                onUpdateShortExpression={setShortExpression}
-                onRunBacktest={handleModularBacktest}
-                isLoading={modularLoading}
-                initialCapital={initialCapital}
-                onUpdateInitialCapital={setInitialCapital}
-                expression={expression}
-                longExpression={longExpression}
-                cashExpression={cashExpression}
-                shortExpression={shortExpression}
-                useSeparateExpressions={useSeparateExpressions}
-                onToggleSeparateExpressions={setUseSeparateExpressions}
-                strategyType={strategyType}
-                onStrategyTypeChange={setStrategyType}
-                availableConditions={getAvailableConditions()}
-                onLoadStrategy={handleLoadStrategy}
-                onToast={(message, type) => {
-                  if (type === 'success') toast.success(message);
-                  else if (type === 'error') toast.error(message);
-                  else if (type === 'warning') toast.warning(message);
-                  else toast.info(message);
-                }}
-              />
+          {/* Strategy Configuration */}
+          <div className="space-y-6">
+            {/* Visual Strategy Builder - Full Width */}
+            <div className="bg-bg-tertiary rounded-xl border border-border-default p-6">
+              <h3 className="text-lg font-semibold text-text-primary mb-4">
+                Visual Strategy Builder
+              </h3>
+              <p className="text-sm text-text-secondary mb-4">
+                Click indicators in the library to add them to the canvas, or drag them. Connect indicators with AND/OR logic by clicking the connection points.
+              </p>
+              <ErrorBoundary>
+                <StrategyBuilder
+                  availableIndicators={availableIndicators}
+                  selectedIndicators={selectedIndicators}
+                  onIndicatorsChange={(indicators) => {
+                    setIndicators(indicators);
+                  }}
+                  onUpdateIndicatorParams={updateIndicatorParams}
+                  onUpdateIndicatorShowOnChart={updateIndicatorShowOnChart}
+                  onUpdateExpression={setExpression}
+                  onUpdateLongExpression={setLongExpression}
+                  onUpdateCashExpression={setCashExpression}
+                  onUpdateShortExpression={setShortExpression}
+                  useSeparateExpressions={useSeparateExpressions}
+                  strategyType={strategyType}
+                  availableConditions={getAvailableConditions()}
+                  initialCapital={initialCapital}
+                  onUpdateInitialCapital={setInitialCapital}
+                  onRunBacktest={handleModularBacktest}
+                  isLoading={catalogLoading}
+                  isBacktestLoading={modularLoading}
+                  backtestResults={modularResponse}
+                />
+              </ErrorBoundary>
             </div>
-          )}
+
+            {/* Advanced Expression Editor - Collapsed by Default */}
+            {selectedIndicators.length > 0 && (
+              <details className="bg-bg-tertiary rounded-xl border border-border-default overflow-hidden">
+                <summary className="p-4 cursor-pointer text-text-primary font-medium hover:bg-bg-elevated transition-colors">
+                  Advanced Expression Editor (Optional)
+                </summary>
+                <div className="p-6 border-t border-border-default">
+                  <StrategyMakeup
+                    selectedIndicators={selectedIndicators}
+                    availableIndicators={availableIndicators}
+                    onUpdateIndicatorParams={updateIndicatorParams}
+                    onUpdateIndicatorShowOnChart={updateIndicatorShowOnChart}
+                    onRemoveIndicator={removeIndicator}
+                    onUpdateExpression={setExpression}
+                    onUpdateLongExpression={setLongExpression}
+                    onUpdateCashExpression={setCashExpression}
+                    onUpdateShortExpression={setShortExpression}
+                    onRunBacktest={handleModularBacktest}
+                    isLoading={modularLoading}
+                    initialCapital={initialCapital}
+                    onUpdateInitialCapital={setInitialCapital}
+                    expression={expression}
+                    longExpression={longExpression}
+                    cashExpression={cashExpression}
+                    shortExpression={shortExpression}
+                    useSeparateExpressions={useSeparateExpressions}
+                    onToggleSeparateExpressions={setUseSeparateExpressions}
+                    strategyType={strategyType}
+                    onStrategyTypeChange={setStrategyType}
+                    availableConditions={getAvailableConditions()}
+                    onLoadStrategy={handleLoadStrategy}
+                    onToast={(message, type) => {
+                      if (type === 'success') toast.success(message);
+                      else if (type === 'error') toast.error(message);
+                      else if (type === 'warning') toast.warning(message);
+                      else toast.info(message);
+                    }}
+                  />
+                </div>
+              </details>
+            )}
+          </div>
 
           {/* Loading State */}
           {(legacyLoading || modularLoading) && (
@@ -554,7 +614,10 @@ export const Dashboard: React.FC = () => {
                 <>
                   {/* Metrics Panel */}
                   {legacyResults.results.metrics && (
-                    <MetricsCard metrics={legacyResults.results.metrics} />
+                    <EnhancedMetrics 
+                      metrics={legacyResults.results.metrics}
+                      title="Backtest Performance Metrics"
+                    />
                   )}
 
                   {/* Charts */}
@@ -570,6 +633,7 @@ export const Dashboard: React.FC = () => {
                         <EquityChart
                           data={legacyResults.results.equity_curve}
                           title="Portfolio Equity Curve"
+                          strategyType={strategyType}
                         />
                       </ErrorBoundary>
                     </>
@@ -591,6 +655,7 @@ export const Dashboard: React.FC = () => {
                   individualResults={modularResponse.individual_results || {}}
                   isLoading={modularLoading}
                   overlaySignals={generateOverlaySignals()}
+                  strategyType={strategyType}
                 />
               )}
             </div>

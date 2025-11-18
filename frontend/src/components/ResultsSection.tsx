@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, memo } from 'react';
 import { BacktestResult } from '../services/api';
-import PerformanceMetrics from './results/PerformanceMetrics';
+import EnhancedMetrics from './results/EnhancedMetrics';
 import { EquityChart } from './charts/EquityChart';
 import { PriceChart } from './charts/PriceChart';
 import { TradeLogTable } from './TradeLogTable';
@@ -11,6 +11,7 @@ interface ResultsSectionProps {
   individualResults: Record<string, BacktestResult>;
   isLoading?: boolean;
   overlaySignals?: Record<string, { buy: { x: string[], y: number[] }, sell: { x: string[], y: number[] } }>;
+  strategyType?: 'long_cash' | 'long_short';
 }
 
 export const ResultsSection: React.FC<ResultsSectionProps> = ({
@@ -18,32 +19,32 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
   individualResults,
   isLoading = false,
   overlaySignals = {},
+  strategyType = 'long_cash',
 }) => {
   const [activeTab, setActiveTab] = useState<string>('combined');
 
-  // Get all tab names: combined + individual indicators
-  const tabNames = ['combined', ...Object.keys(individualResults)];
+  // Memoize tab names to prevent recalculation
+  const tabNames = useMemo(() => ['combined', ...Object.keys(individualResults)], [individualResults]);
 
-  const getTabLabel = (tabName: string) => {
+  const getTabLabel = useMemo(() => (tabName: string) => {
     if (tabName === 'combined') return 'Combined Strategy';
     return tabName;
-  };
+  }, []);
 
-  const getActiveResult = (): BacktestResult | null => {
+  // Memoize active result to prevent unnecessary re-renders
+  const activeResult = useMemo((): BacktestResult | null => {
     if (activeTab === 'combined') {
       return combinedResult;
     }
     return individualResults[activeTab] || null;
-  };
-
-  const activeResult = getActiveResult();
+  }, [activeTab, combinedResult, individualResults]);
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-lg shadow-md p-12">
+      <div className="bg-bg-tertiary rounded-xl border border-border-default p-12">
         <div className="flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
-          <span className="text-gray-700">Loading results...</span>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mr-3"></div>
+          <span className="text-text-primary">Loading results...</span>
         </div>
       </div>
     );
@@ -51,8 +52,8 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
 
   if (!activeResult) {
     return (
-      <div className="bg-white rounded-lg shadow-md p-12">
-        <div className="text-center text-gray-500">
+      <div className="bg-bg-tertiary rounded-xl border border-border-default p-12">
+        <div className="text-center text-text-muted">
           <p>No results available</p>
         </div>
       </div>
@@ -60,20 +61,20 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
   }
 
   return (
-    <div id="results-section" className="bg-white rounded-lg shadow-md overflow-hidden">
+    <div id="results-section" className="bg-bg-tertiary rounded-xl border border-border-default overflow-hidden shadow-lg">
       {/* Tab Navigation */}
-      <div className="border-b border-gray-200 bg-gray-50">
+      <div className="border-b border-border-default bg-bg-secondary">
         <nav className="flex space-x-1 px-4 overflow-x-auto" aria-label="Tabs">
           {tabNames.map((tabName) => (
             <button
               key={tabName}
               onClick={() => setActiveTab(tabName)}
               className={`
-                px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors
+                px-4 py-3 text-sm font-medium whitespace-nowrap transition-all duration-200
                 ${
                   activeTab === tabName
-                    ? 'border-b-2 border-blue-600 text-blue-600 bg-white'
-                    : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-b-2 border-primary-500 text-primary-500 bg-bg-tertiary'
+                    : 'text-text-secondary hover:text-text-primary hover:border-b-2 hover:border-border-light'
                 }
               `}
             >
@@ -87,7 +88,7 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
       <div className="p-6 space-y-6">
         {/* Performance Metrics */}
         <ErrorBoundary>
-          <PerformanceMetrics
+          <EnhancedMetrics
             metrics={activeResult.metrics}
             title={`${getTabLabel(activeTab)} Performance Metrics`}
           />
@@ -108,6 +109,7 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
               <EquityChart
                 data={activeResult.equity_curve}
                 title={`${getTabLabel(activeTab)} Equity Curve`}
+                strategyType={strategyType}
               />
             </ErrorBoundary>
           </>
@@ -122,13 +124,13 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
 
         {/* Empty State Messages */}
         {(!activeResult.equity_curve || activeResult.equity_curve.length === 0) && (
-          <div className="bg-gray-50 rounded-lg p-6 text-center text-gray-500">
+          <div className="bg-bg-secondary rounded-lg p-6 text-center text-text-muted border border-border-default">
             <p>No equity curve data available for this strategy</p>
           </div>
         )}
 
         {(!activeResult.trade_log || activeResult.trade_log.length === 0) && (
-          <div className="bg-gray-50 rounded-lg p-6 text-center text-gray-500">
+          <div className="bg-bg-secondary rounded-lg p-6 text-center text-text-muted border border-border-default">
             <p>No trades were executed for this strategy</p>
           </div>
         )}
@@ -137,5 +139,6 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
   );
 };
 
-export default ResultsSection;
+// Memoize component to prevent unnecessary re-renders
+export default memo(ResultsSection);
 

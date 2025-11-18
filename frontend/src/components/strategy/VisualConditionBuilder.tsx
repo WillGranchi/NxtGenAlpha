@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { IndicatorConfig, IndicatorMetadata } from '../../services/api';
+import { StrategyDescription } from './StrategyDescription';
 
 interface ConditionRow {
   id: string;
@@ -150,33 +151,6 @@ export const VisualConditionBuilder: React.FC<VisualConditionBuilderProps> = ({
     return parts.join(' ');
   };
 
-  // Generate readable preview
-  const readablePreview = useMemo(() => {
-    if (conditionRows.length === 0) {
-      return 'No conditions set';
-    }
-    
-    const parts: string[] = [];
-    
-    conditionRows.forEach((row, index) => {
-      if (!row.conditionName) return;
-      
-      const description = availableConditions[row.conditionName] || row.conditionName;
-      
-      if (row.operator && index > 0) {
-        parts.push(row.operator.toLowerCase());
-      }
-      
-      parts.push(description);
-    });
-    
-    if (parts.length === 0) return 'No conditions set';
-    
-    // Capitalize first letter
-    parts[0] = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
-    
-    return parts.join(' ');
-  }, [conditionRows, availableConditions]);
 
   // Add new condition row
   const addConditionRow = () => {
@@ -234,8 +208,8 @@ export const VisualConditionBuilder: React.FC<VisualConditionBuilderProps> = ({
   // If no indicators selected, show message
   if (selectedIndicators.length === 0) {
     return (
-      <div className={`bg-gray-50 border border-gray-200 rounded-lg p-4 ${className}`}>
-        <p className="text-sm text-gray-500 text-center">
+      <div className={`bg-bg-secondary border border-border-default rounded-lg p-4 ${className}`}>
+        <p className="text-sm text-text-secondary text-center">
           Add indicators to build conditions
         </p>
       </div>
@@ -243,20 +217,21 @@ export const VisualConditionBuilder: React.FC<VisualConditionBuilderProps> = ({
   }
 
   return (
-    <div className={`bg-white border border-gray-300 rounded-lg p-4 ${className}`}>
-      {/* Preview Section */}
-      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-        <div className="text-xs font-medium text-blue-900 mb-1">Preview:</div>
-        <div className="text-sm text-blue-800 font-medium">{readablePreview}</div>
-        <div className="text-xs text-blue-600 font-mono mt-1 break-all">
-          {generateExpressionFromRows(conditionRows) || '(empty)'}
-        </div>
+    <div className={`card p-4 ${className}`}>
+      {/* Natural Language Description */}
+      <div className="mb-4">
+        <StrategyDescription
+          expression={generateExpressionFromRows(conditionRows)}
+          selectedIndicators={selectedIndicators}
+          availableIndicators={availableIndicators}
+          availableConditions={availableConditions}
+        />
       </div>
 
       {/* Condition Rows */}
       <div className="space-y-3">
         {conditionRows.length === 0 ? (
-          <div className="text-center py-4 text-gray-500 text-sm">
+          <div className="text-center py-4 text-text-secondary text-sm">
             No conditions added. Click "Add Condition" to start building your logic.
           </div>
         ) : (
@@ -274,19 +249,19 @@ export const VisualConditionBuilder: React.FC<VisualConditionBuilderProps> = ({
                       onClick={() => updateOperator(row.id, 'AND')}
                       className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
                         row.operator === 'AND'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          ? 'bg-primary-500 text-white'
+                          : 'bg-bg-elevated text-text-secondary hover:bg-bg-tertiary'
                       }`}
                     >
                       AND
                     </button>
-                    <span className="text-xs text-gray-400 my-1">or</span>
+                    <span className="text-xs text-text-muted my-1">or</span>
                     <button
                       onClick={() => updateOperator(row.id, 'OR')}
                       className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
                         row.operator === 'OR'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          ? 'bg-primary-500 text-white'
+                          : 'bg-bg-elevated text-text-secondary hover:bg-bg-tertiary'
                       }`}
                     >
                       OR
@@ -295,7 +270,7 @@ export const VisualConditionBuilder: React.FC<VisualConditionBuilderProps> = ({
                 )}
 
                 {/* Condition Row */}
-                <div className="flex-1 flex items-start gap-2 p-3 border border-gray-300 rounded-lg bg-gray-50">
+                <div className="flex-1 flex items-start gap-2 p-3 border border-border-default rounded-lg bg-bg-secondary">
                   {/* Indicator Dropdown */}
                   <select
                     value={row.indicatorId}
@@ -303,7 +278,7 @@ export const VisualConditionBuilder: React.FC<VisualConditionBuilderProps> = ({
                       indicatorId: e.target.value,
                       conditionName: '' // Clear condition when indicator changes
                     })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="flex-1 input text-sm"
                   >
                     <option value="">Select Indicator</option>
                     {selectedIndicators.map(ind => {
@@ -321,7 +296,7 @@ export const VisualConditionBuilder: React.FC<VisualConditionBuilderProps> = ({
                     value={row.conditionName}
                     onChange={(e) => updateConditionRow(row.id, { conditionName: e.target.value })}
                     disabled={!row.indicatorId || Object.keys(indicatorConditions).length === 0}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-400"
+                    className="flex-1 input text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <option value="">Select Condition</option>
                     {Object.entries(indicatorConditions).map(([name, description]) => (
@@ -334,7 +309,7 @@ export const VisualConditionBuilder: React.FC<VisualConditionBuilderProps> = ({
                   {/* Remove Button */}
                   <button
                     onClick={() => removeConditionRow(row.id)}
-                    className="px-3 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
+                    className="px-3 py-2 text-danger-500 hover:text-danger-400 hover:bg-danger-500/10 rounded-md transition-colors"
                     title="Remove condition"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -351,13 +326,13 @@ export const VisualConditionBuilder: React.FC<VisualConditionBuilderProps> = ({
       {/* Add Condition Button */}
       <button
         onClick={addConditionRow}
-        className="mt-4 w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+        className="mt-4 w-full btn-primary text-sm"
       >
         + Add Condition
       </button>
 
       {/* Helper Text */}
-      <p className="mt-3 text-xs text-gray-500">
+      <p className="mt-3 text-xs text-text-muted">
         Select an indicator and condition for each row. Use AND/OR buttons to combine multiple conditions.
       </p>
     </div>

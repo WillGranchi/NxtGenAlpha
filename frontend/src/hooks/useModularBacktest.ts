@@ -62,11 +62,26 @@ export const useModularBacktest = (): UseModularBacktestReturn => {
         }
       }, 100);
       
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-      console.error('Modular backtest failed:', errorMessage);
+    } catch (err: any) {
+      // Extract error message from API response if available
+      let errorMessage = 'Unknown error occurred';
+      
+      if (err?.response?.data?.detail) {
+        // FastAPI error response
+        errorMessage = err.response.data.detail;
+      } else if (err?.response?.data?.message) {
+        // Generic API error
+        errorMessage = err.response.data.message;
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      }
+      
+      console.error('Modular backtest failed:', errorMessage, err);
       setError(errorMessage);
       setResponse(null);
+      throw new Error(errorMessage); // Re-throw so Dashboard can show toast
     } finally {
       setIsLoading(false);
     }

@@ -4,8 +4,7 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { AuthProvider } from './contexts/AuthContext';
-import IndexPage from './pages/index';
+import { App } from './App';
 import './index.css';
 
 // Create root and render app
@@ -15,8 +14,6 @@ const root = ReactDOM.createRoot(
 
 root.render(
   <React.StrictMode>
-    <AuthProvider>
-      <IndexPage />
-    </AuthProvider>
+    <App />
   </React.StrictMode>
 );

@@ -445,6 +445,30 @@ export class TradingAPI {
   // Auth Methods
 
   /**
+   * Sign up a new user with email and password.
+   */
+  static async signup(email: string, password: string, name?: string): Promise<{ message: string; user: User; token: string }> {
+    const response = await api.post('/api/auth/signup', { email, password, name });
+    // Store token in localStorage as fallback
+    if (response.data.token) {
+      localStorage.setItem('auth_token', response.data.token);
+    }
+    return response.data;
+  }
+
+  /**
+   * Login user with email and password.
+   */
+  static async login(email: string, password: string): Promise<{ message: string; user: User; token: string }> {
+    const response = await api.post('/api/auth/login', { email, password });
+    // Store token in localStorage as fallback
+    if (response.data.token) {
+      localStorage.setItem('auth_token', response.data.token);
+    }
+    return response.data;
+  }
+
+  /**
    * Get current user information.
    */
   static async getCurrentUser(): Promise<AuthResponse> {

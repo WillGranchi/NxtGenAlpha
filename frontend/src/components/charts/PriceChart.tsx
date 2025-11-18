@@ -2,7 +2,7 @@
  * Price chart component with trading signals and indicators.
  */
 
-import React from 'react';
+import React, { useMemo, memo } from 'react';
 import Plot from 'react-plotly.js';
 import { EquityDataPoint } from '../../services/api';
 
@@ -21,45 +21,39 @@ export const PriceChart: React.FC<PriceChartProps> = ({
   overlaySignals = {},
   showOverlayLegend = true,
 }) => {
-  if (!data || data.length === 0) {
-    return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex items-center justify-center h-64 text-gray-500">
-          No data available for price chart
-        </div>
-      </div>
-    );
-  }
+  // Memoize data processing
+  const chartData = useMemo(() => {
+    if (!data || data.length === 0) return null;
 
-  // Prepare data for plotting
-  const dates = data.map(d => d.Date);
-  const prices = data.map(d => d.Price);
-  
-  // Find buy and sell signals
-  const buySignals: { x: string[], y: number[] } = { x: [], y: [] };
-  const sellSignals: { x: string[], y: number[] } = { x: [], y: [] };
-  
-  for (let i = 1; i < data.length; i++) {
-    const prevPosition = data[i - 1].Position;
-    const currentPosition = data[i].Position;
+    // Prepare data for plotting
+    const dates = data.map(d => d.Date);
+    const prices = data.map(d => d.Price);
     
-    if (prevPosition === 0 && currentPosition === 1) {
-      // Buy signal
-      buySignals.x.push(dates[i]);
-      buySignals.y.push(prices[i]);
-    } else if (prevPosition === 1 && currentPosition === 0) {
-      // Sell signal
-      sellSignals.x.push(dates[i]);
-      sellSignals.y.push(prices[i]);
+    // Find buy and sell signals
+    const buySignals: { x: string[], y: number[] } = { x: [], y: [] };
+    const sellSignals: { x: string[], y: number[] } = { x: [], y: [] };
+    
+    for (let i = 1; i < data.length; i++) {
+      const prevPosition = data[i - 1].Position;
+      const currentPosition = data[i].Position;
+      
+      if (prevPosition === 0 && currentPosition === 1) {
+        // Buy signal
+        buySignals.x.push(dates[i]);
+        buySignals.y.push(prices[i]);
+      } else if (prevPosition === 1 && currentPosition === 0) {
+        // Sell signal
+        sellSignals.x.push(dates[i]);
+        sellSignals.y.push(prices[i]);
+      }
     }
-  }
 
-  // Generate colors for overlay signals
-  const overlayColors = [
-    '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
-  ];
+    // Generate colors for overlay signals
+    const overlayColors = [
+      '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
+    ];
 
-  const plotData = [
+    const plotData = [
     {
       x: dates,
       y: prices,
@@ -130,9 +124,25 @@ export const PriceChart: React.FC<PriceChartProps> = ({
         },
       });
     }
-  });
+    });
 
-  const layout = {
+    return { dates, prices, buySignals, sellSignals, plotData };
+  }, [data, overlaySignals]);
+
+  if (!chartData) {
+    return (
+      <div className="bg-bg-tertiary rounded-lg border border-border-default p-6">
+        <div className="flex items-center justify-center h-64 text-text-muted">
+          No data available for price chart
+        </div>
+      </div>
+    );
+  }
+
+  const { plotData } = chartData;
+
+  // Memoize layout
+  const layout = useMemo(() => ({
     title: {
       text: title,
       font: { size: 16 },
@@ -158,17 +168,18 @@ export const PriceChart: React.FC<PriceChartProps> = ({
       r: 20,
     },
     height,
-  };
+  }), [title, height]);
 
-  const config = {
+  // Memoize config
+  const config = useMemo(() => ({
     displayModeBar: true,
     displaylogo: false,
     modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'] as any,
     responsive: true,
-  };
+  }), []);
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div className="bg-bg-tertiary rounded-lg border border-border-default p-6">
       <Plot
         data={plotData}
         layout={layout}
@@ -178,3 +189,6 @@ export const PriceChart: React.FC<PriceChartProps> = ({
     </div>
   );
 };
+
+// Memoize component to prevent unnecessary re-renders
+export default memo(PriceChart);

@@ -13,7 +13,9 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: () => void;
+  login: () => void; // Google OAuth login
+  loginWithEmail: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
   updateTheme: (theme: 'light' | 'dark') => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -119,6 +121,66 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const loginWithEmail = async (email: string, password: string) => {
+    try {
+      setIsLoading(true);
+      const response = await TradingAPI.login(email, password);
+      if (response.user) {
+        // Set user immediately from response
+        setUser(response.user);
+        // Verify authentication by loading user (but don't clear if it fails)
+        try {
+          const verifyResponse = await TradingAPI.getCurrentUser();
+          if (verifyResponse.authenticated && verifyResponse.user) {
+            setUser(verifyResponse.user);
+          }
+          // If verification fails but we have user from login, keep it
+        } catch (verifyError) {
+          console.warn('User verification failed, but keeping user from login response');
+        }
+      } else {
+        // If no user in response, try to load it
+        await loadUser();
+      }
+    } catch (error: any) {
+      console.error('Login failed:', error);
+      setUser(null);
+      throw error; // Re-throw to let the component handle it
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const signup = async (email: string, password: string, name?: string) => {
+    try {
+      setIsLoading(true);
+      const response = await TradingAPI.signup(email, password, name);
+      if (response.user) {
+        // Set user immediately from response
+        setUser(response.user);
+        // Verify authentication by loading user (but don't clear if it fails)
+        try {
+          const verifyResponse = await TradingAPI.getCurrentUser();
+          if (verifyResponse.authenticated && verifyResponse.user) {
+            setUser(verifyResponse.user);
+          }
+          // If verification fails but we have user from signup, keep it
+        } catch (verifyError) {
+          console.warn('User verification failed, but keeping user from signup response');
+        }
+      } else {
+        // If no user in response, try to load it
+        await loadUser();
+      }
+    } catch (error: any) {
+      console.error('Signup failed:', error);
+      setUser(null);
+      throw error; // Re-throw to let the component handle it
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = async () => {
     try {
       await TradingAPI.logout();
@@ -159,6 +221,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isLoading,
     isAuthenticated: !!user,
     login,
+    loginWithEmail,
+    signup,
     logout,
     updateTheme,
     refreshUser,

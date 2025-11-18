@@ -14,6 +14,11 @@ from authlib.integrations.httpx_client import AsyncOAuth2Client
 
 from backend.core.database import get_db
 from backend.api.models.db_models import User
+from passlib.context import CryptContext
+import bcrypt
+
+# Password hashing context
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # JWT Configuration
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-me-in-production")
@@ -59,6 +64,10 @@ def create_access_token(data: Dict, expires_delta: Optional[timedelta] = None) -
         Encoded JWT token string
     """
     to_encode = data.copy()
+    # JWT 'sub' claim must be a string (per JWT spec)
+    if "sub" in to_encode and not isinstance(to_encode["sub"], str):
+        to_encode["sub"] = str(to_encode["sub"])
+    
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
@@ -120,10 +129,15 @@ def get_current_user_optional(
     
     try:
         payload = verify_token(jwt_token)
-        user_id: int = payload.get("sub")
-        if user_id is None:
+        user_id_str = payload.get("sub")
+        if user_id_str is None:
             return None
-    except HTTPException:
+        # Convert string back to int (JWT 'sub' must be string per spec)
+        user_id: int = int(user_id_str)
+    except (HTTPException, ValueError, TypeError):
+        return None
+    except Exception:
+        # Catch any other token verification errors
         return None
     
     user = db.query(User).filter(User.id == user_id).first()
@@ -224,4 +238,59 @@ async def exchange_google_code_for_token(code: str) -> Dict:
         redirect_uri=GOOGLE_REDIRECT_URI,
     )
     return token
+
+
+def hash_password(password: str) -> str:
+    """
+    Hash a password using bcrypt.
+    
+    Args:
+        password: Plain text password (will be truncated to 72 bytes if longer)
+        
+    Returns:
+        Hashed password string
+    """
+    # Ensure password is a string
+    password_str = str(password).strip()
+    
+    # Convert to bytes for bcrypt
+    password_bytes = password_str.encode('utf-8')
+    
+    # Bcrypt has a strict 72-byte limit - truncate if necessary
+    if len(password_bytes) > 72:
+        password_bytes = password_bytes[:72]
+    
+    # Hash using bcrypt directly (more reliable than passlib for edge cases)
+    salt = bcrypt.gensalt(rounds=12)
+    hashed = bcrypt.hashpw(password_bytes, salt)
+    
+    # Return as string (passlib format)
+    return hashed.decode('utf-8')
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """
+    Verify a password against its hash.
+    
+    Args:
+        plain_password: Plain text password
+        hashed_password: Hashed password from database
+        
+    Returns:
+        True if password matches, False otherwise
+    """
+    # Convert to bytes
+    plain_bytes = str(plain_password).strip().encode('utf-8')
+    hashed_bytes = hashed_password.encode('utf-8')
+    
+    # Truncate plain password to 72 bytes if necessary
+    if len(plain_bytes) > 72:
+        plain_bytes = plain_bytes[:72]
+    
+    # Verify using bcrypt directly
+    try:
+        return bcrypt.checkpw(plain_bytes, hashed_bytes)
+    except Exception:
+        # Fallback to passlib if bcrypt fails
+        return pwd_context.verify(plain_password, hashed_password)
 

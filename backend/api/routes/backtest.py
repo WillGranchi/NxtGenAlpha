@@ -133,14 +133,29 @@ async def run_backtest(request: BacktestRequest) -> BacktestResponse:
                 detail=f"Invalid strategy parameters: {str(e)}"
             )
         
-        # Generate signals
-        logger.info("Generating trading signals...")
-        df_with_signals = strategy.generate_signals(df)
-        
-        # Run backtest
-        logger.info("Running backtest simulation...")
-        engine = BacktestEngine(initial_capital=request.initial_capital)
-        results = engine.run_backtest(df_with_signals, strategy_name=request.strategy)
+        # Generate signals and run backtest
+        logger.info("Generating trading signals and running backtest...")
+        try:
+            df_with_signals = strategy.generate_signals(df)
+            
+            # Run backtest
+            logger.info("Running backtest simulation...")
+            engine = BacktestEngine(initial_capital=request.initial_capital)
+            results = engine.run_backtest(df_with_signals, strategy_name=request.strategy)
+        except HTTPException:
+            # Pass through explicitly raised HTTP errors
+            raise
+        except (TypeError, ValueError) as e:
+            # Parameter-related issues (e.g. wrong types) should return 400
+            logger.error(f"Invalid strategy parameters during backtest: {e}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid strategy parameters: {str(e)}"
+            )
+        except Exception as e:
+            # Any other unexpected error will be handled by the outer exception block
+            logger.error(f"Unexpected error during backtest execution: {e}")
+            raise
         
         # Organize metrics into a single dictionary
         metrics = {

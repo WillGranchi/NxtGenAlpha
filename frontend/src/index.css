@@ -7,27 +7,91 @@
   html {
     font-family: 'Inter', system-ui, sans-serif;
   }
+  
+  body {
+    @apply bg-bg-primary text-text-primary;
+    min-height: 100vh;
+  }
+  
+  * {
+    @apply border-border-default;
+  }
 }
 
 @layer components {
+  /* Buttons */
   .btn-primary {
-    @apply bg-primary-600 text-white py-2 px-4 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-gradient-to-r from-primary-500 to-indigo-500 text-white py-2.5 px-6 rounded-lg 
+           font-medium transition-all duration-300 
+           hover:from-primary-600 hover:to-indigo-600 
+           hover:shadow-lg hover:shadow-primary-500/50
+           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-bg-primary
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none
+           active:scale-95;
   }
   
   .btn-secondary {
-    @apply bg-gray-200 text-gray-900 py-2 px-4 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-bg-tertiary text-text-primary py-2.5 px-6 rounded-lg border border-border-default
+           font-medium transition-all duration-300 
+           hover:bg-bg-elevated hover:border-primary-500/50
+           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-bg-primary
+           disabled:opacity-50 disabled:cursor-not-allowed
+           active:scale-95;
   }
   
+  .btn-ghost {
+    @apply text-text-secondary py-2 px-4 rounded-lg 
+           font-medium transition-all duration-300 
+           hover:bg-bg-tertiary hover:text-text-primary
+           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-bg-primary
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  /* Cards */
   .card {
-    @apply bg-white rounded-lg shadow-md p-6;
+    @apply bg-bg-tertiary rounded-xl border border-border-default p-6 
+           shadow-lg shadow-black/20
+           transition-all duration-300
+           hover:border-primary-500/30 hover:shadow-xl hover:shadow-primary-500/10;
   }
   
+  .card-glass {
+    @apply bg-bg-tertiary/50 backdrop-blur-md rounded-xl border border-border-light/50 p-6
+           shadow-lg shadow-black/20;
+  }
+  
+  /* Inputs */
   .input {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500;
+    @apply w-full px-4 py-2.5 bg-bg-secondary border border-border-default rounded-lg
+           text-text-primary placeholder:text-text-muted
+           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500
+           transition-all duration-300
+           disabled:opacity-50 disabled:cursor-not-allowed;
   }
   
+  .input-error {
+    @apply border-danger-500 focus:ring-danger-500;
+  }
+  
+  /* Metric Cards */
   .metric-card {
-    @apply bg-gray-50 rounded-lg p-4;
+    @apply bg-bg-tertiary rounded-lg p-4 border border-border-default
+           transition-all duration-300 hover:border-primary-500/30;
+  }
+  
+  /* Gradient Text */
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary-400 via-purple-500 to-indigo-500 
+           bg-clip-text text-transparent;
+  }
+  
+  /* Glow Effect */
+  .glow-primary {
+    @apply shadow-lg shadow-primary-500/50;
+  }
+  
+  .glow-purple {
+    @apply shadow-lg shadow-purple-500/50;
   }
 }
 
@@ -42,21 +106,23 @@
   @apply animate-spin rounded-full border-b-2 border-primary-600;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar - Dark theme */
 ::-webkit-scrollbar {
   width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-gray-100;
+  @apply bg-bg-secondary;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 rounded;
+  @apply bg-border-default rounded-full;
+  transition: background 0.2s;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-400;
+  @apply bg-primary-500/50;
 }
 
 /* Fade-in animation */

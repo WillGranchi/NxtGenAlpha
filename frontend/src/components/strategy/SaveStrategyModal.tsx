@@ -55,24 +55,24 @@ const SaveStrategyModal: React.FC<SaveStrategyModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={handleClose}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={handleClose}>
       <div
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md mx-4"
+        className="card shadow-xl p-6 w-full max-w-md mx-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Save Strategy</h2>
+        <h2 className="text-2xl font-bold mb-4 text-text-primary">Save Strategy</h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="strategy-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Strategy Name <span className="text-red-500">*</span>
+            <label htmlFor="strategy-name" className="block text-sm font-medium text-text-primary mb-1">
+              Strategy Name <span className="text-danger-500">*</span>
             </label>
             <input
               id="strategy-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="input"
               placeholder="e.g., My RSI Strategy"
               disabled={isSaving}
               required
@@ -81,14 +81,14 @@ const SaveStrategyModal: React.FC<SaveStrategyModalProps> = ({
           </div>
 
           <div>
-            <label htmlFor="strategy-description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label htmlFor="strategy-description" className="block text-sm font-medium text-text-primary mb-1">
               Description (Optional)
             </label>
             <textarea
               id="strategy-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="input resize-none"
               placeholder="Add a description for this strategy..."
               rows={3}
               disabled={isSaving}
@@ -97,8 +97,8 @@ const SaveStrategyModal: React.FC<SaveStrategyModalProps> = ({
           </div>
 
           {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
-              <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+            <div className="bg-danger-500/10 border border-danger-500/30 rounded-lg p-3">
+              <p className="text-sm text-danger-400">{error}</p>
             </div>
           )}
 
@@ -107,14 +107,14 @@ const SaveStrategyModal: React.FC<SaveStrategyModalProps> = ({
               type="button"
               onClick={handleClose}
               disabled={isSaving}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+              className="btn-secondary disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSaving || !name.trim()}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? (
                 <span className="flex items-center">

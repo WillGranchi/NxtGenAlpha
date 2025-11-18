@@ -55,9 +55,9 @@ const StrategySelector: React.FC<StrategySelectorProps> = ({
 
   if (isLoading && strategies.length === 0) {
     return (
-      <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-        <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
-          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600 dark:border-gray-400"></div>
+      <div className="p-4 border border-border-default rounded-lg">
+        <div className="flex items-center space-x-2 text-text-secondary">
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-500"></div>
           <span>Loading strategies...</span>
         </div>
       </div>
@@ -66,8 +66,8 @@ const StrategySelector: React.FC<StrategySelectorProps> = ({
 
   if (strategies.length === 0) {
     return (
-      <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800/50">
-        <p className="text-sm text-gray-600 dark:text-gray-400">
+      <div className="p-4 border border-border-default rounded-lg bg-bg-secondary">
+        <p className="text-sm text-text-secondary">
           No saved strategies yet. Create and save a strategy to see it here.
         </p>
       </div>
@@ -76,7 +76,7 @@ const StrategySelector: React.FC<StrategySelectorProps> = ({
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+      <label className="block text-sm font-medium text-text-primary mb-2">
         Load Saved Strategy
       </label>
       <select
@@ -89,7 +89,7 @@ const StrategySelector: React.FC<StrategySelectorProps> = ({
             setSelectedId(null);
           }
         }}
-        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        className="input"
         disabled={isLoading}
       >
         <option value="">Select a strategy...</option>
@@ -101,12 +101,12 @@ const StrategySelector: React.FC<StrategySelectorProps> = ({
         ))}
       </select>
       {error && (
-        <div className="text-sm text-red-600 dark:text-red-400 mt-1">{error}</div>
+        <div className="text-sm text-danger-400 mt-1">{error}</div>
       )}
       {selectedId && (
         <button
           onClick={() => setSelectedId(null)}
-          className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+          className="text-sm text-primary-400 hover:text-primary-300 hover:underline"
         >
           Clear selection
         </button>

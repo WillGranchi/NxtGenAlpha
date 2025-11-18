@@ -18,8 +18,9 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
     name = Column(String(255), nullable=True)
+    password_hash = Column(String(255), nullable=True)  # For email/password auth
     google_id = Column(String(255), unique=True, index=True, nullable=True)
-    theme = Column(String(20), default="light", nullable=False)  # 'light' or 'dark'
+    theme = Column(String(20), default="dark", nullable=False)  # 'light' or 'dark'
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     

@@ -106,8 +106,8 @@ export const ExpressionTemplates: React.FC<ExpressionTemplatesProps> = ({
 
   if (selectedIndicators.length === 0) {
     return (
-      <div className={`bg-blue-50 border border-blue-200 rounded-lg p-4 ${className}`}>
-        <p className="text-sm text-blue-800">
+      <div className={`bg-primary-500/10 border border-primary-500/30 rounded-lg p-4 ${className}`}>
+        <p className="text-sm text-primary-400">
           Add indicators to see expression templates
         </p>
       </div>
@@ -115,10 +115,10 @@ export const ExpressionTemplates: React.FC<ExpressionTemplatesProps> = ({
   }
 
   return (
-    <div className={`bg-white border border-gray-200 rounded-lg p-4 ${className}`}>
+    <div className={`card p-4 ${className}`}>
       <div className="mb-4">
-        <h4 className="text-sm font-semibold text-gray-900 mb-2">Expression Templates</h4>
-        <p className="text-xs text-gray-600 mb-3">
+        <h4 className="text-sm font-semibold text-text-primary mb-2">Expression Templates</h4>
+        <p className="text-xs text-text-secondary mb-3">
           Click a template to insert it into your expression builder
         </p>
 
@@ -130,8 +130,8 @@ export const ExpressionTemplates: React.FC<ExpressionTemplatesProps> = ({
               onClick={() => setSelectedCategory(category)}
               className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
                 selectedCategory === category
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-primary-500 text-white'
+                  : 'bg-bg-elevated text-text-secondary hover:bg-bg-tertiary'
               }`}
             >
               {category}
@@ -143,7 +143,7 @@ export const ExpressionTemplates: React.FC<ExpressionTemplatesProps> = ({
       {/* Templates List */}
       <div className="space-y-2 max-h-64 overflow-y-auto">
         {filteredTemplates.length === 0 ? (
-          <p className="text-sm text-gray-500 text-center py-4">
+          <p className="text-sm text-text-muted text-center py-4">
             No templates available for selected indicators
           </p>
         ) : (
@@ -151,26 +151,26 @@ export const ExpressionTemplates: React.FC<ExpressionTemplatesProps> = ({
             <button
               key={index}
               onClick={() => onSelectTemplate(template.expression)}
-              className="w-full text-left p-3 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors group"
+              className="w-full text-left p-3 border border-border-default rounded-lg hover:border-primary-500/50 hover:bg-primary-500/10 transition-colors group"
             >
               <div className="flex items-start justify-between mb-1">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-sm text-gray-900 group-hover:text-blue-900">
+                    <span className="font-medium text-sm text-text-primary group-hover:text-primary-400">
                       {template.name}
                     </span>
-                    <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
+                    <span className="text-xs px-2 py-0.5 bg-bg-elevated text-text-secondary rounded">
                       {template.category}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-600 mb-2">{template.description}</p>
+                  <p className="text-xs text-text-secondary mb-2">{template.description}</p>
                 </div>
               </div>
-              <code className="block text-xs text-blue-600 font-mono bg-blue-50 px-2 py-1 rounded border border-blue-200 group-hover:bg-blue-100">
+              <code className="block text-xs text-primary-400 font-code bg-bg-secondary px-2 py-1 rounded border border-primary-500/30 group-hover:bg-primary-500/10">
                 {template.expression}
               </code>
               {template.example && (
-                <p className="text-xs text-gray-500 mt-1 italic">{template.example}</p>
+                <p className="text-xs text-text-muted mt-1 italic">{template.example}</p>
               )}
             </button>
           ))

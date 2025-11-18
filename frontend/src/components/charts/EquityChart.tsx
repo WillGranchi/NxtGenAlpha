@@ -2,7 +2,7 @@
  * Equity curve chart component showing portfolio performance.
  */
 
-import React from 'react';
+import React, { useMemo, memo } from 'react';
 import Plot from 'react-plotly.js';
 import { EquityDataPoint } from '../../services/api';
 
@@ -12,6 +12,7 @@ interface EquityChartProps {
   height?: number;
   individualEquityData?: Record<string, EquityDataPoint[]>;
   showIndividualLegend?: boolean;
+  strategyType?: 'long_cash' | 'long_short';
 }
 
 export const EquityChart: React.FC<EquityChartProps> = ({
@@ -20,41 +21,53 @@ export const EquityChart: React.FC<EquityChartProps> = ({
   height = 500,
   individualEquityData = {},
   showIndividualLegend = true,
+  strategyType = 'long_cash',
 }) => {
-  if (!data || data.length === 0) {
+  // Memoize data processing to prevent recalculation on every render
+  const chartData = useMemo(() => {
+    if (!data || data.length === 0) return null;
+
+    // Prepare data for plotting
+    const dates = data.map(d => d.Date);
+    const portfolioValues = data.map(d => d.Portfolio_Value);
+    const prices = data.map(d => d.Price);
+    const positions = data.map(d => d.Position);
+    
+    // Calculate buy and hold performance
+    const initialPrice = prices[0];
+    const initialValue = portfolioValues[0];
+    const buyAndHoldValues = prices.map(price => (price / initialPrice) * initialValue);
+    
+    // Create position-based colors for the strategy line
+    const strategyColors = positions.map(position => {
+      if (position === 1) return '#2ca02c'; // Green for long
+      if (position === -1) return '#d62728'; // Red for short
+      return '#ff7f0e'; // Orange for cash
+    });
+
+    return { dates, portfolioValues, prices, positions, buyAndHoldValues, strategyColors, initialValue };
+  }, [data]);
+
+  if (!chartData) {
     return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex items-center justify-center h-64 text-gray-500">
+      <div className="bg-bg-tertiary rounded-lg border border-border-default p-6">
+        <div className="flex items-center justify-center h-64 text-text-muted">
           No data available for equity chart
         </div>
       </div>
     );
   }
 
-  // Prepare data for plotting
-  const dates = data.map(d => d.Date);
-  const portfolioValues = data.map(d => d.Portfolio_Value);
-  const prices = data.map(d => d.Price);
-  const positions = data.map(d => d.Position);
-  
-  // Calculate buy and hold performance
-  const initialPrice = prices[0];
-  const initialValue = portfolioValues[0];
-  const buyAndHoldValues = prices.map(price => (price / initialPrice) * initialValue);
-  
-  // Create position-based colors for the strategy line
-  const strategyColors = positions.map(position => {
-    if (position === 1) return '#2ca02c'; // Green for long
-    if (position === -1) return '#d62728'; // Red for short
-    return '#ff7f0e'; // Orange for cash
-  });
+  const { dates, portfolioValues, prices, positions, buyAndHoldValues, strategyColors } = chartData;
 
-  // Generate colors for individual equity curves
-  const individualColors = [
-    '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
-  ];
+  // Memoize plot data to prevent recalculation
+  const plotData = useMemo(() => {
+    // Generate colors for individual equity curves
+    const individualColors = [
+      '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
+    ];
 
-  const plotData = [
+    const data = [
     {
       x: dates,
       y: portfolioValues,
@@ -109,35 +122,39 @@ export const EquityChart: React.FC<EquityChartProps> = ({
       }),
       showlegend: false,
     },
-  ];
+    ];
 
-  // Add individual equity curves
-  Object.entries(individualEquityData).forEach(([indicatorId, equityData], index) => {
-    if (equityData && equityData.length > 0) {
-      const individualDates = equityData.map(d => d.Date);
-      const individualValues = equityData.map(d => d.Portfolio_Value);
-      const color = individualColors[index % individualColors.length];
-      
-      plotData.push({
-        x: individualDates,
-        y: individualValues,
-        type: 'scatter' as const,
-        mode: 'lines' as const,
-        name: `${indicatorId} Strategy`,
-        line: {
-          color: color,
-          width: 2,
-          dash: 'dash' as const,
-        },
-        hovertemplate: `<b>${indicatorId} Strategy</b><br>` +
-          'Date: %{x}<br>' +
-          'Value: $%{y:,.0f}<br>' +
-          '<extra></extra>',
-      });
-    }
-  });
+    // Add individual equity curves
+    Object.entries(individualEquityData).forEach(([indicatorId, equityData], index) => {
+      if (equityData && equityData.length > 0) {
+        const individualDates = equityData.map(d => d.Date);
+        const individualValues = equityData.map(d => d.Portfolio_Value);
+        const color = individualColors[index % individualColors.length];
+        
+        data.push({
+          x: individualDates,
+          y: individualValues,
+          type: 'scatter' as const,
+          mode: 'lines' as const,
+          name: `${indicatorId} Strategy`,
+          line: {
+            color: color,
+            width: 2,
+            dash: 'dash' as const,
+          },
+          hovertemplate: `<b>${indicatorId} Strategy</b><br>` +
+            'Date: %{x}<br>' +
+            'Value: $%{y:,.0f}<br>' +
+            '<extra></extra>',
+        });
+      }
+    });
 
-  const layout = {
+    return data;
+  }, [dates, portfolioValues, positions, strategyColors, buyAndHoldValues, individualEquityData]);
+
+  // Memoize layout to prevent recalculation
+  const layout = useMemo(() => ({
     title: {
       text: title,
       font: { size: 16 },
@@ -149,6 +166,8 @@ export const EquityChart: React.FC<EquityChartProps> = ({
     yaxis: {
       title: 'Portfolio Value ($)',
       tickformat: '$,.0f',
+      // Allow negative values for long_short mode
+      ...(strategyType === 'long_short' ? {} : { rangemode: 'tozero' }),
     },
     hovermode: 'x unified' as const,
     showlegend: true,
@@ -169,7 +188,9 @@ export const EquityChart: React.FC<EquityChartProps> = ({
         y: 0.98,
         xref: 'paper' as const,
         yref: 'paper' as const,
-        text: '🟢 Long | 🟠 Cash | 🔴 Short',
+        text: strategyType === 'long_short' 
+          ? '🟢 Long | 🟠 Cash | 🔴 Short'
+          : '🟢 Long | 🟠 Cash',
         showarrow: false,
         font: { size: 12 },
         bgcolor: 'rgba(255,255,255,0.8)',
@@ -177,17 +198,18 @@ export const EquityChart: React.FC<EquityChartProps> = ({
         borderwidth: 1,
       },
     ],
-  };
+  }), [title, height, strategyType]);
 
-  const config = {
+  // Memoize config
+  const config = useMemo(() => ({
     displayModeBar: true,
     displaylogo: false,
     modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'] as any,
     responsive: true,
-  };
+  }), []);
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div className="bg-bg-tertiary rounded-lg border border-border-default p-6">
       <Plot
         data={plotData}
         layout={layout}
@@ -197,3 +219,6 @@ export const EquityChart: React.FC<EquityChartProps> = ({
     </div>
   );
 };
+
+// Memoize component to prevent unnecessary re-renders
+export default memo(EquityChart);

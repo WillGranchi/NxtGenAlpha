@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from typing import Optional
+from pydantic import BaseModel, EmailStr
 
 from backend.core.database import get_db
 import os
@@ -17,6 +18,8 @@ from backend.core.auth import (
     exchange_google_code_for_token,
     get_google_user_info,
     validate_oauth_config,
+    hash_password,
+    verify_password,
 )
 from backend.api.models.db_models import User
 from backend.utils.helpers import get_logger
@@ -27,6 +30,208 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 # Store OAuth state temporarily (in production, use Redis or similar)
 oauth_states = {}
+
+
+# Pydantic models for request/response
+class SignupRequest(BaseModel):
+    email: EmailStr
+    password: str
+    name: Optional[str] = None
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+@router.post("/signup")
+async def signup(
+    request: SignupRequest,
+    response: Response,
+    db: Session = Depends(get_db)
+):
+    """
+    Register a new user with email and password.
+    """
+    try:
+        # Validate password length (bcrypt limit is 72 bytes)
+        if len(request.password.encode('utf-8')) > 72:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password is too long. Maximum length is 72 bytes."
+            )
+        
+        # Validate password minimum length
+        if len(request.password) < 8:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password must be at least 8 characters long"
+            )
+        
+        # Check if user already exists
+        existing_user = db.query(User).filter(User.email == request.email).first()
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
+        
+        # Hash password (ensure it's a string, not bytes)
+        password_str = str(request.password).strip()
+        
+        # Debug: Log password length (but not the password itself)
+        password_bytes_len = len(password_str.encode('utf-8'))
+        logger.info(f"Signup attempt for {request.email}, password length: {len(password_str)} chars, {password_bytes_len} bytes")
+        
+        if password_bytes_len > 72:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Password is too long. Maximum length is 72 bytes, got {password_bytes_len} bytes."
+            )
+        
+        password_hash = hash_password(password_str)
+        
+        # Create new user
+        user = User(
+            email=request.email,
+            name=request.name or request.email.split("@")[0],
+            password_hash=password_hash,
+            theme="dark"
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        
+        # Create JWT token
+        token = create_access_token(data={"sub": user.id})
+        
+        # Get frontend URL from environment
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        
+        # Get cookie security settings
+        environment = os.getenv("ENVIRONMENT", "development")
+        cookie_secure = os.getenv("COOKIE_SECURE", "false").lower() == "true"
+        cookie_samesite = os.getenv("COOKIE_SAMESITE", "lax")
+        
+        if environment == "production":
+            cookie_secure = True
+            cookie_samesite = "lax"
+        
+        # Set HTTP-only cookie with token
+        response.set_cookie(
+            key="token",
+            value=token,
+            httponly=True,
+            secure=cookie_secure,
+            samesite=cookie_samesite,
+            max_age=7 * 24 * 60 * 60,  # 7 days
+            path="/",
+        )
+        
+        return {
+            "message": "User created successfully",
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "name": user.name,
+            },
+            "token": token
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Signup error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create user: {str(e)}"
+        )
+
+
+@router.post("/login")
+async def login(
+    request: LoginRequest,
+    response: Response,
+    db: Session = Depends(get_db)
+):
+    """
+    Login user with email and password.
+    """
+    try:
+        # Find user by email
+        user = db.query(User).filter(User.email == request.email).first()
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password"
+            )
+        
+        # Check if user has password (not just Google OAuth)
+        if not user.password_hash:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Account was created with Google. Please use Google login."
+            )
+        
+        # Verify password (ensure it's a string)
+        password_str = str(request.password)
+        if len(password_str.encode('utf-8')) > 72:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password is too long. Maximum length is 72 bytes."
+            )
+        
+        if not verify_password(password_str, user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password"
+            )
+        
+        # Create JWT token
+        token = create_access_token(data={"sub": user.id})
+        
+        # Get frontend URL from environment
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        
+        # Get cookie security settings
+        environment = os.getenv("ENVIRONMENT", "development")
+        cookie_secure = os.getenv("COOKIE_SECURE", "false").lower() == "true"
+        cookie_samesite = os.getenv("COOKIE_SAMESITE", "lax")
+        
+        if environment == "production":
+            cookie_secure = True
+            cookie_samesite = "lax"
+        
+        # Set HTTP-only cookie with token
+        response.set_cookie(
+            key="token",
+            value=token,
+            httponly=True,
+            secure=cookie_secure,
+            samesite=cookie_samesite,
+            max_age=7 * 24 * 60 * 60,  # 7 days
+            path="/",
+        )
+        
+        return {
+            "message": "Login successful",
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "name": user.name,
+            },
+            "token": token
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Login error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Login failed: {str(e)}"
+        )
 
 
 @router.get("/google/login")
