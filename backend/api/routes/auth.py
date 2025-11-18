@@ -2,8 +2,8 @@
 Authentication routes for Google OAuth and user management.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
+from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from typing import Optional
 from pydantic import BaseModel, EmailStr
