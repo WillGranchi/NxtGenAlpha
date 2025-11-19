@@ -71,7 +71,11 @@ DATABASE_URL=<auto-populated>
 
 # JWT Configuration
 JWT_SECRET_KEY=<generate-a-random-secret-key-here>
+# Generate one using: openssl rand -hex 32
+# Or use: python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+# Example: JWT_SECRET_KEY=a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6
 JWT_ALGORITHM=HS256
+# HS256 is the standard algorithm - keep this as-is
 
 # Frontend URL (update after frontend is deployed)
 FRONTEND_URL=https://your-frontend-url.up.railway.app
@@ -109,11 +113,17 @@ openssl rand -hex 32
    - `Application startup complete`
    - `Database initialized successfully`
 
-### 3.6: Get Backend URL
+### 3.6: Enable Public Networking & Get Backend URL
 
 1. **Backend** → **Settings** → **Networking**
-2. Copy the **Railway-generated URL** (e.g., `https://backend-production-xxxx.up.railway.app`)
-3. **Save this URL** - you'll need it for frontend configuration
+2. Look for **"Public Networking"** section
+3. If you see **"Generate Domain"** or **"Enable Public Networking"** button:
+   - Click it to generate a public domain
+   - Railway will create a public URL like `https://backend-production-xxxx.up.railway.app`
+4. Copy the **Railway-generated public URL**
+5. **Save this URL** - you'll need it for frontend configuration
+
+**Note:** If you only see "Private Networking", you need to enable public networking for the backend to be accessible from the frontend. Look for a toggle or button to enable it.
 
 ---
 
@@ -145,7 +155,7 @@ openssl rand -hex 32
 In **Frontend** → **Variables** tab, add these:
 
 ```
-# Backend API URL (use the backend URL from Step 3.6)
+# Backend API URL (use the backend PUBLIC URL from Step 3.6)
 VITE_API_URL=https://your-backend-url.up.railway.app
 
 # Backend URL for nginx proxy (same as above)
@@ -153,9 +163,10 @@ BACKEND_URL=https://your-backend-url.up.railway.app
 ```
 
 **IMPORTANT:** 
-- Replace `your-backend-url.up.railway.app` with the actual backend URL from Step 3.6
+- Replace `your-backend-url.up.railway.app` with the actual **PUBLIC** backend URL from Step 3.6
 - **No trailing slashes** in URLs
 - Must be **HTTPS** (not HTTP)
+- If backend only shows "Private Networking", you MUST enable public networking first (see Step 3.6)
 
 ### 4.4: Wait for Frontend Deployment
 
