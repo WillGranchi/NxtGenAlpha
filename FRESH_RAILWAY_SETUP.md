@@ -119,11 +119,20 @@ openssl rand -hex 32
 2. Look for **"Public Networking"** section
 3. If you see **"Generate Domain"** or **"Enable Public Networking"** button:
    - Click it to generate a public domain
+   - If Railway asks for a **"Target Port"** or **"Port"**:
+     - **Use: `8080`** (or whatever port Railway suggests)
+     - Railway automatically sets the `PORT` environment variable
+     - Your app listens on whatever port Railway assigns (via `$PORT` env var)
+     - The port you enter here is just for Railway's routing configuration
    - Railway will create a public URL like `https://backend-production-xxxx.up.railway.app`
 4. Copy the **Railway-generated public URL**
 5. **Save this URL** - you'll need it for frontend configuration
 
-**Note:** If you only see "Private Networking", you need to enable public networking for the backend to be accessible from the frontend. Look for a toggle or button to enable it.
+**Note:** 
+- If Railway requires a port, use `8080` (Railway's common default)
+- Your Dockerfile already handles the PORT environment variable correctly
+- Railway will automatically route traffic to your app on the correct port
+- If you only see "Private Networking", you need to enable public networking for the backend to be accessible from the frontend
 
 ---
 
