@@ -111,8 +111,16 @@ def save_data_to_csv(df: pd.DataFrame, file_path: Optional[str] = None) -> str:
         os.makedirs(data_dir, exist_ok=True)
         file_path = os.path.join(data_dir, 'Bitcoin Historical Data4.csv')
     
+    # Create a copy to avoid modifying the original
+    df_save = df.copy()
+    
     # Reset index to save Date as column
-    df_save = df.reset_index()
+    df_save = df_save.reset_index()
+    
+    # Rename Close to Price to match expected CSV format (will be renamed back by _clean_data)
+    if 'Close' in df_save.columns and 'Price' not in df_save.columns:
+        df_save.rename(columns={'Close': 'Price'}, inplace=True)
+    
     df_save.to_csv(file_path, index=False)
     
     logger = logging.getLogger(__name__)
@@ -230,12 +238,17 @@ def _clean_data(df: pd.DataFrame) -> pd.DataFrame:
     df_clean.set_index('Date', inplace=True)
     
     # Clean numeric columns by removing commas and converting to float
-    numeric_columns = ['Price', 'Open', 'High', 'Low']
+    # Handle both Price and Close columns (will normalize to Close later)
+    numeric_columns = ['Price', 'Close', 'Open', 'High', 'Low']
     
     for col in numeric_columns:
         if col in df_clean.columns:
             # Remove commas and convert to float
-            df_clean[col] = df_clean[col].astype(str).str.replace(',', '').astype(float)
+            # If already numeric, just ensure it's float
+            if df_clean[col].dtype != 'float64' and df_clean[col].dtype != 'int64':
+                df_clean[col] = df_clean[col].astype(str).str.replace(',', '').astype(float)
+            else:
+                df_clean[col] = df_clean[col].astype(float)
     
     # Clean volume column (remove 'K' and 'M' suffixes and convert to float)
     if 'Vol.' in df_clean.columns:
@@ -264,16 +277,22 @@ def _clean_data(df: pd.DataFrame) -> pd.DataFrame:
     # Remove any rows with NaN values
     df_clean.dropna(inplace=True)
     
-    # Ensure we have the required columns
-    required_columns = ['Open', 'High', 'Low', 'Price']
+    # Handle Price/Close column - accept either format
+    if 'Close' in df_clean.columns and 'Price' not in df_clean.columns:
+        # Already has Close, that's fine
+        pass
+    elif 'Price' in df_clean.columns:
+        # Rename Price to Close for consistency
+        df_clean.rename(columns={'Price': 'Close'}, inplace=True)
+    else:
+        raise ValueError("Missing required column: 'Price' or 'Close'")
+    
+    # Ensure we have the required columns (after Price->Close rename)
+    required_columns = ['Open', 'High', 'Low', 'Close']
     missing_columns = [col for col in required_columns if col not in df_clean.columns]
     
     if missing_columns:
         raise ValueError(f"Missing required columns: {missing_columns}")
-    
-    # Rename Price to Close for consistency
-    if 'Price' in df_clean.columns:
-        df_clean.rename(columns={'Price': 'Close'}, inplace=True)
     
     logger = logging.getLogger(__name__)
     logger.info(f"Data cleaned successfully. Shape: {df_clean.shape}")
