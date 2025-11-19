@@ -154,7 +154,9 @@ class BacktestEngine:
             if target_position == 0:  # Long → Cash
                 # Sell shares and convert to cash
                 shares_to_sell = self.shares  # Save before clearing
-                self.capital = current_portfolio_value
+                sell_value = shares_to_sell * price
+                # Capital after selling (minus fees)
+                self.capital = sell_value - (sell_value * self.fee)
                 self.shares = 0
                 self.position = 0
                 
@@ -163,17 +165,17 @@ class BacktestEngine:
                     'Type': 'SELL',
                     'Price': price,
                     'Quantity': shares_to_sell,
-                    'Value': current_portfolio_value,
-                    'Commission': current_portfolio_value * self.fee,
+                    'Value': sell_value,
+                    'Commission': sell_value * self.fee,
                     'Capital_After': self.capital,
                     'Position_After': self.position
                 })
             elif target_position == -1:  # Long → Short
                 # First sell long position, then enter short
                 shares_to_sell = self.shares  # Save before changing
-                sell_proceeds = current_portfolio_value  # From selling long
-                # After selling, capital equals portfolio value
-                intermediate_capital = sell_proceeds
+                sell_value = shares_to_sell * price
+                # After selling, capital equals sell proceeds minus fees
+                intermediate_capital = sell_value - (sell_value * self.fee)
                 
                 # Now enter short position with all available capital
                 short_shares = intermediate_capital / price  # Amount to short
@@ -188,8 +190,8 @@ class BacktestEngine:
                     'Type': 'SELL',
                     'Price': price,
                     'Quantity': shares_to_sell,
-                    'Value': sell_proceeds,
-                    'Commission': sell_proceeds * self.fee,
+                    'Value': sell_value,
+                    'Commission': sell_value * self.fee,
                     'Capital_After': intermediate_capital,
                     'Position_After': 0  # Intermediate state
                 })
@@ -211,7 +213,8 @@ class BacktestEngine:
                 shares_to_cover = abs(self.shares)  # Save before clearing
                 cover_cost = shares_to_cover * price
                 # After covering, capital is reduced by the cost (plus fees)
-                self.capital = current_portfolio_value - cover_cost - (cover_cost * self.fee)
+                # Use capital directly, not portfolio_value (which already accounts for short liability)
+                self.capital = self.capital - cover_cost - (cover_cost * self.fee)
                 self.shares = 0
                 self.position = 0
                 
@@ -228,12 +231,19 @@ class BacktestEngine:
             elif target_position == 1:  # Short → Long
                 # Cover short, then enter long
                 shares_to_cover = abs(self.shares)  # Save before changing
-                short_value = shares_to_cover * price
-                # After covering, remaining capital goes to long
-                remaining_capital = current_portfolio_value - (short_value * (1 + self.fee))
-                long_shares = remaining_capital / price if remaining_capital > 0 else 0
-                self.shares = long_shares
-                self.capital = 0
+                cover_cost = shares_to_cover * price
+                # Cover the short position first (use capital directly)
+                remaining_capital = self.capital - cover_cost - (cover_cost * self.fee)
+                # Then use remaining capital to buy long position
+                if remaining_capital > 0:
+                    long_shares = remaining_capital / (price * (1 + self.fee))
+                    long_cost = long_shares * price
+                    self.shares = long_shares
+                    self.capital = remaining_capital - long_cost - (long_cost * self.fee)
+                else:
+                    long_shares = 0
+                    self.shares = 0
+                    self.capital = remaining_capital
                 self.position = 1
                 
                 # Record two trades: cover short, then buy
@@ -242,19 +252,20 @@ class BacktestEngine:
                     'Type': 'COVER_SHORT',
                     'Price': price,
                     'Quantity': shares_to_cover,
-                    'Value': short_value,
-                    'Commission': short_value * self.fee,
+                    'Value': cover_cost,
+                    'Commission': cover_cost * self.fee,
                     'Capital_After': remaining_capital,
                     'Position_After': 0  # Intermediate state
                 })
                 if long_shares > 0:
+                    long_cost = long_shares * price
                     self.trades.append({
                         'Date': date,
                         'Type': 'BUY',
                         'Price': price,
                         'Quantity': long_shares,
-                        'Value': remaining_capital,
-                        'Commission': remaining_capital * self.fee,
+                        'Value': long_cost,
+                        'Commission': long_cost * self.fee,
                         'Capital_After': self.capital,
                         'Position_After': self.position
                     })
