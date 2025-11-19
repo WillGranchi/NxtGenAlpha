@@ -32,7 +32,8 @@ RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
 FROM nginx:alpine
 
 # Install gettext for envsubst (to substitute environment variables in nginx.conf)
-RUN apk add --no-cache gettext
+# Install curl for health checks
+RUN apk add --no-cache gettext curl
 
 # Copy built files from build stage
 COPY --from=build /app/dist /usr/share/nginx/html
@@ -42,11 +43,16 @@ COPY --from=build /app/nginx.conf /etc/nginx/nginx.conf.template
 
 # Create startup script to substitute PORT and BACKEND_URL environment variables
 # Strip trailing slash from BACKEND_URL to avoid double slashes in proxy_pass
+# Add error handling and logging
 RUN echo '#!/bin/sh' > /docker-entrypoint.sh && \
+    echo 'set -e' >> /docker-entrypoint.sh && \
     echo 'export PORT=${PORT:-80}' >> /docker-entrypoint.sh && \
     echo 'BACKEND_URL_RAW=${BACKEND_URL:-http://localhost:8000}' >> /docker-entrypoint.sh && \
     echo 'export BACKEND_URL=$(echo "$BACKEND_URL_RAW" | sed "s|/*$||")' >> /docker-entrypoint.sh && \
-    echo 'envsubst '"'"'$PORT $BACKEND_URL'"'"' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf' && \
+    echo 'echo "Starting nginx with PORT=$PORT and BACKEND_URL=$BACKEND_URL"' >> /docker-entrypoint.sh && \
+    echo 'envsubst '"'"'$PORT $BACKEND_URL'"'"' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf || (echo "Failed to substitute environment variables" && exit 1)' >> /docker-entrypoint.sh && \
+    echo 'nginx -t || (echo "Nginx configuration test failed" && cat /etc/nginx/nginx.conf && exit 1)' >> /docker-entrypoint.sh && \
+    echo 'echo "Nginx configuration is valid, starting nginx..."' >> /docker-entrypoint.sh && \
     echo 'exec nginx -g "daemon off;"' >> /docker-entrypoint.sh && \
     chmod +x /docker-entrypoint.sh
 
