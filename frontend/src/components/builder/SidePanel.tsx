@@ -187,7 +187,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        <div className="flex-1 overflow-y-auto p-4 space-y-6 min-h-0">
           {activeTab === 'indicator' && (
             <>
           {/* Description */}
@@ -335,10 +335,10 @@ export const SidePanel: React.FC<SidePanelProps> = ({
 
               {/* Backtest Results */}
               {combinedResult && (
-                <div className="mt-6 space-y-4 border-t border-border-default pt-4">
-                  <h4 className="text-sm font-semibold text-text-primary">Backtest Results</h4>
+                <div className="mt-6 space-y-6 border-t border-border-default pt-6">
+                  <h4 className="text-base font-semibold text-text-primary mb-4">Backtest Results</h4>
                   
-                  {/* Metrics - Compact View */}
+                  {/* Metrics - Compact View with Better Spacing */}
                   {combinedResult.metrics && (
                     <EnhancedMetrics
                       metrics={combinedResult.metrics}
@@ -346,28 +346,28 @@ export const SidePanel: React.FC<SidePanelProps> = ({
                     />
                   )}
 
-                  {/* Mini Equity Chart */}
+                  {/* Mini Equity Chart - Larger */}
                   {combinedResult.equity_curve && combinedResult.equity_curve.length > 0 && (
-                    <div className="mt-4">
-                      <div className="text-xs font-medium text-text-secondary mb-2">Equity Curve</div>
-                      <div className="bg-bg-tertiary rounded-lg p-2" style={{ height: '200px' }}>
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium text-text-primary">Equity Curve</div>
+                      <div className="bg-bg-tertiary rounded-lg p-3" style={{ height: '280px' }}>
                         <EquityChart
                           data={combinedResult.equity_curve}
-                          height={180}
+                          height={260}
                           strategyType={strategyType}
                         />
                       </div>
                     </div>
                   )}
 
-                  {/* Mini Price Chart with Strategy */}
+                  {/* Mini Price Chart with Strategy - Larger */}
                   {combinedResult.equity_curve && combinedResult.equity_curve.length > 0 && (
-                    <div className="mt-4">
-                      <div className="text-xs font-medium text-text-secondary mb-2">Price & Strategy</div>
-                      <div className="bg-bg-tertiary rounded-lg p-2" style={{ height: '200px' }}>
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium text-text-primary">Price & Strategy</div>
+                      <div className="bg-bg-tertiary rounded-lg p-3" style={{ height: '280px' }}>
                         <PriceChart
                           data={combinedResult.equity_curve}
-                          height={180}
+                          height={260}
                         />
                       </div>
                     </div>
@@ -375,8 +375,8 @@ export const SidePanel: React.FC<SidePanelProps> = ({
 
                   {/* Individual Indicator Result (if available) */}
                   {indicatorResult && indicatorConfig && (
-                    <div className="mt-4 pt-4 border-t border-border-default">
-                      <div className="text-xs font-medium text-text-secondary mb-2">
+                    <div className="mt-6 pt-6 border-t border-border-default space-y-4">
+                      <div className="text-sm font-medium text-text-primary mb-3">
                         {indicatorMetadata?.name || indicatorConfig.id} Performance
                       </div>
                       {indicatorResult.metrics && (
@@ -387,12 +387,15 @@ export const SidePanel: React.FC<SidePanelProps> = ({
                         />
                       )}
                       {indicatorResult.equity_curve && indicatorResult.equity_curve.length > 0 && (
-                        <div className="bg-bg-tertiary rounded-lg p-2" style={{ height: '150px' }}>
-                          <EquityChart
-                            data={indicatorResult.equity_curve}
-                            height={130}
-                            strategyType={strategyType}
-                          />
+                        <div className="space-y-2 mt-4">
+                          <div className="text-sm font-medium text-text-primary">Equity Curve</div>
+                          <div className="bg-bg-tertiary rounded-lg p-3" style={{ height: '240px' }}>
+                            <EquityChart
+                              data={indicatorResult.equity_curve}
+                              height={220}
+                              strategyType={strategyType}
+                            />
+                          </div>
                         </div>
                       )}
                     </div>

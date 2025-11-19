@@ -260,26 +260,26 @@ export const EnhancedMetrics: React.FC<EnhancedMetricsProps> = ({
   }
 
   return (
-    <div className={`bg-bg-tertiary rounded-xl border border-border-default p-6 ${className}`}>
-      <h3 className="text-lg font-semibold text-text-primary mb-6">{title}</h3>
+    <div className={`bg-bg-tertiary rounded-xl border border-border-default ${compact ? 'p-4' : 'p-6'} ${className}`}>
+      {title && <h3 className={`${compact ? 'text-base mb-4' : 'text-lg mb-6'} font-semibold text-text-primary`}>{title}</h3>}
       
       {compact ? (
-        // Compact grid view
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+        // Compact grid view - optimized for side panel (2 columns)
+        <div className="grid grid-cols-2 gap-3">
           {displayMetrics.map((metric) => (
             <div
               key={metric.key}
-              className="bg-bg-secondary rounded-lg p-4 border border-border-default hover:border-primary-500/50 transition-all duration-200"
+              className="bg-bg-secondary rounded-lg p-3 border border-border-default hover:border-primary-500/50 transition-all duration-200"
             >
               <div className="flex items-center justify-between mb-2">
                 <div className={`${getColorClass(metric)}`}>
                   {metric.icon}
                 </div>
               </div>
-              <div className={`text-2xl font-bold ${getColorClass(metric)} mb-1`}>
+              <div className={`text-xl font-bold ${getColorClass(metric)} mb-1`}>
                 {formatValue(metric.value, metric.format)}
               </div>
-              <div className="text-xs text-text-secondary font-medium">
+              <div className="text-xs text-text-secondary font-medium leading-tight">
                 {metric.label}
               </div>
             </div>
