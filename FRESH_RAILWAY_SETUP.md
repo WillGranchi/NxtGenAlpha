@@ -278,9 +278,6 @@ CORS_ORIGINS=https://your-frontend-url.up.railway.app
    - Try creating an account
    - Check browser console for API errors
    - Verify `VITE_API_URL` is set correctly in Frontend → Variables
-
-2. Test signup/login:
-   - Try creating an account
    - Should work without CORS errors
 
 ---
