@@ -24,16 +24,44 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({ from, to, type, 
 
   return (
     <g>
+      {/* Connection dots at endpoints */}
+      {!isPreview && (
+        <>
+          <circle
+            cx={from.x}
+            cy={from.y}
+            r="4"
+            fill={color}
+            stroke="#0A0A0A"
+            strokeWidth="1"
+            className="pointer-events-none"
+            style={{ filter: 'drop-shadow(0 0 2px rgba(59, 130, 246, 0.5))' }}
+          />
+          <circle
+            cx={to.x}
+            cy={to.y}
+            r="4"
+            fill={color}
+            stroke="#0A0A0A"
+            strokeWidth="1"
+            className="pointer-events-none"
+            style={{ filter: 'drop-shadow(0 0 2px rgba(59, 130, 246, 0.5))' }}
+          />
+        </>
+      )}
       <path
         d={path}
         stroke={color}
-        strokeWidth={isPreview ? "2" : "2"}
+        strokeWidth={isPreview ? "2" : "2.5"}
         strokeDasharray={isPreview ? "5,5" : "none"}
         fill="none"
         markerEnd={isPreview ? undefined : "url(#arrowhead)"}
         className={onClick ? "cursor-pointer pointer-events-auto" : ""}
         onClick={onClick}
-        style={{ opacity: isPreview ? 0.6 : 1 }}
+        style={{ 
+          opacity: isPreview ? 0.6 : 1,
+          filter: isPreview ? 'none' : 'drop-shadow(0 0 3px rgba(59, 130, 246, 0.3))'
+        }}
         pointerEvents={onClick ? "auto" : "none"}
       />
       {/* Arrow marker definition */}
@@ -61,6 +89,10 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({ from, to, type, 
         fontWeight="bold"
         textAnchor="middle"
         className="pointer-events-none"
+        style={{ 
+          textShadow: '0 0 3px rgba(0, 0, 0, 0.8)',
+          filter: 'drop-shadow(0 0 2px rgba(59, 130, 246, 0.5))'
+        }}
       >
         {type}
       </text>

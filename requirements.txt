@@ -40,6 +40,10 @@ python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
 authlib>=1.2.0
 
+# Data fetching and scheduling
+requests>=2.31.0
+apscheduler>=3.10.0
+
 # Optional: For enhanced data sources
 # yfinance>=0.2.0
 # ccxt>=4.0.0

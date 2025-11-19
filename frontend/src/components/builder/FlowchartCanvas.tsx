@@ -40,6 +40,8 @@ interface FlowchartCanvasProps {
   connectingFrom?: { nodeId: string; point: 'output' } | null;
   mousePosition?: { x: number; y: number } | null;
   onDropPosition?: (x: number, y: number) => { adjustedX: number; adjustedY: number };
+  zoom?: number;
+  onZoomChange?: (zoom: number) => void;
 }
 
 // Canvas drop zone component
@@ -78,8 +80,12 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
   connectingFrom,
   mousePosition,
   onDropPosition,
+  zoom: externalZoom,
+  onZoomChange,
 }) => {
-  const [zoom, setZoom] = useState(1);
+  const [internalZoom, setInternalZoom] = useState(1);
+  const zoom = externalZoom !== undefined ? externalZoom : internalZoom;
+  const setZoom = onZoomChange || setInternalZoom;
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -122,13 +128,15 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
   }, []);
 
 
-  // Handle node dragging
-  const handleNodeDrag = useCallback((nodeId: string, deltaX: number, deltaY: number) => {
-    const node = nodes.find(n => n.id === nodeId);
-    if (node) {
-      onNodeMove(nodeId, node.x + deltaX / zoom, node.y + deltaY / zoom);
-    }
-  }, [nodes, onNodeMove, zoom]);
+  // Calculate connection counts for each node
+  const connectionCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    connections.forEach(conn => {
+      counts[conn.from] = (counts[conn.from] || 0) + 1;
+      counts[conn.to] = (counts[conn.to] || 0) + 1;
+    });
+    return counts;
+  }, [connections]);
 
   return (
     <div className="relative w-full h-full bg-bg-secondary border border-border-default rounded-lg overflow-hidden">
@@ -203,10 +211,14 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
           {/* Nodes Container */}
           <div
             data-nodes-container
+            data-zoom={zoom}
+            data-pan-x={pan.x}
+            data-pan-y={pan.y}
             className="absolute inset-0"
             style={{
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
               transformOrigin: '0 0',
+              willChange: 'transform',
             }}
           >
               {/* Connection Lines */}
@@ -248,6 +260,7 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
 
                 const isConnectingTo = connectingFrom ? connectingFrom.nodeId !== node.id : false;
                 const isConnectingFromNode = connectingFrom?.nodeId === node.id;
+                const connectionCount = connectionCounts[node.id] || 0;
 
                 return (
                   <IndicatorNode
@@ -257,11 +270,11 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
                     isSelected={selectedNodeId === node.id}
                     onSelect={() => onNodeSelect(node.id)}
                     onRemove={() => onNodeRemove(node.id)}
-                    onDrag={(deltaX, deltaY) => handleNodeDrag(node.id, deltaX, deltaY)}
                     onConnectionPointClick={onConnectionPointClick}
                     isConnecting={!!connectingFrom}
                     isConnectingTo={isConnectingTo}
                     isConnectingFrom={isConnectingFromNode}
+                    connectionCount={connectionCount}
                   />
                 );
               })}

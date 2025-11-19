@@ -2,15 +2,173 @@
 Data loader module for Bitcoin trading strategy backtesting.
 
 This module handles loading and preprocessing of historical Bitcoin price data
-from CSV files, ensuring proper datetime indexing and data cleaning.
+from CSV files and fetching live data from CoinGecko API, ensuring proper 
+datetime indexing and data cleaning.
 """
 
 import pandas as pd
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Tuple
 from functools import lru_cache
 import logging
+import requests
+import os
+import json
+from pathlib import Path
+
+
+# Global variable to track last update time
+_last_update_time: Optional[datetime] = None
+
+def fetch_btc_data_from_coingecko(days: int = 365) -> pd.DataFrame:
+    """
+    Fetch Bitcoin historical data from CoinGecko API.
+    
+    Args:
+        days (int): Number of days of historical data to fetch (max 365)
+        
+    Returns:
+        pd.DataFrame: DataFrame with OHLC data
+        
+    Raises:
+        Exception: If API request fails
+    """
+    logger = logging.getLogger(__name__)
+    try:
+        url = f"https://api.coingecko.com/api/v3/coins/bitcoin/market_chart"
+        params = {
+            'vs_currency': 'usd',
+            'days': min(days, 365),  # CoinGecko free tier limit
+            'interval': 'daily'
+        }
+        
+        logger.info(f"Fetching Bitcoin data from CoinGecko ({days} days)...")
+        response = requests.get(url, params=params, timeout=30)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        # Extract prices (OHLC data)
+        prices = data.get('prices', [])
+        if not prices:
+            raise ValueError("No price data returned from CoinGecko")
+        
+        # Convert to DataFrame
+        df = pd.DataFrame(prices, columns=['timestamp', 'price'])
+        df['Date'] = pd.to_datetime(df['timestamp'], unit='ms')
+        df.set_index('Date', inplace=True)
+        
+        # CoinGecko only provides close prices in market_chart endpoint
+        # For OHLC, we'd need a different endpoint or use close as all values
+        # For now, use close price for all OHLC columns
+        df['Open'] = df['price']
+        df['High'] = df['price']
+        df['Low'] = df['price']
+        df['Close'] = df['price']
+        
+        # Try to get market cap data for volume estimation
+        market_caps = data.get('market_caps', [])
+        if market_caps:
+            df_mc = pd.DataFrame(market_caps, columns=['timestamp', 'market_cap'])
+            df_mc['Date'] = pd.to_datetime(df_mc['timestamp'], unit='ms')
+            df_mc.set_index('Date', inplace=True)
+            # Estimate volume as a percentage of market cap (rough approximation)
+            df['Volume'] = df_mc['market_cap'] * 0.01  # 1% of market cap as volume estimate
+        else:
+            df['Volume'] = 0
+        
+        df.drop(['timestamp', 'price'], axis=1, inplace=True)
+        df.sort_index(inplace=True)
+        
+        logger.info(f"Successfully fetched {len(df)} days of data from CoinGecko")
+        logger.info(f"Date range: {df.index.min()} to {df.index.max()}")
+        
+        return df
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error fetching data from CoinGecko: {e}")
+        raise Exception(f"Failed to fetch data from CoinGecko: {str(e)}")
+    except Exception as e:
+        logger.error(f"Unexpected error fetching data: {e}")
+        raise
+
+
+def save_data_to_csv(df: pd.DataFrame, file_path: Optional[str] = None) -> str:
+    """
+    Save DataFrame to CSV file.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to save
+        file_path (str, optional): Path to save file. Defaults to data directory.
+        
+    Returns:
+        str: Path to saved file
+    """
+    if file_path is None:
+        import os
+        data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
+        os.makedirs(data_dir, exist_ok=True)
+        file_path = os.path.join(data_dir, 'Bitcoin Historical Data4.csv')
+    
+    # Reset index to save Date as column
+    df_save = df.reset_index()
+    df_save.to_csv(file_path, index=False)
+    
+    logger = logging.getLogger(__name__)
+    logger.info(f"Data saved to {file_path}")
+    
+    return file_path
+
+
+def update_btc_data(force: bool = False) -> pd.DataFrame:
+    """
+    Update Bitcoin data from CoinGecko API and save to CSV.
+    Checks if data is fresh (updated within last 24 hours) before fetching.
+    
+    Args:
+        force (bool): Force update even if data is fresh
+        
+    Returns:
+        pd.DataFrame: Updated DataFrame
+    """
+    global _last_update_time
+    
+    logger = logging.getLogger(__name__)
+    
+    # Check if we need to update (once per day)
+    if not force and _last_update_time:
+        time_since_update = datetime.now() - _last_update_time
+        if time_since_update < timedelta(hours=23):  # Update if older than 23 hours
+            logger.info("Data is fresh, skipping update")
+            return load_btc_data()
+    
+    try:
+        # Fetch fresh data
+        df = fetch_btc_data_from_coingecko(days=365)
+        
+        # Save to CSV
+        save_data_to_csv(df)
+        
+        # Update cache
+        load_btc_data.cache_clear()
+        _last_update_time = datetime.now()
+        
+        logger.info("Bitcoin data updated successfully")
+        return df
+        
+    except Exception as e:
+        logger.error(f"Error updating data: {e}")
+        # Fall back to existing CSV if available
+        try:
+            return load_btc_data()
+        except:
+            raise Exception(f"Failed to update data and no local data available: {str(e)}")
+
+
+def get_last_update_time() -> Optional[datetime]:
+    """Get the last time data was updated."""
+    return _last_update_time
 
 
 @lru_cache(maxsize=1)

@@ -3,7 +3,8 @@
  */
 
 import React, { useState, useCallback, useMemo, memo } from 'react';
-import { DndContext, DragEndEvent, DragStartEvent, useSensor, useSensors, PointerSensor, MouseSensor } from '@dnd-kit/core';
+import { DndContext, DragEndEvent, DragStartEvent, DragOverEvent, useSensor, useSensors, PointerSensor, MouseSensor, TouchSensor, useDndMonitor } from '@dnd-kit/core';
+import { restrictToParentElement } from '@dnd-kit/modifiers';
 import { FlowchartCanvas, type FlowchartNode, type FlowchartConnection } from './FlowchartCanvas';
 import { IndicatorLibrary } from './IndicatorLibrary';
 import { SidePanel } from './SidePanel';
@@ -228,30 +229,64 @@ export const StrategyBuilder: React.FC<StrategyBuilderProps> = ({
     return availableIndicators?.[selectedNode.indicatorId] || null;
   }, [selectedNode, availableIndicators]);
 
-  // DnD sensors
+  // DnD sensors - improved responsiveness
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 3, // Reduced from 8px for better responsiveness
       },
     }),
     useSensor(MouseSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 3,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 5,
       },
     })
   );
 
-  // Handle drag end from library to canvas
+  // Handle drag end - both library to canvas and node repositioning
   const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over } = event;
+    const { active, over, delta } = event;
     
-    // Check if dropped on canvas
+    // Check if dragging an indicator from library to canvas
     if (over?.id === 'canvas-drop-zone' && typeof active.id === 'string' && availableIndicators?.[active.id]) {
       // Use auto-layout (position will be calculated)
       handleNodeAdd(active.id);
+      return;
     }
-  }, [availableIndicators, handleNodeAdd]);
+    
+    // Check if dragging a node on the canvas
+    const draggedNode = nodes.find(n => n.id === active.id);
+    if (draggedNode && over?.id === 'canvas-drop-zone') {
+      // Calculate new position accounting for zoom
+      // delta is in screen coordinates, need to convert to canvas coordinates
+      const canvasRef = document.querySelector('[data-nodes-container]') as HTMLElement;
+      if (canvasRef) {
+        // Get zoom from data attribute (more reliable than parsing transform)
+        const zoom = parseFloat(canvasRef.getAttribute('data-zoom') || '1');
+        
+        // Apply delta accounting for zoom
+        const newX = draggedNode.x + delta.x / zoom;
+        const newY = draggedNode.y + delta.y / zoom;
+        
+        // Bounds checking
+        const minX = 0;
+        const minY = 0;
+        const maxX = 5000; // Reasonable canvas bounds
+        const maxY = 5000;
+        
+        const boundedX = Math.max(minX, Math.min(maxX, newX));
+        const boundedY = Math.max(minY, Math.min(maxY, newY));
+        
+        handleNodeMove(active.id as string, boundedX, boundedY);
+      }
+    }
+  }, [availableIndicators, handleNodeAdd, nodes, handleNodeMove]);
 
   // Handle click to add indicator
   const handleIndicatorClick = useCallback((indicatorId: string) => {
@@ -480,7 +515,7 @@ export const StrategyBuilder: React.FC<StrategyBuilderProps> = ({
           </div>
 
           {/* Flowchart Canvas */}
-          <div className="flex-1 min-w-0">
+          <div className={`flex-1 min-w-0 transition-all duration-300 ${selectedNodeId ? '' : ''}`}>
             <FlowchartCanvas
               nodes={nodes}
               connections={connections}

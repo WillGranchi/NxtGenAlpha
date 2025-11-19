@@ -6,8 +6,9 @@ from fastapi import APIRouter, HTTPException
 from typing import Dict, Any
 import logging
 
-from backend.core.data_loader import load_btc_data, get_data_summary, validate_data
+from backend.core.data_loader import load_btc_data, get_data_summary, validate_data, update_btc_data, get_last_update_time
 from backend.api.models.backtest_models import DataInfoResponse, ErrorResponse
+from datetime import datetime
 
 router = APIRouter(prefix="/api/data", tags=["data"])
 logger = logging.getLogger(__name__)
@@ -63,6 +64,13 @@ async def get_data_info() -> DataInfoResponse:
         
         logger.info(f"Data info requested: {len(df)} records from {data_info['date_range']['start']} to {data_info['date_range']['end']}")
         
+        # Add last update time to response
+        last_update = get_last_update_time()
+        if last_update:
+            data_info['last_update'] = last_update.isoformat()
+            time_since_update = datetime.now() - last_update
+            data_info['hours_since_update'] = time_since_update.total_seconds() / 3600
+        
         return DataInfoResponse(
             success=True,
             data_info=data_info
@@ -79,6 +87,77 @@ async def get_data_info() -> DataInfoResponse:
         raise HTTPException(
             status_code=500,
             detail=f"Error loading data: {str(e)}"
+        )
+
+
+@router.post("/refresh")
+async def refresh_data(force: bool = False) -> Dict[str, Any]:
+    """
+    Manually trigger a data refresh from CoinGecko API.
+    
+    Args:
+        force (bool): Force refresh even if data is fresh
+        
+    Returns:
+        Dict: Refresh status and data info
+    """
+    try:
+        logger.info(f"Manual data refresh requested (force={force})")
+        df = update_btc_data(force=force)
+        
+        summary = get_data_summary(df)
+        last_update = get_last_update_time()
+        
+        return {
+            "success": True,
+            "message": "Data refreshed successfully",
+            "records": len(df),
+            "date_range": summary['date_range'],
+            "last_update": last_update.isoformat() if last_update else None
+        }
+    except Exception as e:
+        logger.error(f"Error refreshing data: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to refresh data: {str(e)}"
+        )
+
+
+@router.get("/status")
+async def get_data_status() -> Dict[str, Any]:
+    """
+    Get data freshness status and last update time.
+    
+    Returns:
+        Dict: Status information including last update time
+    """
+    try:
+        df = load_btc_data()
+        last_update = get_last_update_time()
+        summary = get_data_summary(df)
+        
+        # Calculate freshness
+        is_fresh = False
+        hours_since_update = None
+        if last_update:
+            time_since_update = datetime.now() - last_update
+            hours_since_update = time_since_update.total_seconds() / 3600
+            is_fresh = hours_since_update < 24
+        
+        return {
+            "success": True,
+            "last_update": last_update.isoformat() if last_update else None,
+            "is_fresh": is_fresh,
+            "hours_since_update": hours_since_update,
+            "total_records": len(df),
+            "date_range": summary['date_range'],
+            "current_price": summary['price_range']['current']
+        }
+    except Exception as e:
+        logger.error(f"Error getting data status: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get data status: {str(e)}"
         )
 
 

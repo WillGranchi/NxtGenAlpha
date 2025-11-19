@@ -117,6 +117,32 @@ export interface DataInfo {
     max: number;
     current: number;
   };
+  last_update?: string;
+  hours_since_update?: number;
+}
+
+export interface DataStatus {
+  success: boolean;
+  last_update: string | null;
+  is_fresh: boolean;
+  hours_since_update: number | null;
+  total_records: number;
+  date_range: {
+    start: string;
+    end: string;
+  };
+  current_price: number;
+}
+
+export interface DataRefreshResponse {
+  success: boolean;
+  message: string;
+  records: number;
+  date_range: {
+    start: string;
+    end: string;
+  };
+  last_update: string | null;
 }
 
 export interface DataInfoResponse {
@@ -375,6 +401,18 @@ export class TradingAPI {
    */
   static async getDataInfo(): Promise<DataInfoResponse> {
     const response: AxiosResponse<DataInfoResponse> = await api.get('/api/data/info');
+    return response.data;
+  }
+
+  static async getDataStatus(): Promise<DataStatus> {
+    const response: AxiosResponse<DataStatus> = await api.get('/api/data/status');
+    return response.data;
+  }
+
+  static async refreshData(force: boolean = false): Promise<DataRefreshResponse> {
+    const response: AxiosResponse<DataRefreshResponse> = await api.post('/api/data/refresh', null, {
+      params: { force }
+    });
     return response.data;
   }
 

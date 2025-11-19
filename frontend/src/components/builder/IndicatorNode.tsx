@@ -2,10 +2,10 @@
  * Indicator node component for flowchart canvas
  */
 
-import React, { useState, memo } from 'react';
+import React, { memo } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { X, Settings } from 'lucide-react';
+import { X } from 'lucide-react';
 import type { FlowchartNode } from './FlowchartCanvas';
 import type { IndicatorMetadata } from '../../services/api';
 
@@ -15,11 +15,11 @@ interface IndicatorNodeProps {
   isSelected: boolean;
   onSelect: () => void;
   onRemove: () => void;
-  onDrag: (deltaX: number, deltaY: number) => void;
   onConnectionPointClick?: (nodeId: string, point: 'input' | 'output', e: React.MouseEvent) => void;
   isConnecting?: boolean;
   isConnectingTo?: boolean;
   isConnectingFrom?: boolean;
+  connectionCount?: number;
 }
 
 export const IndicatorNode: React.FC<IndicatorNodeProps> = ({
@@ -28,15 +28,12 @@ export const IndicatorNode: React.FC<IndicatorNodeProps> = ({
   isSelected,
   onSelect,
   onRemove,
-  onDrag,
   onConnectionPointClick,
   isConnecting = false,
   isConnectingTo = false,
   isConnectingFrom = false,
+  connectionCount = 0,
 }) => {
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-
   const {
     attributes,
     listeners,
@@ -45,34 +42,21 @@ export const IndicatorNode: React.FC<IndicatorNodeProps> = ({
     isDragging: isDndDragging,
   } = useDraggable({
     id: node.id,
-    disabled: true, // We'll handle dragging manually
+    disabled: false, // Enable @dnd-kit dragging
   });
 
   const style = {
     left: `${node.x}px`,
     top: `${node.y}px`,
     transform: CSS.Translate.toString(transform),
+    willChange: isDndDragging ? 'transform' : 'auto',
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button === 0) {
-      setIsDragging(true);
-      setDragStart({ x: e.clientX - node.x, y: e.clientY - node.y });
+  const handleClick = (e: React.MouseEvent) => {
+    // Only select if not dragging and not clicking on buttons
+    if (!isDndDragging && !(e.target as HTMLElement).closest('button')) {
       onSelect();
     }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isDragging) {
-      const deltaX = e.clientX - dragStart.x - node.x;
-      const deltaY = e.clientY - dragStart.y - node.y;
-      onDrag(deltaX, deltaY);
-      setDragStart({ x: e.clientX - node.x, y: e.clientY - node.y });
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
   };
 
   const getCategoryColor = (category?: string) => {
@@ -91,16 +75,13 @@ export const IndicatorNode: React.FC<IndicatorNodeProps> = ({
   return (
     <div
       ref={setNodeRef}
-      className={`indicator-node absolute w-48 cursor-move select-none ${
+      className={`indicator-node absolute w-48 cursor-move select-none transition-shadow ${
         isSelected
           ? 'ring-2 ring-primary-500 ring-offset-2 ring-offset-bg-secondary'
           : ''
-      }`}
+      } ${isDndDragging ? 'opacity-90 z-50' : 'z-10'}`}
       style={style}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
+      onClick={handleClick}
       {...attributes}
       {...listeners}
     >
@@ -155,21 +136,35 @@ export const IndicatorNode: React.FC<IndicatorNodeProps> = ({
         {/* Connection Points */}
         <div
           className={`
-            absolute -right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 rounded-full border-2 border-bg-secondary cursor-pointer transition-all
-            ${isConnectingFrom ? 'bg-primary-400 scale-125 ring-2 ring-primary-500' : 'bg-primary-500 hover:bg-primary-400 hover:scale-110'}
+            absolute -right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 rounded-full border-2 border-bg-secondary cursor-pointer transition-all z-20
+            ${isConnectingFrom ? 'bg-primary-400 scale-125 ring-2 ring-primary-500 animate-pulse' : 'bg-primary-500 hover:bg-primary-400 hover:scale-110'}
+            ${connectionCount > 0 ? 'ring-2 ring-primary-400/50' : ''}
           `}
-          onClick={(e) => onConnectionPointClick?.(node.id, 'output', e)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onConnectionPointClick?.(node.id, 'output', e);
+          }}
           title="Output connection point"
         />
+        {connectionCount > 0 && (
+          <div className="absolute -right-1 top-1/2 transform -translate-y-1/2 translate-x-4 w-2 h-2 rounded-full bg-primary-400 z-20" />
+        )}
         <div
           className={`
-            absolute -left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 rounded-full border-2 border-bg-secondary cursor-pointer transition-all
-            ${isConnectingTo ? 'bg-purple-400 scale-125 ring-2 ring-purple-500' : 'bg-purple-500 hover:bg-purple-400 hover:scale-110'}
+            absolute -left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 rounded-full border-2 border-bg-secondary cursor-pointer transition-all z-20
+            ${isConnectingTo ? 'bg-purple-400 scale-125 ring-2 ring-purple-500 animate-pulse' : 'bg-purple-500 hover:bg-purple-400 hover:scale-110'}
             ${isConnecting && !isConnectingTo ? 'opacity-50' : ''}
+            ${connectionCount > 0 ? 'ring-2 ring-purple-400/50' : ''}
           `}
-          onClick={(e) => onConnectionPointClick?.(node.id, 'input', e)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onConnectionPointClick?.(node.id, 'input', e);
+          }}
           title="Input connection point"
         />
+        {connectionCount > 0 && (
+          <div className="absolute -left-1 top-1/2 transform -translate-y-1/2 -translate-x-4 w-2 h-2 rounded-full bg-purple-400 z-20" />
+        )}
       </div>
     </div>
   );

@@ -16,7 +16,6 @@ import StrategyMakeup from './strategy/StrategyMakeup';
 import { StrategyBuilder } from './builder/StrategyBuilder';
 import IndicatorTileGrid from './results/IndicatorTileGrid';
 import ResultsSection from './ResultsSection';
-import { ToastContainer } from './Toast';
 import { useToast } from '../hooks/useToast';
 import { BacktestRequest, ModularBacktestRequest, SavedStrategy } from '../services/api';
 import LoginButton from './auth/LoginButton';
@@ -37,6 +36,8 @@ export const Dashboard: React.FC = () => {
   const [overlayStates, setOverlayStates] = useState<Record<string, boolean>>({});
   const toast = useToast();
   const { isAuthenticated } = useAuth();
+  const [dataStatus, setDataStatus] = useState<{ last_update: string | null; is_fresh: boolean; hours_since_update: number | null } | null>(null);
+  const [isRefreshingData, setIsRefreshingData] = useState(false);
 
   // Legacy backtest hook
   const {
@@ -398,6 +399,50 @@ export const Dashboard: React.FC = () => {
     loadStrategies();
   }, [loadDataInfo, loadStrategies]);
 
+  // Load data status for freshness indicator
+  useEffect(() => {
+    const fetchDataStatus = async () => {
+      try {
+        const { TradingAPI } = await import('../services/api');
+        const status = await TradingAPI.getDataStatus();
+        setDataStatus({
+          last_update: status.last_update,
+          is_fresh: status.is_fresh,
+          hours_since_update: status.hours_since_update,
+        });
+      } catch (error) {
+        console.error('Failed to fetch data status:', error);
+      }
+    };
+    fetchDataStatus();
+    // Refresh status every 5 minutes
+    const interval = setInterval(fetchDataStatus, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Handle manual data refresh
+  const handleRefreshData = async () => {
+    setIsRefreshingData(true);
+    try {
+      const { TradingAPI } = await import('../services/api');
+      await TradingAPI.refreshData(true);
+      toast.success('Data refreshed successfully!');
+      // Reload data info
+      loadDataInfo();
+      // Update status
+      const status = await TradingAPI.getDataStatus();
+      setDataStatus({
+        last_update: status.last_update,
+        is_fresh: status.is_fresh,
+        hours_since_update: status.hours_since_update,
+      });
+    } catch (error: any) {
+      toast.error(error?.response?.data?.detail || 'Failed to refresh data');
+    } finally {
+      setIsRefreshingData(false);
+    }
+  };
+
   // Initialize endDate when dataInfo loads
   useEffect(() => {
     if (dataInfo?.data_info?.date_range?.end && !endDate) {
@@ -437,6 +482,35 @@ export const Dashboard: React.FC = () => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-8">
+          {/* Data Freshness Indicator */}
+          {dataStatus && (
+            <div className="bg-bg-secondary border border-border-default rounded-lg p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-full ${dataStatus.is_fresh ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                <div>
+                  <p className="text-sm font-medium text-text-primary">
+                    Data Status: {dataStatus.is_fresh ? 'Fresh' : 'Stale'}
+                  </p>
+                  {dataStatus.last_update && (
+                    <p className="text-xs text-text-muted">
+                      Last updated: {new Date(dataStatus.last_update).toLocaleString()}
+                      {dataStatus.hours_since_update !== null && (
+                        <span> ({Math.round(dataStatus.hours_since_update)}h ago)</span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={handleRefreshData}
+                disabled={isRefreshingData}
+                className="px-4 py-2 text-sm font-medium text-primary-500 hover:text-primary-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isRefreshingData ? 'Refreshing...' : 'Refresh Data'}
+              </button>
+            </div>
+          )}
+
           {/* Error Display */}
           {(legacyError || modularError || catalogError) && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">

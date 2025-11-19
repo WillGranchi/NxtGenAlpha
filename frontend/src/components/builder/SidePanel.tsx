@@ -77,15 +77,14 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   }, [combinedResult, activeTab]);
 
   if (!isOpen) {
-    return null;
+    return <div className="w-0 flex-shrink-0" />; // Take up 0 width when closed but still in layout
   }
 
   // If no indicator selected, show strategy settings
   if (!indicatorConfig || !indicatorMetadata) {
     return (
-      <div className="fixed right-0 top-0 h-full w-96 bg-bg-secondary border-l border-border-default shadow-xl z-50 transform transition-transform duration-300">
-        <div className="h-full flex flex-col">
-          <div className="p-4 border-b border-border-default flex items-center justify-between">
+      <div className="w-96 flex-shrink-0 bg-bg-secondary border-l border-border-default h-full flex flex-col overflow-hidden">
+        <div className="p-4 border-b border-border-default flex items-center justify-between">
             <h3 className="text-lg font-semibold text-text-primary">Strategy Settings</h3>
             <button
               onClick={onClose}
@@ -120,7 +119,6 @@ export const SidePanel: React.FC<SidePanelProps> = ({
               </Button>
             )}
           </div>
-        </div>
       </div>
     );
   }
@@ -135,8 +133,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   };
 
   return (
-    <div className="fixed right-0 top-0 h-full w-[448px] bg-bg-secondary border-l border-border-default shadow-xl z-50 transform transition-transform duration-300">
-      <div className="h-full flex flex-col">
+    <div className="w-96 flex-shrink-0 bg-bg-secondary border-l border-border-default h-full flex flex-col overflow-hidden">
         {/* Header */}
         <div className="p-4 border-b border-border-default flex items-center justify-between">
           <div>
@@ -448,7 +445,6 @@ export const SidePanel: React.FC<SidePanelProps> = ({
             Remove Indicator
           </Button>
         </div>
-      </div>
     </div>
   );
 };

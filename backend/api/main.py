@@ -20,6 +20,9 @@ sys.path.insert(0, str(backend_path))
 from backend.api.routes import data, strategies, backtest, auth
 from backend.utils.helpers import get_logger
 from backend.core.database import init_db
+from backend.core.data_loader import update_btc_data
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 # Configure logging
 logger = get_logger(__name__)
@@ -65,10 +68,22 @@ app.add_middleware(
     max_age=3600,  # Cache preflight requests for 1 hour
 )
 
+# Initialize scheduler for daily data updates
+scheduler = AsyncIOScheduler()
+
+async def scheduled_data_update():
+    """Scheduled task to update Bitcoin data daily."""
+    try:
+        logger.info("Running scheduled data update...")
+        update_btc_data(force=False)
+        logger.info("Scheduled data update completed successfully")
+    except Exception as e:
+        logger.error(f"Error in scheduled data update: {e}", exc_info=True)
+
 # Initialize database on startup
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database tables on application startup."""
+    """Initialize database tables and scheduler on application startup."""
     try:
         init_db()
         logger.info("Database initialized successfully")
@@ -77,6 +92,30 @@ async def startup_event():
         # Don't crash the app - database operations will fail later with proper error messages
         # This allows the app to start even if DB isn't ready yet (e.g., during Railway deployment)
         logger.warning("Application will continue without database initialization. Database operations may fail until connection is established.")
+    
+    # Start scheduler for daily data updates (runs at 2 AM UTC daily)
+    try:
+        scheduler.add_job(
+            scheduled_data_update,
+            trigger=CronTrigger(hour=2, minute=0),  # 2 AM UTC daily
+            id='daily_data_update',
+            name='Daily Bitcoin Data Update',
+            replace_existing=True
+        )
+        scheduler.start()
+        logger.info("Scheduler started for daily data updates (2 AM UTC)")
+    except Exception as e:
+        logger.error(f"Failed to start scheduler: {e}", exc_info=True)
+        logger.warning("Application will continue without scheduler. Manual data updates will still work.")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Shutdown scheduler on application shutdown."""
+    try:
+        scheduler.shutdown()
+        logger.info("Scheduler shut down successfully")
+    except Exception as e:
+        logger.error(f"Error shutting down scheduler: {e}", exc_info=True)
 
 # Include routers
 app.include_router(data.router)
