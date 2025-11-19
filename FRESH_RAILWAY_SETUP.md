@@ -165,17 +165,25 @@ In **Frontend** → **Variables** tab, add these:
 
 ```
 # Backend API URL (use the backend PUBLIC URL from Step 3.6)
-VITE_API_URL=https://your-backend-url.up.railway.app
+VITE_API_URL=https://backend-production-e240a.up.railway.app
 
 # Backend URL for nginx proxy (same as above)
-BACKEND_URL=https://your-backend-url.up.railway.app
+BACKEND_URL=https://backend-production-e240a.up.railway.app
 ```
 
 **IMPORTANT:** 
-- Replace `your-backend-url.up.railway.app` with the actual **PUBLIC** backend URL from Step 3.6
+- Use the **actual public URL** from Step 3.6 (e.g., `https://backend-production-e240a.up.railway.app`)
+- **DO NOT** use variable references like `${{Backend.BACKEND_URL}}` - use the actual URL
+- **Must include `https://`** at the beginning
 - **No trailing slashes** in URLs
 - Must be **HTTPS** (not HTTP)
 - If backend only shows "Private Networking", you MUST enable public networking first (see Step 3.6)
+
+**Example (using your actual backend URL):**
+```
+VITE_API_URL=https://backend-production-e240a.up.railway.app
+BACKEND_URL=https://backend-production-e240a.up.railway.app
+```
 
 ### 4.4: Wait for Frontend Deployment
 
