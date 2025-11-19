@@ -264,8 +264,20 @@ CORS_ORIGINS=https://your-frontend-url.up.railway.app
 ### 6.2: Test Frontend
 
 1. Visit: `https://your-frontend-url.up.railway.app`
-   - Should see React app (dashboard)
+   - Should see React app (dashboard/login page)
    - **NOT** backend JSON
+   - If you see backend JSON → Domain routing issue (see troubleshooting below)
+
+2. **If frontend shows blank page or errors:**
+   - Open browser DevTools (F12)
+   - Check Console tab for JavaScript errors
+   - Check Network tab to see if files are loading
+   - See `FRONTEND_TROUBLESHOOTING.md` for detailed help
+
+3. **Test signup/login:**
+   - Try creating an account
+   - Check browser console for API errors
+   - Verify `VITE_API_URL` is set correctly in Frontend → Variables
 
 2. Test signup/login:
    - Try creating an account
