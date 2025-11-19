@@ -225,10 +225,17 @@ CORS_ORIGINS=https://your-frontend-url.up.railway.app
 ### 6.1: Test Backend
 
 1. Visit: `https://your-backend-url.up.railway.app/health`
-   - Should return: `{"status": "healthy", ...}`
+   - Should return: `{"status": "ok"}` or `{"status": "healthy", ...}`
+   - If you get 404, try: `https://your-backend-url.up.railway.app/` (root endpoint)
+   - Root endpoint should return: `{"message": "Bitcoin Trading Strategy API", "status": "running", ...}`
 
 2. Visit: `https://your-backend-url.up.railway.app/docs`
-   - Should show FastAPI documentation
+   - Should show FastAPI documentation (Swagger UI)
+   - If this works, your backend is running correctly
+
+3. Alternative health check endpoints:
+   - `https://your-backend-url.up.railway.app/api/data/health`
+   - `https://your-backend-url.up.railway.app/api/backtest/health`
 
 ### 6.2: Test Frontend
 
