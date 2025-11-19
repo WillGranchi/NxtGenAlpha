@@ -17,6 +17,7 @@ import { StrategyBuilder } from './builder/StrategyBuilder';
 import IndicatorTileGrid from './results/IndicatorTileGrid';
 import ResultsSection from './ResultsSection';
 import { useToast } from '../hooks/useToast';
+import { ToastContainer } from './Toast';
 import { BacktestRequest, ModularBacktestRequest, SavedStrategy } from '../services/api';
 import LoginButton from './auth/LoginButton';
 import { useAuth } from '../hooks/useAuth';

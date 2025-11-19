@@ -3,8 +3,7 @@
  */
 
 import React, { useState, useCallback, useMemo, memo } from 'react';
-import { DndContext, DragEndEvent, DragStartEvent, DragOverEvent, useSensor, useSensors, PointerSensor, MouseSensor, TouchSensor, useDndMonitor } from '@dnd-kit/core';
-import { restrictToParentElement } from '@dnd-kit/modifiers';
+import { DndContext, DragEndEvent, DragStartEvent, useSensor, useSensors, PointerSensor, MouseSensor, TouchSensor } from '@dnd-kit/core';
 import { FlowchartCanvas, type FlowchartNode, type FlowchartConnection } from './FlowchartCanvas';
 import { IndicatorLibrary } from './IndicatorLibrary';
 import { SidePanel } from './SidePanel';

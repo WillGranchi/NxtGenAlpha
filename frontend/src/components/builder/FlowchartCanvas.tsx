@@ -2,7 +2,7 @@
  * Flowchart-style canvas for drag-and-drop strategy building
  */
 
-import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
 import { DragOverlay, useDroppable } from '@dnd-kit/core';
 import { type IndicatorConfig, type IndicatorMetadata } from '../../services/api';
 import { IndicatorNode } from './IndicatorNode';
@@ -85,7 +85,6 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
 }) => {
   const [internalZoom, setInternalZoom] = useState(1);
   const zoom = externalZoom !== undefined ? externalZoom : internalZoom;
-  const setZoom = onZoomChange || setInternalZoom;
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -115,17 +114,33 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
 
   // Handle zoom
   const handleZoomIn = useCallback(() => {
-    setZoom(prev => Math.min(prev + 0.1, 2));
-  }, []);
+    const currentZoom = externalZoom !== undefined ? externalZoom : internalZoom;
+    const newZoom = Math.min(currentZoom + 0.1, 2);
+    if (onZoomChange) {
+      onZoomChange(newZoom);
+    } else {
+      setInternalZoom(newZoom);
+    }
+  }, [externalZoom, internalZoom, onZoomChange]);
 
   const handleZoomOut = useCallback(() => {
-    setZoom(prev => Math.max(prev - 0.1, 0.5));
-  }, []);
+    const currentZoom = externalZoom !== undefined ? externalZoom : internalZoom;
+    const newZoom = Math.max(currentZoom - 0.1, 0.5);
+    if (onZoomChange) {
+      onZoomChange(newZoom);
+    } else {
+      setInternalZoom(newZoom);
+    }
+  }, [externalZoom, internalZoom, onZoomChange]);
 
   const handleResetView = useCallback(() => {
-    setZoom(1);
+    if (onZoomChange) {
+      onZoomChange(1);
+    } else {
+      setInternalZoom(1);
+    }
     setPan({ x: 0, y: 0 });
-  }, []);
+  }, [onZoomChange]);
 
 
   // Calculate connection counts for each node
