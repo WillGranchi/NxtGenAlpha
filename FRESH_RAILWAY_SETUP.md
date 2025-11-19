@@ -224,18 +224,42 @@ CORS_ORIGINS=https://your-frontend-url.up.railway.app
 
 ### 6.1: Test Backend
 
-1. Visit: `https://your-backend-url.up.railway.app/health`
-   - Should return: `{"status": "ok"}` or `{"status": "healthy", ...}`
-   - If you get 404, try: `https://your-backend-url.up.railway.app/` (root endpoint)
-   - Root endpoint should return: `{"message": "Bitcoin Trading Strategy API", "status": "running", ...}`
+**IMPORTANT:** If you get 404 for ALL endpoints, check backend logs first (see troubleshooting below).
 
-2. Visit: `https://your-backend-url.up.railway.app/docs`
+1. Visit: `https://your-backend-url.up.railway.app/`
+   - Should return: `{"message": "Bitcoin Trading Strategy API", "status": "running", ...}`
+   - If you get 404 → **Backend is not running** - check Step 6.3 below
+
+2. Visit: `https://your-backend-url.up.railway.app/health`
+   - Should return: `{"status": "healthy", "data_records": X, ...}`
+   - If you get 404 → Check backend logs for startup errors
+
+3. Visit: `https://your-backend-url.up.railway.app/docs`
    - Should show FastAPI documentation (Swagger UI)
    - If this works, your backend is running correctly
 
-3. Alternative health check endpoints:
-   - `https://your-backend-url.up.railway.app/api/data/health`
-   - `https://your-backend-url.up.railway.app/api/backtest/health`
+### 6.3: Troubleshooting Backend 404 Errors
+
+**If you get 404 for ALL endpoints (including `/`):**
+
+1. **Check Backend Deployment Status:**
+   - Railway → Backend → Deployments
+   - Latest deployment should be **"Active"** or **"Success"**
+   - If **"Failed"**, check build logs
+
+2. **Check Backend Logs:**
+   - Railway → Backend → Logs tab
+   - Look for: `Uvicorn running on http://0.0.0.0:XXXX`
+   - Look for: `Application startup complete`
+   - If you see errors/tracebacks → Backend crashed during startup
+
+3. **Common Issues:**
+   - **Missing data file:** Check logs for `FileNotFoundError`
+   - **Import errors:** Check logs for `ModuleNotFoundError`
+   - **Database errors:** Check `DATABASE_URL` is set correctly
+   - **Port issues:** Verify public networking is enabled
+
+4. **See detailed troubleshooting:** `BACKEND_404_TROUBLESHOOTING.md`
 
 ### 6.2: Test Frontend
 
