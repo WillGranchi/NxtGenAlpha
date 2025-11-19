@@ -59,9 +59,9 @@ RUN echo '#!/bin/sh' > /docker-entrypoint.sh && \
 # Expose port (Railway will set PORT environment variable)
 EXPOSE ${PORT:-80}
 
-# Health check
+# Health check - use sh -c to read PORT at runtime
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${PORT:-80}/ || exit 1
+    CMD sh -c 'curl -f http://localhost:${PORT:-80}/ || exit 1'
 
 # Start nginx with environment variable substitution
 CMD ["/docker-entrypoint.sh"]
