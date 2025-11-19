@@ -1,9 +1,63 @@
 # Frontend Not Working - Troubleshooting Guide
 
+## 🚨 "Application failed to respond" Error
+
+If you see Railway's error page saying **"Application failed to respond"**, this means the container crashed or isn't starting. Follow these steps **immediately**:
+
+### Immediate Checks:
+
+1. **Check Deployment Status:**
+   - Railway → Frontend Service → **Deployments** tab
+   - Is the latest deployment **"Active"** or **"Failed"**?
+   - If **"Failed"**, check build logs below
+
+2. **Check Build Logs:**
+   - Railway → Frontend Service → **Deployments** → Latest → **Build Logs**
+   - Look for:
+     - ❌ `npm run build` errors
+     - ❌ TypeScript compilation errors
+     - ❌ `COPY --from=build /app/dist` failures
+     - ❌ Docker build failures
+
+3. **Check Runtime Logs:**
+   - Railway → Frontend Service → **Logs** tab
+   - Look for:
+     - ❌ No logs at all → Container crashed immediately
+     - ❌ `nginx: [emerg]` → Nginx config error
+     - ❌ `exec: /docker-entrypoint.sh: not found` → Script not created
+     - ❌ Port binding errors
+
+4. **Common Causes:**
+   - **Build failed** → TypeScript errors or missing dependencies
+   - **Missing dist folder** → Build didn't complete
+   - **Nginx config error** → Syntax error in `nginx.conf`
+   - **Missing environment variables** → `PORT` or `BACKEND_URL` not set
+   - **Health check failing** → Container keeps restarting
+
+### Quick Fixes:
+
+1. **If build failed:**
+   - Check build logs for specific errors
+   - Ensure all TypeScript errors are fixed
+   - Verify `package.json` dependencies are correct
+
+2. **If container crashes:**
+   - Check runtime logs for error messages
+   - Verify `PORT` environment variable is set (Railway auto-sets this)
+   - Verify `BACKEND_URL` is set correctly
+
+3. **Redeploy:**
+   - Frontend → Deployments → **Redeploy**
+   - Wait for build to complete
+   - Check logs again
+
+---
+
 ## Step 1: Check What "Not Working" Means
 
 What exactly do you see when visiting the frontend URL?
 
+- ❌ **"Application failed to respond"** → Container crashed (see above)
 - ❌ **Blank white page** → JavaScript error or build issue
 - ❌ **502 Bad Gateway** → Nginx not running or misconfigured
 - ❌ **404 Not Found** → Files not copied correctly
