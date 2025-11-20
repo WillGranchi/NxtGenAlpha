@@ -15,7 +15,7 @@ export interface UseBacktestReturn {
   
   // Actions
   runBacktest: (request: BacktestRequest) => Promise<void>;
-  loadDataInfo: () => Promise<void>;
+  loadDataInfo: (symbol?: string) => Promise<void>;
   loadStrategies: () => Promise<void>;
   clearResults: () => void;
   clearError: () => void;
@@ -89,19 +89,31 @@ export const useBacktest = (): UseBacktestReturn => {
     }
   }, []);
 
-  const loadDataInfo = useCallback(async () => {
+  const loadDataInfo = useCallback(async (symbol?: string) => {
     setLoading(true);
-    setError(null);
+    // Don't clear error here - only clear on user actions, not on initial load
+    // This prevents showing "Network Error" on page load
     
     try {
-      console.log('Loading data info...');
-      const response = await TradingAPI.getDataInfo();
+      console.log(`Loading data info for ${symbol || 'default'}...`);
+      const response = await TradingAPI.getDataInfo(symbol);
       setDataInfo(response);
       console.log('Data info loaded successfully:', response);
+      // Clear any previous errors on successful load
+      setError(null);
     } catch (err: any) {
       const errorMessage = err.response?.data?.detail || err.message || 'Failed to load data info';
-      setError(errorMessage);
+      // Only set error for critical failures, not for initial page load
+      // Log the error but don't show it as a persistent error banner
       console.error('Failed to load data info:', errorMessage);
+      // Only set error if it's a critical failure (not a network timeout or similar)
+      if (err.response?.status && err.response.status >= 500) {
+        setError(errorMessage);
+      } else {
+        // For 4xx errors or network issues, just log them
+        // Don't show as persistent error to avoid "Network Error" on page load
+        console.warn('Data info load failed (non-critical):', errorMessage);
+      }
     } finally {
       setLoading(false);
     }

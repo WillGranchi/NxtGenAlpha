@@ -402,10 +402,12 @@ export interface StrategyListResponse {
 // API Methods
 export class TradingAPI {
   /**
-   * Get information about the Bitcoin dataset.
+   * Get information about the cryptocurrency dataset.
    */
-  static async getDataInfo(): Promise<DataInfoResponse> {
-    const response: AxiosResponse<DataInfoResponse> = await api.get('/api/data/info');
+  static async getDataInfo(symbol?: string): Promise<DataInfoResponse> {
+    const response: AxiosResponse<DataInfoResponse> = await api.get('/api/data/info', {
+      params: symbol ? { symbol } : {},
+    });
     return response.data;
   }
 

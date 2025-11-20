@@ -402,11 +402,16 @@ export const Dashboard: React.FC = () => {
     return individualEquityData;
   }, [modularResponse]);
 
-  // Load initial data
+  // Load initial data and reload when symbol changes
   useEffect(() => {
-    loadDataInfo();
+    // Clear any stale errors when symbol changes to prevent showing old errors
+    clearLegacyError();
+    clearModularError();
+    
+    // Load data for the selected symbol
+    loadDataInfo(selectedSymbol);
     loadStrategies();
-  }, [loadDataInfo, loadStrategies]);
+  }, [loadDataInfo, loadStrategies, selectedSymbol, clearLegacyError, clearModularError]);
 
   // Load data status for freshness indicator
   useEffect(() => {
@@ -436,8 +441,8 @@ export const Dashboard: React.FC = () => {
       const { TradingAPI } = await import('../services/api');
       await TradingAPI.refreshData(selectedSymbol, true);
       toast.success('Data refreshed successfully!');
-      // Reload data info
-      loadDataInfo();
+      // Reload data info with selected symbol
+      loadDataInfo(selectedSymbol);
       // Update status
       const status = await TradingAPI.getDataStatus(selectedSymbol);
       setDataStatus({
