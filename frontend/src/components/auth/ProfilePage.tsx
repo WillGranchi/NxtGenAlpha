@@ -8,7 +8,7 @@ import { Edit2, Save, X, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 
 const ProfilePage: React.FC = () => {
   const { user, updateTheme, updateProfile, changePassword, logout } = useAuth();
-  const { showToast, success, error, ToastComponent } = useToast();
+  const { toasts, success, error, removeToast } = useToast();
   
   // Edit states
   const [isEditingName, setIsEditingName] = useState(false);
@@ -158,7 +158,7 @@ const ProfilePage: React.FC = () => {
 
   return (
     <div className="max-w-2xl mx-auto p-6">
-      <ToastComponent />
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
       <h1 className="text-3xl font-bold mb-6 text-text-primary">Profile & Settings</h1>
 
       <div className="bg-bg-secondary border border-border-default rounded-lg shadow-lg p-6 space-y-6">

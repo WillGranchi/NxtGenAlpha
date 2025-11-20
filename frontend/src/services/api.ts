@@ -119,6 +119,9 @@ export interface DataInfo {
   };
   last_update?: string;
   hours_since_update?: number;
+  data_source?: string;  // "binance", "coingecko", "thegraph", "unknown"
+  data_quality?: string;  // "full_ohlcv", "close_only", "unknown"
+  symbol?: string;
 }
 
 export interface DataStatus {
@@ -406,14 +409,16 @@ export class TradingAPI {
     return response.data;
   }
 
-  static async getDataStatus(): Promise<DataStatus> {
-    const response: AxiosResponse<DataStatus> = await api.get('/api/data/status');
+  static async getDataStatus(symbol?: string): Promise<DataStatus> {
+    const response: AxiosResponse<DataStatus> = await api.get('/api/data/status', {
+      params: symbol ? { symbol } : {},
+    });
     return response.data;
   }
 
-  static async refreshData(force: boolean = false): Promise<DataRefreshResponse> {
+  static async refreshData(symbol?: string, force: boolean = false): Promise<DataRefreshResponse> {
     const response: AxiosResponse<DataRefreshResponse> = await api.post('/api/data/refresh', null, {
-      params: { force }
+      params: { ...(symbol ? { symbol } : {}), force }
     });
     return response.data;
   }
