@@ -410,8 +410,13 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
             return load_crypto_data(symbol=symbol)
     
     try:
-        # Fetch fresh data using hybrid approach
-        df, data_source, data_quality = fetch_crypto_data_hybrid(symbol=symbol, days=days)
+        # Fetch fresh data using hybrid approach with maximum historical depth
+        # Ensure we fetch maximum days (1825 = 5 years) for comprehensive historical data
+        fetch_days = max(days, 1825)  # Always fetch at least 5 years
+        df, data_source, data_quality = fetch_crypto_data_hybrid(symbol=symbol, days=fetch_days)
+        
+        # Log data date range to verify historical depth
+        logger.info(f"Fetched {symbol} data: {len(df)} rows from {df.index.min()} to {df.index.max()}")
         
         # Save to CSV
         save_data_to_csv(df, symbol=symbol)
@@ -420,7 +425,7 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
         load_crypto_data.cache_clear()
         _last_update_time[symbol] = datetime.now()
         
-        logger.info(f"{symbol} data updated successfully from {data_source} (quality: {data_quality})")
+        logger.info(f"{symbol} data updated successfully from {data_source} (quality: {data_quality}, date range: {df.index.min()} to {df.index.max()})")
         return df
         
     except Exception as e:
@@ -454,6 +459,7 @@ def get_last_update_time(symbol: str = "BTCUSDT") -> Optional[datetime]:
 def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None) -> pd.DataFrame:
     """
     Load cryptocurrency historical data from CSV file with caching.
+    Automatically fetches data if file doesn't exist.
     
     Args:
         symbol (str): Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
@@ -463,9 +469,10 @@ def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None) -
         pd.DataFrame: Cleaned DataFrame with datetime index and numeric columns
         
     Raises:
-        FileNotFoundError: If the specified file doesn't exist
-        ValueError: If the data format is invalid
+        ValueError: If the data format is invalid or data cannot be fetched
     """
+    logger = logging.getLogger(__name__)
+    
     if file_path is None:
         import os
         data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
@@ -485,8 +492,7 @@ def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None) -
         df = pd.read_csv(file_path)
         
         # Log basic info about the loaded data
-        logger = logging.getLogger(__name__)
-        logger.info(f"Loaded {len(df)} rows of {symbol} data")
+        logger.info(f"Loaded {len(df)} rows of {symbol} data from {file_path}")
         logger.debug(f"Columns: {list(df.columns)}")
         
         # Clean and preprocess the data
@@ -495,7 +501,26 @@ def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None) -
         return df
         
     except FileNotFoundError:
-        raise FileNotFoundError(f"Data file not found: {file_path}")
+        # File doesn't exist - automatically fetch data
+        logger.info(f"Data file not found for {symbol}, automatically fetching historical data...")
+        try:
+            # Clear cache before fetching to ensure fresh data
+            load_crypto_data.cache_clear()
+            
+            # Fetch maximum historical data (5 years = 1825 days)
+            df = update_crypto_data(symbol=symbol, force=True, days=1825)
+            
+            logger.info(f"Successfully fetched and saved {len(df)} rows of {symbol} data")
+            logger.info(f"Date range: {df.index.min()} to {df.index.max()}")
+            
+            return df
+            
+        except Exception as fetch_error:
+            logger.error(f"Failed to auto-fetch {symbol} data: {fetch_error}")
+            raise ValueError(
+                f"Data file not found for {symbol} and automatic fetch failed: {str(fetch_error)}. "
+                f"Please ensure the symbol is valid and data sources are accessible."
+            )
     except Exception as e:
         raise ValueError(f"Error loading {symbol} data: {str(e)}")
 

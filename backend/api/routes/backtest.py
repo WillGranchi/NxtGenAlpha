@@ -105,23 +105,52 @@ async def run_backtest(request: BacktestRequest) -> BacktestResponse:
         
         # Load cryptocurrency data with caching
         symbol = request.symbol or "BTCUSDT"
-        df = load_crypto_data(symbol=symbol)
+        try:
+            df = load_crypto_data(symbol=symbol)
+        except ValueError as e:
+            # Provide clearer error message for data loading failures
+            logger.error(f"Failed to load data for {symbol}: {e}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Failed to load data for {symbol}. The data file may be missing or invalid. Error: {str(e)}"
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error loading data for {symbol}: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Unexpected error loading data for {symbol}: {str(e)}"
+            )
+        
+        # Log available data date range
+        data_start = df.index.min()
+        data_end = df.index.max()
+        logger.info(f"Loaded {symbol} data: {len(df)} rows from {data_start} to {data_end}")
         
         # Apply date filtering if specified
         if request.start_date:
             start_date = pd.to_datetime(request.start_date)
+            if start_date < data_start:
+                logger.warning(f"Requested start date {request.start_date} is before available data start {data_start}, using {data_start}")
+                start_date = data_start
             df = df[df.index >= start_date]
-            logger.info(f"Filtered data from {request.start_date}")
+            logger.info(f"Filtered data from {start_date}")
         
         if request.end_date:
             end_date = pd.to_datetime(request.end_date)
+            if end_date > data_end:
+                logger.warning(f"Requested end date {request.end_date} is after available data end {data_end}, using {data_end}")
+                end_date = data_end
             df = df[df.index <= end_date]
-            logger.info(f"Filtered data to {request.end_date}")
+            logger.info(f"Filtered data to {end_date}")
         
         if df.empty:
+            available_range = f"{data_start} to {data_end}"
+            requested_range = ""
+            if request.start_date or request.end_date:
+                requested_range = f" (requested: {request.start_date or 'start'} to {request.end_date or 'end'})"
             raise HTTPException(
                 status_code=400,
-                detail="No data available for the specified date range"
+                detail=f"No data available for the specified date range{requested_range}. Available data range: {available_range}"
             )
         
         # Create strategy instance
@@ -243,23 +272,52 @@ async def run_modular_backtest(request: ModularBacktestRequest) -> ModularBackte
         
         # Load cryptocurrency data with caching
         symbol = request.symbol or "BTCUSDT"
-        df = load_crypto_data(symbol=symbol)
+        try:
+            df = load_crypto_data(symbol=symbol)
+        except ValueError as e:
+            # Provide clearer error message for data loading failures
+            logger.error(f"Failed to load data for {symbol}: {e}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Failed to load data for {symbol}. The data file may be missing or invalid. Error: {str(e)}"
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error loading data for {symbol}: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Unexpected error loading data for {symbol}: {str(e)}"
+            )
+        
+        # Log available data date range
+        data_start = df.index.min()
+        data_end = df.index.max()
+        logger.info(f"Loaded {symbol} data: {len(df)} rows from {data_start} to {data_end}")
         
         # Apply date filtering if specified
         if request.start_date:
             start_date = pd.to_datetime(request.start_date)
+            if start_date < data_start:
+                logger.warning(f"Requested start date {request.start_date} is before available data start {data_start}, using {data_start}")
+                start_date = data_start
             df = df[df.index >= start_date]
-            logger.info(f"Filtered data from {request.start_date}")
+            logger.info(f"Filtered data from {start_date}")
         
         if request.end_date:
             end_date = pd.to_datetime(request.end_date)
+            if end_date > data_end:
+                logger.warning(f"Requested end date {request.end_date} is after available data end {data_end}, using {data_end}")
+                end_date = data_end
             df = df[df.index <= end_date]
-            logger.info(f"Filtered data to {request.end_date}")
+            logger.info(f"Filtered data to {end_date}")
         
         if df.empty:
+            available_range = f"{data_start} to {data_end}"
+            requested_range = ""
+            if request.start_date or request.end_date:
+                requested_range = f" (requested: {request.start_date or 'start'} to {request.end_date or 'end'})"
             raise HTTPException(
                 status_code=400,
-                detail="No data available for the specified date range"
+                detail=f"No data available for the specified date range{requested_range}. Available data range: {available_range}"
             )
         
         # Validate indicators
