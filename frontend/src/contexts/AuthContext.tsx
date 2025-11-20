@@ -18,6 +18,8 @@ interface AuthContextType {
   signup: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
   updateTheme: (theme: 'light' | 'dark') => Promise<void>;
+  updateProfile: (name?: string, email?: string) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -216,6 +218,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     await loadUser();
   };
 
+  const updateProfile = async (name?: string, email?: string) => {
+    try {
+      const response = await TradingAPI.updateProfile(name, email);
+      if (response.user) {
+        setUser(response.user);
+        // Apply theme if it changed
+        if (response.user.theme) {
+          localStorage.setItem('theme', response.user.theme);
+          applyTheme(response.user.theme);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to update profile:', error);
+      throw error;
+    }
+  };
+
+  const changePassword = async (currentPassword: string, newPassword: string) => {
+    try {
+      await TradingAPI.changePassword(currentPassword, newPassword);
+    } catch (error) {
+      console.error('Failed to change password:', error);
+      throw error;
+    }
+  };
+
   const value: AuthContextType = {
     user,
     isLoading,
@@ -225,6 +253,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signup,
     logout,
     updateTheme,
+    updateProfile,
+    changePassword,
     refreshUser,
   };
 

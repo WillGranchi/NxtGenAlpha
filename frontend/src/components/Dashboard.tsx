@@ -22,6 +22,7 @@ import { BacktestRequest, ModularBacktestRequest, SavedStrategy } from '../servi
 import LoginButton from './auth/LoginButton';
 import { useAuth } from '../hooks/useAuth';
 import { DateRangePicker } from './DateRangePicker';
+import { TokenSelector } from './TokenSelector';
 
 export const Dashboard: React.FC = () => {
   const [mode, setMode] = useState<'simple' | 'advanced'>('advanced');
@@ -39,6 +40,11 @@ export const Dashboard: React.FC = () => {
   const { isAuthenticated } = useAuth();
   const [dataStatus, setDataStatus] = useState<{ last_update: string | null; is_fresh: boolean; hours_since_update: number | null } | null>(null);
   const [isRefreshingData, setIsRefreshingData] = useState(false);
+  const [selectedSymbol, setSelectedSymbol] = useState<string>(() => {
+    // Load from localStorage or default to BTCUSDT
+    const saved = localStorage.getItem('selectedSymbol');
+    return saved || 'BTCUSDT';
+  });
 
   // Legacy backtest hook
   const {
@@ -169,6 +175,7 @@ export const Dashboard: React.FC = () => {
         initial_capital: initialCapital,
         start_date: startDate || undefined,
         end_date: endDate || undefined,
+        symbol: selectedSymbol,
         options: { allow_short: strategyType === 'long_short' },
       };
     } else {
@@ -202,6 +209,7 @@ export const Dashboard: React.FC = () => {
         initial_capital: initialCapital,
         start_date: startDate || undefined,
         end_date: endDate || undefined,
+        symbol: selectedSymbol,
         options: { allow_short: strategyType === 'long_short' },
       };
     }
@@ -214,7 +222,7 @@ export const Dashboard: React.FC = () => {
       const errorMessage = error instanceof Error ? error.message : 'Backtest failed';
       toast.error(errorMessage);
     }
-  }, [selectedIndicators, expression, longExpression, cashExpression, shortExpression, strategyType, useSeparateExpressions, mode, initialCapital, runModularBacktest, toast, getAvailableConditions]);
+  }, [selectedIndicators, expression, longExpression, cashExpression, shortExpression, strategyType, useSeparateExpressions, mode, initialCapital, selectedSymbol, runModularBacktest, toast, getAvailableConditions]);
 
   // Generate simple expression (AND logic for all indicators)
   const generateSimpleExpression = useCallback(() => {
@@ -405,7 +413,7 @@ export const Dashboard: React.FC = () => {
     const fetchDataStatus = async () => {
       try {
         const { TradingAPI } = await import('../services/api');
-        const status = await TradingAPI.getDataStatus();
+        const status = await TradingAPI.getDataStatus(selectedSymbol);
         setDataStatus({
           last_update: status.last_update,
           is_fresh: status.is_fresh,
@@ -419,19 +427,19 @@ export const Dashboard: React.FC = () => {
     // Refresh status every 5 minutes
     const interval = setInterval(fetchDataStatus, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedSymbol]);
 
   // Handle manual data refresh
   const handleRefreshData = async () => {
     setIsRefreshingData(true);
     try {
       const { TradingAPI } = await import('../services/api');
-      await TradingAPI.refreshData(true);
+      await TradingAPI.refreshData(selectedSymbol, true);
       toast.success('Data refreshed successfully!');
       // Reload data info
       loadDataInfo();
       // Update status
-      const status = await TradingAPI.getDataStatus();
+      const status = await TradingAPI.getDataStatus(selectedSymbol);
       setDataStatus({
         last_update: status.last_update,
         is_fresh: status.is_fresh,
@@ -483,34 +491,69 @@ export const Dashboard: React.FC = () => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-8">
-          {/* Data Freshness Indicator */}
-          {dataStatus && (
-            <div className="bg-bg-secondary border border-border-default rounded-lg p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`w-3 h-3 rounded-full ${dataStatus.is_fresh ? 'bg-green-500' : 'bg-yellow-500'}`} />
-                <div>
-                  <p className="text-sm font-medium text-text-primary">
-                    Data Status: {dataStatus.is_fresh ? 'Fresh' : 'Stale'}
-                  </p>
-                  {dataStatus.last_update && (
-                    <p className="text-xs text-text-muted">
-                      Last updated: {new Date(dataStatus.last_update).toLocaleString()}
-                      {dataStatus.hours_since_update !== null && (
-                        <span> ({Math.round(dataStatus.hours_since_update)}h ago)</span>
-                      )}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <button
-                onClick={handleRefreshData}
-                disabled={isRefreshingData}
-                className="px-4 py-2 text-sm font-medium text-primary-500 hover:text-primary-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {isRefreshingData ? 'Refreshing...' : 'Refresh Data'}
-              </button>
+          {/* Token Selector and Data Freshness Indicator */}
+          <div className="bg-bg-secondary border border-border-default rounded-lg p-4 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                Select Cryptocurrency
+              </label>
+              <TokenSelector
+                selectedSymbol={selectedSymbol}
+                onSymbolChange={setSelectedSymbol}
+              />
             </div>
-          )}
+            {dataStatus && (
+              <div className="pt-4 border-t border-border-default space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-3 h-3 rounded-full ${dataStatus.is_fresh ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                    <div>
+                      <p className="text-sm font-medium text-text-primary">
+                        Data Status: {dataStatus.is_fresh ? 'Fresh' : 'Stale'}
+                      </p>
+                      {dataStatus.last_update && (
+                        <p className="text-xs text-text-muted">
+                          Last updated: {new Date(dataStatus.last_update).toLocaleString()}
+                          {dataStatus.hours_since_update !== null && (
+                            <span> ({Math.round(dataStatus.hours_since_update)}h ago)</span>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleRefreshData}
+                    disabled={isRefreshingData}
+                    className="px-4 py-2 text-sm font-medium text-primary-500 hover:text-primary-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isRefreshingData ? 'Refreshing...' : 'Refresh Data'}
+                  </button>
+                </div>
+                {dataInfo?.data_info?.data_source && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-text-muted">Data Source:</span>
+                    <span className={`px-2 py-1 rounded ${
+                      dataInfo.data_info.data_source === 'binance' 
+                        ? 'bg-green-500/20 text-green-400' 
+                        : dataInfo.data_info.data_source === 'coingecko'
+                        ? 'bg-yellow-500/20 text-yellow-400'
+                        : 'bg-gray-500/20 text-gray-400'
+                    }`}>
+                      {dataInfo.data_info.data_source.toUpperCase()}
+                    </span>
+                    {dataInfo.data_info.data_quality && (
+                      <>
+                        <span className="text-text-muted">•</span>
+                        <span className="text-text-muted">
+                          {dataInfo.data_info.data_quality === 'full_ohlcv' ? 'Full OHLCV' : 'Close Only'}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Error Display */}
           {(legacyError || modularError || catalogError) && (

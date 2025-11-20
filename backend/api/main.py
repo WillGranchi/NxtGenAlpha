@@ -20,7 +20,7 @@ sys.path.insert(0, str(backend_path))
 from backend.api.routes import data, strategies, backtest, auth
 from backend.utils.helpers import get_logger
 from backend.core.database import init_db
-from backend.core.data_loader import update_btc_data
+from backend.core.data_loader import update_btc_data, update_crypto_data
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
@@ -72,10 +72,11 @@ app.add_middleware(
 scheduler = AsyncIOScheduler()
 
 async def scheduled_data_update():
-    """Scheduled task to update Bitcoin data daily."""
+    """Scheduled task to update cryptocurrency data daily."""
     try:
-        logger.info("Running scheduled data update...")
-        update_btc_data(force=False)
+        logger.info("Running scheduled data update for Bitcoin...")
+        # Update Bitcoin data (can add more symbols here in the future)
+        update_crypto_data(symbol="BTCUSDT", force=False)
         logger.info("Scheduled data update completed successfully")
     except Exception as e:
         logger.error(f"Error in scheduled data update: {e}", exc_info=True)

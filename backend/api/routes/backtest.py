@@ -8,7 +8,7 @@ import pandas as pd
 import logging
 from datetime import datetime
 
-from backend.core.data_loader import load_btc_data
+from backend.core.data_loader import load_btc_data, load_crypto_data
 from backend.core.strategy import (
     SMAStrategy, RSIStrategy, MACDStrategy, 
     BollingerBandsStrategy, CombinedStrategy
@@ -103,8 +103,9 @@ async def run_backtest(request: BacktestRequest) -> BacktestResponse:
                 detail=f"Unknown strategy: {request.strategy}. Available strategies: {list(STRATEGY_MAP.keys())}"
             )
         
-        # Load Bitcoin data with caching
-        df = load_btc_data()
+        # Load cryptocurrency data with caching
+        symbol = request.symbol or "BTCUSDT"
+        df = load_crypto_data(symbol=symbol)
         
         # Apply date filtering if specified
         if request.start_date:
@@ -240,8 +241,9 @@ async def run_modular_backtest(request: ModularBacktestRequest) -> ModularBackte
         else:
             logger.info(f"Legacy expression: {request.expression}")
         
-        # Load Bitcoin data with caching
-        df = load_btc_data()
+        # Load cryptocurrency data with caching
+        symbol = request.symbol or "BTCUSDT"
+        df = load_crypto_data(symbol=symbol)
         
         # Apply date filtering if specified
         if request.start_date:
@@ -534,7 +536,7 @@ async def health_check() -> Dict[str, str]:
     """
     try:
         # Try to load data and create a strategy to verify service is working
-        df = load_btc_data()
+        df = load_crypto_data(symbol="BTCUSDT")  # Use BTCUSDT for health check (backward compatibility)
         strategy = SMAStrategy(20, 50)
         return {"status": "healthy", "data_records": str(len(df))}
     except Exception as e:

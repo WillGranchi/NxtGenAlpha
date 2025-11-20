@@ -177,6 +177,7 @@ export interface BacktestRequest {
   initial_capital: number;
   start_date?: string;
   end_date?: string;
+  symbol?: string;  // Trading pair symbol (e.g., BTCUSDT, ETHUSDT)
 }
 
 export interface EquityDataPoint {
@@ -266,6 +267,7 @@ export interface ModularBacktestRequest {
   initial_capital: number;
   start_date?: string;
   end_date?: string;
+  symbol?: string;  // Trading pair symbol (e.g., BTCUSDT, ETHUSDT)
   options?: Record<string, any>;
 }
 
@@ -529,6 +531,36 @@ export class TradingAPI {
     const response = await api.post('/api/auth/theme', null, {
       params: { theme },
     });
+    return response.data;
+  }
+
+  /**
+   * Update user profile (name and/or email).
+   */
+  static async updateProfile(name?: string, email?: string): Promise<{ message: string; user: User }> {
+    const response = await api.put('/api/auth/profile', {
+      name,
+      email,
+    });
+    return response.data;
+  }
+
+  /**
+   * Change user password.
+   */
+  static async changePassword(currentPassword: string, newPassword: string): Promise<{ message: string }> {
+    const response = await api.post('/api/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    });
+    return response.data;
+  }
+
+  /**
+   * Get available cryptocurrency symbols.
+   */
+  static async getAvailableSymbols(): Promise<{ success: boolean; symbols: string[]; count: number }> {
+    const response = await api.get('/api/data/symbols');
     return response.data;
   }
 

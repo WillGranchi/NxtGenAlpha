@@ -90,6 +90,16 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class UpdateProfileRequest(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
 @router.post("/signup")
 async def signup(
     request: SignupRequest,
@@ -501,4 +511,131 @@ async def update_theme(
     db.commit()
     
     return {"message": "Theme updated", "theme": theme}
+
+
+@router.put("/profile")
+async def update_profile(
+    request: UpdateProfileRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update user profile (name and/or email).
+    """
+    try:
+        updated = False
+        
+        # Update name if provided
+        if request.name is not None:
+            current_user.name = request.name
+            updated = True
+        
+        # Update email if provided
+        if request.email is not None:
+            # Check if email is already taken by another user
+            existing_user = db.query(User).filter(
+                User.email == request.email,
+                User.id != current_user.id
+            ).first()
+            
+            if existing_user:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Email is already taken by another account"
+                )
+            
+            current_user.email = request.email
+            updated = True
+        
+        if not updated:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No fields provided to update"
+            )
+        
+        db.commit()
+        db.refresh(current_user)
+        
+        return {
+            "message": "Profile updated successfully",
+            "user": {
+                "id": current_user.id,
+                "email": current_user.email,
+                "name": current_user.name,
+                "theme": current_user.theme,
+                "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Profile update error: {str(e)}", exc_info=True)
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update profile: {str(e)}"
+        )
+
+
+@router.post("/change-password")
+async def change_password(
+    request: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Change user password.
+    """
+    try:
+        # Check if user has a password (not just Google OAuth)
+        if not current_user.password_hash:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Account was created with Google. Password cannot be changed."
+            )
+        
+        # Verify current password
+        password_str = str(request.current_password)
+        if len(password_str.encode('utf-8')) > 72:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current password is too long."
+            )
+        
+        if not verify_password(password_str, current_user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Current password is incorrect"
+            )
+        
+        # Validate new password
+        new_password_str = str(request.new_password)
+        if len(new_password_str.encode('utf-8')) > 72:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="New password is too long. Maximum length is 72 bytes."
+            )
+        
+        if len(new_password_str) < 8:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="New password must be at least 8 characters long"
+            )
+        
+        # Hash and update password
+        current_user.password_hash = hash_password(new_password_str)
+        db.commit()
+        
+        return {"message": "Password changed successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Password change error: {str(e)}", exc_info=True)
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to change password: {str(e)}"
+        )
 

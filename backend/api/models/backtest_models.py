@@ -13,6 +13,7 @@ class BacktestRequest(BaseModel):
     strategy: str = Field(..., description="Strategy name (SMA, RSI, MACD, Bollinger, Combined)")
     parameters: Dict[str, Any] = Field(..., description="Strategy parameters")
     initial_capital: float = Field(10000, ge=1000, description="Initial capital for backtesting")
+    symbol: Optional[str] = Field("BTCUSDT", description="Cryptocurrency symbol (e.g., BTCUSDT, ETHUSDT)")
     start_date: Optional[str] = Field(None, description="Start date for backtesting (YYYY-MM-DD)")
     end_date: Optional[str] = Field(None, description="End date for backtesting (YYYY-MM-DD)")
     
@@ -144,6 +145,7 @@ class ModularBacktestRequest(BaseModel):
     cash_expression: Optional[str] = Field(None, description="Expression for when to go to CASH position (used in long_cash mode)")
     short_expression: Optional[str] = Field(None, description="Expression for when to go SHORT position (used in long_short mode)")
     initial_capital: float = Field(10000, ge=1000, description="Initial capital for backtesting")
+    symbol: Optional[str] = Field("BTCUSDT", description="Cryptocurrency symbol (e.g., BTCUSDT, ETHUSDT)")
     start_date: Optional[str] = Field(None, description="Start date for backtesting (YYYY-MM-DD)")
     end_date: Optional[str] = Field(None, description="End date for backtesting (YYYY-MM-DD)")
     options: Optional[Dict[str, Any]] = Field(default_factory=lambda: {"allow_short": False}, 
