@@ -3,13 +3,14 @@
  */
 
 import React from 'react';
-import { X } from 'lucide-react';
+import { X, CheckCircle2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/Card';
 import { EquityChart } from '../charts/EquityChart';
 import { PriceChart } from '../charts/PriceChart';
 import EnhancedMetrics from '../results/EnhancedMetrics';
+import { ConditionTooltip } from './ConditionTooltip';
 import type { IndicatorConfig, IndicatorMetadata, BacktestResult, ModularBacktestResponse } from '../../services/api';
 
 interface SidePanelProps {
@@ -68,6 +69,29 @@ export const SidePanel: React.FC<SidePanelProps> = ({
     }
     return backtestResults.combined_result;
   }, [backtestResults]);
+
+  // Parse expression to extract active conditions
+  const activeConditions = React.useMemo(() => {
+    if (!expression) return [];
+    
+    // Split expression by AND/OR and extract condition names
+    const parts = expression.split(/\s+(AND|OR)\s+/i);
+    const conditions: string[] = [];
+    
+    for (const part of parts) {
+      const cleanPart = part.trim().replace(/[()]/g, '');
+      if (cleanPart && cleanPart.toUpperCase() !== 'AND' && cleanPart.toUpperCase() !== 'OR') {
+        // Check if it's a valid condition
+        if (indicatorMetadata?.conditions && cleanPart in indicatorMetadata.conditions) {
+          conditions.push(cleanPart);
+        } else if (availableConditions && cleanPart in availableConditions) {
+          conditions.push(cleanPart);
+        }
+      }
+    }
+    
+    return conditions;
+  }, [expression, indicatorMetadata, availableConditions]);
 
   // Auto-switch to Strategy tab when backtest results are available
   React.useEffect(() => {
@@ -266,21 +290,68 @@ export const SidePanel: React.FC<SidePanelProps> = ({
             </div>
           </div>
 
+          {/* Active Conditions Panel */}
+          {activeConditions.length > 0 && (
+            <div className="bg-primary-500/10 border border-primary-500/30 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <CheckCircle2 className="w-4 h-4 text-primary-400" />
+                <h4 className="text-sm font-semibold text-text-primary">
+                  Active Conditions in Strategy
+                </h4>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {activeConditions.map((conditionName) => {
+                  const description = indicatorMetadata?.conditions?.[conditionName] || availableConditions[conditionName] || '';
+                  return (
+                    <ConditionTooltip
+                      key={conditionName}
+                      conditionName={conditionName}
+                      description={description}
+                    >
+                      <div className="px-3 py-1.5 bg-primary-500/20 rounded-md border border-primary-500/40 cursor-help">
+                        <span className="text-xs font-medium text-primary-300">{conditionName}</span>
+                      </div>
+                    </ConditionTooltip>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Available Conditions */}
           <div>
             <h4 className="text-sm font-semibold text-text-primary mb-3">
               Available Conditions
             </h4>
+            <p className="text-xs text-text-muted mb-3">
+              Hover over conditions to see insights and buy/sell examples
+            </p>
             <div className="flex flex-wrap gap-2">
-              {Object.entries(indicatorMetadata.conditions).map(([conditionName, description]) => (
-                <div
-                  key={conditionName}
-                  className="px-2 py-1 bg-bg-tertiary rounded text-xs text-text-secondary border border-border-default"
-                  title={description}
-                >
-                  <code className="text-primary-400">{conditionName}</code>
-                </div>
-              ))}
+              {Object.entries(indicatorMetadata.conditions).map(([conditionName, description]) => {
+                const isActive = activeConditions.includes(conditionName);
+                return (
+                  <ConditionTooltip
+                    key={conditionName}
+                    conditionName={conditionName}
+                    description={description}
+                  >
+                    <div
+                      className={`
+                        px-3 py-2 rounded-md text-xs font-medium transition-all cursor-help
+                        ${isActive 
+                          ? 'bg-primary-500/20 border-2 border-primary-500/50 text-primary-300' 
+                          : 'bg-bg-tertiary border border-border-default text-text-secondary hover:border-primary-500/50 hover:text-text-primary'
+                        }
+                      `}
+                    >
+                      {conditionName}
+                      {isActive && (
+                        <span className="ml-1.5 text-primary-400">✓</span>
+                      )}
+                    </div>
+                  </ConditionTooltip>
+                );
+              })}
             </div>
           </div>
             </>
