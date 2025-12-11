@@ -7,6 +7,7 @@ import { PriceChart } from './charts/PriceChart';
 import { EquityChart } from './charts/EquityChart';
 import { TradeLogTable } from './TradeLogTable';
 import EnhancedMetrics from './results/EnhancedMetrics';
+import { MobileMetrics } from './results/MobileMetrics';
 import ErrorBoundary from './ErrorBoundary';
 import { useBacktest } from '../hooks/useBacktest';
 import { useModularBacktest } from '../hooks/useModularBacktest';
@@ -27,6 +28,8 @@ import { SignalFlowDiagram } from './strategy/SignalFlowDiagram';
 import { AndOrLogicVisualizer } from './strategy/AndOrLogicVisualizer';
 import { StrategyValidator } from './strategy/StrategyValidator';
 import { StrategyTemplates } from './strategy/StrategyTemplates';
+import { MobileStrategyBuilder } from './mobile/MobileStrategyBuilder';
+import { useMobile } from '../hooks/useMobile';
 
 export const Dashboard: React.FC = () => {
   const [mode, setMode] = useState<'simple' | 'advanced'>('advanced');
@@ -635,8 +638,8 @@ export const Dashboard: React.FC = () => {
           )}
 
           {/* Strategy Type Toggle */}
-          <div className="bg-bg-tertiary rounded-xl border border-border-default p-6">
-            <div className="flex items-center justify-between">
+          <div className="bg-bg-tertiary rounded-xl border border-border-default p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <h3 className="text-lg font-semibold text-text-primary mb-2">
                   Strategy Type
@@ -648,23 +651,23 @@ export const Dashboard: React.FC = () => {
                   }
                 </p>
               </div>
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center gap-3 sm:space-x-4">
                 <button
                   onClick={() => setStrategyType('long_cash')}
-                  className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+                  className={`flex-1 sm:flex-none px-4 sm:px-6 py-3 rounded-lg font-medium transition-all duration-200 touch-manipulation ${
                     strategyType === 'long_cash'
                       ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/50'
-                      : 'bg-bg-secondary text-text-secondary hover:bg-bg-elevated border border-border-default'
+                      : 'bg-bg-secondary text-text-secondary hover:bg-bg-elevated border border-border-default active:bg-bg-elevated'
                   }`}
                 >
                   Long/Cash
                 </button>
                 <button
                   onClick={() => setStrategyType('long_short')}
-                  className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+                  className={`flex-1 sm:flex-none px-4 sm:px-6 py-3 rounded-lg font-medium transition-all duration-200 touch-manipulation ${
                     strategyType === 'long_short'
                       ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/50'
-                      : 'bg-bg-secondary text-text-secondary hover:bg-bg-elevated border border-border-default'
+                      : 'bg-bg-secondary text-text-secondary hover:bg-bg-elevated border border-border-default active:bg-bg-elevated'
                   }`}
                 >
                   Long/Short
@@ -685,39 +688,66 @@ export const Dashboard: React.FC = () => {
 
           {/* Strategy Configuration */}
           <div className="space-y-6">
-            {/* Visual Strategy Builder - Full Width */}
-            <div className="bg-bg-tertiary rounded-xl border border-border-default p-6">
-              <h3 className="text-lg font-semibold text-text-primary mb-4">
-                Visual Strategy Builder
-              </h3>
-              <p className="text-sm text-text-secondary mb-4">
-                Click indicators in the library to add them to the canvas, or drag them. Connect indicators with AND/OR logic by clicking the connection points.
-              </p>
-              <ErrorBoundary>
-                <StrategyBuilder
-                  availableIndicators={availableIndicators}
-                  selectedIndicators={selectedIndicators}
-                  onIndicatorsChange={(indicators) => {
-                    setIndicators(indicators);
-                  }}
-                  onUpdateIndicatorParams={updateIndicatorParams}
-                  onUpdateIndicatorShowOnChart={updateIndicatorShowOnChart}
-                  onUpdateExpression={setExpression}
-                  onUpdateLongExpression={setLongExpression}
-                  onUpdateCashExpression={setCashExpression}
-                  onUpdateShortExpression={setShortExpression}
-                  useSeparateExpressions={useSeparateExpressions}
-                  strategyType={strategyType}
-                  availableConditions={getAvailableConditions()}
-                  initialCapital={initialCapital}
-                  onUpdateInitialCapital={setInitialCapital}
-                  onRunBacktest={handleModularBacktest}
-                  isLoading={catalogLoading}
-                  isBacktestLoading={modularLoading}
-                  backtestResults={modularResponse}
-                />
-              </ErrorBoundary>
-            </div>
+            {/* Mobile Strategy Builder */}
+            {isMobile ? (
+              <div className="bg-bg-tertiary rounded-xl border border-border-default p-4">
+                <h3 className="text-lg font-semibold text-text-primary mb-4">
+                  Strategy Builder
+                </h3>
+                <ErrorBoundary>
+                  <MobileStrategyBuilder
+                    availableIndicators={availableIndicators}
+                    selectedIndicators={selectedIndicators}
+                    onIndicatorsChange={(indicators) => {
+                      setIndicators(indicators);
+                    }}
+                    expression={useSeparateExpressions ? longExpression : expression}
+                    onExpressionChange={(expr) => {
+                      if (useSeparateExpressions) {
+                        setLongExpression(expr);
+                      } else {
+                        setExpression(expr);
+                      }
+                    }}
+                    availableConditions={getAvailableConditions()}
+                  />
+                </ErrorBoundary>
+              </div>
+            ) : (
+              /* Desktop Visual Strategy Builder */
+              <div className="bg-bg-tertiary rounded-xl border border-border-default p-6">
+                <h3 className="text-lg font-semibold text-text-primary mb-4">
+                  Visual Strategy Builder
+                </h3>
+                <p className="text-sm text-text-secondary mb-4">
+                  Click indicators in the library to add them to the canvas, or drag them. Connect indicators with AND/OR logic by clicking the connection points.
+                </p>
+                <ErrorBoundary>
+                  <StrategyBuilder
+                    availableIndicators={availableIndicators}
+                    selectedIndicators={selectedIndicators}
+                    onIndicatorsChange={(indicators) => {
+                      setIndicators(indicators);
+                    }}
+                    onUpdateIndicatorParams={updateIndicatorParams}
+                    onUpdateIndicatorShowOnChart={updateIndicatorShowOnChart}
+                    onUpdateExpression={setExpression}
+                    onUpdateLongExpression={setLongExpression}
+                    onUpdateCashExpression={setCashExpression}
+                    onUpdateShortExpression={setShortExpression}
+                    useSeparateExpressions={useSeparateExpressions}
+                    strategyType={strategyType}
+                    availableConditions={getAvailableConditions()}
+                    initialCapital={initialCapital}
+                    onUpdateInitialCapital={setInitialCapital}
+                    onRunBacktest={handleModularBacktest}
+                    isLoading={catalogLoading}
+                    isBacktestLoading={modularLoading}
+                    backtestResults={modularResponse}
+                  />
+                </ErrorBoundary>
+              </div>
+            )}
 
             {/* Strategy Validator */}
             {selectedIndicators.length > 0 && (
@@ -828,10 +858,14 @@ export const Dashboard: React.FC = () => {
                 <>
                   {/* Metrics Panel */}
                   {legacyResults.results.metrics && (
-                    <EnhancedMetrics 
-                      metrics={legacyResults.results.metrics}
-                      title="Backtest Performance Metrics"
-                    />
+                    isMobile ? (
+                      <MobileMetrics metrics={legacyResults.results.metrics} />
+                    ) : (
+                      <EnhancedMetrics 
+                        metrics={legacyResults.results.metrics}
+                        title="Backtest Performance Metrics"
+                      />
+                    )
                   )}
 
                   {/* Charts */}

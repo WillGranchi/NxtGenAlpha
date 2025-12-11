@@ -137,6 +137,64 @@
   }
 }
 
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
 .animate-fade-in {
   animation: fadeIn 0.6s ease-out;
+}
+
+/* Mobile optimizations */
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent text selection on buttons and interactive elements */
+button, .touch-manipulation {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Larger tap targets for mobile */
+@media (max-width: 768px) {
+  button, a, input, select, textarea {
+    min-height: 44px; /* iOS recommended minimum */
+  }
+  
+  /* Better spacing for mobile */
+  .space-y-4 > * + * {
+    margin-top: 1rem;
+  }
+  
+  /* Full width on mobile */
+  .mobile-full {
+    width: 100%;
+  }
+  
+  /* Responsive padding */
+  .p-6 {
+    padding: 1rem;
+  }
+  
+  .px-4 {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
 }

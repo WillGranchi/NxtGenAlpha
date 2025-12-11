@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { Navigation } from './Navigation';
+import { MobileNavigation } from './MobileNavigation';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -13,8 +13,8 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children, showNav = true }) => {
   return (
     <div className="min-h-screen bg-bg-primary flex">
-      {showNav && <Navigation />}
-      <main className="flex-1 overflow-auto">
+      {showNav && <MobileNavigation />}
+      <main className="flex-1 overflow-auto min-w-0">
         {children}
       </main>
     </div>

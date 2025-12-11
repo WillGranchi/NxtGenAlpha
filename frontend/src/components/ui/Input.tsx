@@ -29,7 +29,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           ref={ref}
           id={inputId}
           className={clsx(
-            'input',
+            'input touch-manipulation',
             error && 'input-error',
             className
           )}

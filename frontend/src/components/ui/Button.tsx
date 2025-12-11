@@ -42,6 +42,7 @@ export const Button: React.FC<ButtonProps> = ({
         baseStyles,
         variants[variant],
         sizes[size],
+        'touch-manipulation',
         className
       )}
       disabled={disabled || isLoading}

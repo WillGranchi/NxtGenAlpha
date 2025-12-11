@@ -154,34 +154,40 @@ export const EquityChart: React.FC<EquityChartProps> = ({
   }, [dates, portfolioValues, positions, strategyColors, buyAndHoldValues, individualEquityData]);
 
   // Memoize layout to prevent recalculation
-  const layout = useMemo(() => ({
-    title: {
-      text: title,
-      font: { size: 16 },
-    },
-    xaxis: {
-      title: 'Date',
-      type: 'date' as const,
-    },
-    yaxis: {
-      title: 'Portfolio Value ($)',
-      tickformat: '$,.0f',
-      // Allow negative values for long_short mode
-      ...(strategyType === 'long_short' ? {} : { rangemode: 'tozero' as const }),
-    },
-    hovermode: 'x unified' as const,
-    showlegend: true,
-    legend: {
-      orientation: 'h' as const,
-      y: -0.2,
-    },
-    margin: {
-      t: 50,
-      b: 80,
-      l: 60,
-      r: 20,
-    },
-    height,
+  const layout = useMemo(() => {
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    return {
+      title: {
+        text: title,
+        font: { size: isMobile ? 14 : 16 },
+      },
+      xaxis: {
+        title: 'Date',
+        type: 'date' as const,
+      },
+      yaxis: {
+        title: 'Portfolio Value ($)',
+        tickformat: '$,.0f',
+        // Allow negative values for long_short mode
+        ...(strategyType === 'long_short' ? {} : { rangemode: 'tozero' as const }),
+      },
+      hovermode: 'x unified' as const,
+      showlegend: !isMobile && showIndividualLegend,
+      legend: {
+        orientation: 'h' as const,
+        y: -0.2,
+      },
+      margin: {
+        t: isMobile ? 40 : 50,
+        b: isMobile ? 60 : 80,
+        l: isMobile ? 50 : 60,
+        r: isMobile ? 10 : 20,
+      },
+    height: isMobile ? Math.min(height, 400) : height,
+    font: { size: isMobile ? 10 : 12 },
+    dragmode: 'pan' as const, // Better for mobile
+    };
+  }, [title, height, strategyType, showIndividualLegend]);
     annotations: [
       {
         x: 0.02,
