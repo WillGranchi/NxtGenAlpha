@@ -13,7 +13,7 @@ interface StrategyTemplate {
   description: string;
   category: 'Trend Following' | 'Mean Reversion' | 'Momentum' | 'Breakout' | 'Multi-Factor';
   indicators: Array<{ id: string; params: Record<string, any> }>;
-  expression: string;
+  expression?: string;
   longExpression?: string;
   cashExpression?: string;
   shortExpression?: string;
@@ -37,7 +37,7 @@ const STRATEGY_TEMPLATES: StrategyTemplate[] = [
       { id: 'SMA', params: { period: 50 } },
       { id: 'SMA', params: { period: 200 } }
     ],
-    expression: 'sma_price_cross_above AND sma_price_cross_above',
+    expression: 'sma_price_cross_above',
     strategyType: 'long_cash',
     useSeparateExpressions: false,
   },

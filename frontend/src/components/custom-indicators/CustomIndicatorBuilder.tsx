@@ -71,11 +71,15 @@ export const CustomIndicatorBuilder: React.FC<CustomIndicatorBuilderProps> = ({
     })) : []
   );
   
-  // Validation state
+  // Validation state (API returns snake_case)
   const [validationResult, setValidationResult] = useState<{
-    isValid: boolean;
+    is_valid?: boolean;
+    isValid?: boolean;
+    error_message?: string;
     errorMessage?: string;
-    signatureValid: boolean;
+    signature_valid?: boolean;
+    signatureValid?: boolean;
+    signature_error?: string;
     signatureError?: string;
   } | null>(null);
 
@@ -122,10 +126,16 @@ export const CustomIndicatorBuilder: React.FC<CustomIndicatorBuilderProps> = ({
       });
       setValidationResult(result);
       
-      if (result.is_valid && result.signature_valid) {
+      // Handle both snake_case (API) and camelCase formats
+      const isValid = result.is_valid ?? result.isValid ?? false;
+      const signatureValid = result.signature_valid ?? result.signatureValid ?? false;
+      const errorMsg = result.error_message || result.errorMessage;
+      const sigError = result.signature_error || result.signatureError;
+      
+      if (isValid && signatureValid) {
         toast.success('Code is valid!');
       } else {
-        toast.error(result.error_message || result.signature_error || 'Validation failed');
+        toast.error(errorMsg || sigError || 'Validation failed');
       }
     } catch (error: any) {
       toast.error('Validation error: ' + (error.message || 'Unknown error'));
@@ -195,8 +205,10 @@ export const CustomIndicatorBuilder: React.FC<CustomIndicatorBuilderProps> = ({
       toast.warning('No conditions defined. Add conditions to use this indicator in strategies.');
     }
 
-    // Validate code before saving
-    if (!validationResult?.is_valid || !validationResult?.signature_valid) {
+    // Validate code before saving (handle both snake_case and camelCase)
+    const isValid = validationResult?.is_valid ?? validationResult?.isValid ?? false;
+    const signatureValid = validationResult?.signature_valid ?? validationResult?.signatureValid ?? false;
+    if (!isValid || !signatureValid) {
       toast.error('Please validate your code before saving');
       return;
     }
@@ -388,19 +400,30 @@ export const CustomIndicatorBuilder: React.FC<CustomIndicatorBuilderProps> = ({
             </Button>
             {validationResult && (
               <div className="flex items-center gap-2">
-                {validationResult.is_valid && validationResult.signature_valid ? (
-                  <>
-                    <CheckCircle2 className="w-5 h-5 text-success-500" />
-                    <span className="text-sm text-success-500">Code is valid</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="w-5 h-5 text-danger-500" />
-                    <span className="text-sm text-danger-500">
-                      {validationResult.error_message || validationResult.signature_error || 'Validation failed'}
-                    </span>
-                  </>
-                )}
+                {(() => {
+                  const isValid = validationResult.is_valid ?? validationResult.isValid ?? false;
+                  const signatureValid = validationResult.signature_valid ?? validationResult.signatureValid ?? false;
+                  const errorMsg = validationResult.error_message || validationResult.errorMessage;
+                  const sigError = validationResult.signature_error || validationResult.signatureError;
+                  
+                  if (isValid && signatureValid) {
+                    return (
+                      <>
+                        <CheckCircle2 className="w-5 h-5 text-success-500" />
+                        <span className="text-sm text-success-500">Code is valid</span>
+                      </>
+                    );
+                  } else {
+                    return (
+                      <>
+                        <AlertCircle className="w-5 h-5 text-danger-500" />
+                        <span className="text-sm text-danger-500">
+                          {errorMsg || sigError || 'Validation failed'}
+                        </span>
+                      </>
+                    );
+                  }
+                })()}
               </div>
             )}
           </div>

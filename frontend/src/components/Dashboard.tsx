@@ -349,6 +349,38 @@ export const Dashboard: React.FC = () => {
     toast.success(`Strategy "${strategy.name}" loaded successfully!`);
   }, [clearSelectedIndicators, setIndicators, availableIndicators, toast]);
 
+  // Handle template selection
+  const handleTemplateSelect = useCallback((template: any) => {
+    if (!availableIndicators) {
+      toast.error('Indicators not loaded yet. Please wait...');
+      return;
+    }
+
+    // Convert template indicators to IndicatorConfig format
+    const templateIndicators: IndicatorConfig[] = template.indicators.map((ind: any) => ({
+      id: ind.id,
+      params: ind.params,
+      show_on_chart: true,
+    }));
+
+    // Set indicators
+    setIndicators(templateIndicators);
+
+    // Set expressions
+    if (template.useSeparateExpressions) {
+      setUseSeparateExpressions(true);
+      setStrategyType(template.strategyType || 'long_cash');
+      setLongExpression(template.longExpression || '');
+      setCashExpression(template.cashExpression || '');
+      setShortExpression(template.shortExpression || '');
+    } else {
+      setUseSeparateExpressions(false);
+      setExpression(template.expression || '');
+    }
+
+    toast.success(`Template "${template.name}" loaded! Customize it as needed.`);
+  }, [availableIndicators, setIndicators, toast]);
+
   // Handle overlay toggle
   const handleToggleOverlay = useCallback((indicatorId: string, show: boolean) => {
     setOverlayStates(prev => ({
