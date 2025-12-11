@@ -17,7 +17,7 @@ from pathlib import Path
 backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
-from backend.api.routes import data, strategies, backtest, auth
+from backend.api.routes import data, strategies, backtest, auth, custom_indicators
 from backend.utils.helpers import get_logger
 from backend.core.database import init_db
 from backend.core.data_loader import update_btc_data, update_crypto_data
@@ -123,6 +123,7 @@ app.include_router(data.router)
 app.include_router(strategies.router)
 app.include_router(backtest.router)
 app.include_router(auth.router)
+app.include_router(custom_indicators.router)
 
 
 @app.get("/")
@@ -151,9 +152,8 @@ async def health_check():
         dict: Health status
     """
     try:
-        # Test data loading
-        from backend.core.data_loader import load_btc_data
-        df = load_btc_data()
+        from backend.core.data_loader import load_crypto_data
+        df = load_crypto_data()
         
         return {
             "status": "healthy",

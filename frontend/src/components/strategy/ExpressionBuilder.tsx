@@ -86,7 +86,6 @@ export const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
             onValidate(clientValidation2.isValid, clientValidation2.errorMessage);
           }
         } catch (error) {
-          console.error('Validation error:', error);
           // Don't show error for validation failures, just keep client-side validation
         } finally {
           setIsValidating(false);
@@ -184,7 +183,6 @@ export const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
         onValidate(clientValidation.isValid, clientValidation.errorMessage);
       }
     } catch (error) {
-      console.error('Validation error:', error);
       // Don't show error for validation failures, just keep client-side validation
     } finally {
       setIsValidating(false);

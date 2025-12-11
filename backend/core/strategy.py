@@ -431,29 +431,3 @@ def get_available_strategies() -> Dict[str, Any]:
     }
 
 
-if __name__ == "__main__":
-    # Test the strategies
-    import sys
-    sys.path.append('..')
-    from data_loader import load_btc_data
-    
-    try:
-        # Load sample data
-        df = load_btc_data("../data/btc_price.csv")
-        
-        # Test SMA strategy
-        sma_strategy = SMAStrategy(50, 200)
-        df_with_signals = sma_strategy.generate_signals(df)
-        
-        print(f"Strategy: {sma_strategy.name}")
-        print(f"Total signals generated: {(df_with_signals['Signal'] != 0).sum()}")
-        print(f"Buy signals: {(df_with_signals['Signal'] == 1).sum()}")
-        print(f"Sell signals: {(df_with_signals['Signal'] == -1).sum()}")
-        
-        # Show some signal examples
-        signals = df_with_signals[df_with_signals['Signal'] != 0][['Close', 'Signal', 'Position']].head(10)
-        print("\nSample signals:")
-        print(signals)
-        
-    except Exception as e:
-        print(f"Error: {e}")

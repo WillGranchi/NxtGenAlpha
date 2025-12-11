@@ -557,33 +557,3 @@ def compare_strategies(df: pd.DataFrame, strategies: List[Tuple],
     return pd.DataFrame(results)
 
 
-if __name__ == "__main__":
-    # Test the backtesting engine
-    import sys
-    sys.path.append('..')
-    from data_loader import load_btc_data
-    from strategy import SMAStrategy
-    
-    try:
-        # Load sample data
-        df = load_btc_data("../data/btc_price.csv")
-        
-        # Test SMA strategy
-        sma_strategy = SMAStrategy(50, 200)
-        df_with_signals = sma_strategy.generate_signals(df)
-        
-        # Run backtest
-        results = run_backtest(df_with_signals, "SMA 50/200", 10000, 0.001)
-        
-        print(f"Strategy: {results['strategy_name']}")
-        print(f"Initial Capital: ${results['initial_capital']:,.2f}")
-        print(f"Final Portfolio Value: ${results['final_portfolio_value']:,.2f}")
-        print(f"Total Return: {results['total_return']:.2%}")
-        print(f"CAGR: {results['cagr']:.2%}")
-        print(f"Sharpe Ratio: {results['sharpe_ratio']:.2f}")
-        print(f"Max Drawdown: {results['max_drawdown']:.2%}")
-        print(f"Total Trades: {results['total_trades']}")
-        print(f"Win Rate: {results['win_rate']:.2%}")
-        
-    except Exception as e:
-        print(f"Error: {e}")

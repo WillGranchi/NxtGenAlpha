@@ -33,7 +33,6 @@ const LoginPage: React.FC = () => {
       await loginWithEmail(email, password);
       // Navigation will happen via useEffect when isAuthenticated becomes true
     } catch (err: any) {
-      console.error('Login error details:', err);
       let errorMessage = 'Login failed. Please check your credentials.';
       
       if (err.response?.data?.detail) {

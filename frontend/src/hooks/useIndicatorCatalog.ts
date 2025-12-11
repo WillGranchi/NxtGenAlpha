@@ -39,7 +39,6 @@ export const useIndicatorCatalog = (): UseIndicatorCatalogReturn => {
         }
         
         setAvailableIndicators(response.indicators);
-        console.log('Available indicators loaded:', response.indicators);
         
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load indicators';
@@ -55,13 +54,11 @@ export const useIndicatorCatalog = (): UseIndicatorCatalogReturn => {
 
   const addIndicator = useCallback((indicatorId: string) => {
     if (!availableIndicators || !availableIndicators[indicatorId]) {
-      console.error('Indicator not found:', indicatorId);
       return;
     }
 
     // Check if indicator is already selected
     if (selectedIndicators.some(ind => ind.id === indicatorId)) {
-      console.warn('Indicator already selected:', indicatorId);
       return;
     }
 
@@ -80,12 +77,10 @@ export const useIndicatorCatalog = (): UseIndicatorCatalogReturn => {
     };
 
     setSelectedIndicators(prev => [...prev, newIndicator]);
-    console.log('Added indicator:', indicatorId, newIndicator);
   }, [availableIndicators, selectedIndicators]);
 
   const removeIndicator = useCallback((indicatorId: string) => {
     setSelectedIndicators(prev => prev.filter(ind => ind.id !== indicatorId));
-    console.log('Removed indicator:', indicatorId);
   }, []);
 
   const updateIndicatorParams = useCallback((indicatorId: string, params: Record<string, any>) => {
@@ -96,7 +91,6 @@ export const useIndicatorCatalog = (): UseIndicatorCatalogReturn => {
           : ind
       )
     );
-    console.log('Updated indicator params:', indicatorId, params);
   }, []);
 
   const updateIndicatorShowOnChart = useCallback((indicatorId: string, showOnChart: boolean) => {
@@ -107,31 +101,23 @@ export const useIndicatorCatalog = (): UseIndicatorCatalogReturn => {
           : ind
       )
     );
-    console.log('Updated indicator show on chart:', indicatorId, showOnChart);
   }, []);
 
   const clearSelectedIndicators = useCallback(() => {
     setSelectedIndicators([]);
-    console.log('Cleared all selected indicators');
   }, []);
 
   const setIndicators = useCallback((indicators: IndicatorConfig[]) => {
     // Validate that all indicator IDs exist in availableIndicators
     if (!availableIndicators) {
-      console.warn('Cannot set indicators: catalog not loaded yet');
       return;
     }
 
     const validIndicators = indicators.filter(ind => {
-      if (!availableIndicators[ind.id]) {
-        console.warn(`Skipping invalid indicator: ${ind.id}`);
-        return false;
-      }
-      return true;
+      return !!availableIndicators[ind.id];
     });
 
     setSelectedIndicators(validIndicators);
-    console.log('Set indicators:', validIndicators);
   }, [availableIndicators]);
 
   const getAvailableConditions = useCallback((): Record<string, string> => {

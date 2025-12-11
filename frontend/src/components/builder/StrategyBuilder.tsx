@@ -474,7 +474,6 @@ export const StrategyBuilder: React.FC<StrategyBuilderProps> = ({
     try {
       return generateExpressionFromConnections();
     } catch (error) {
-      console.error('Error generating expression:', error);
       return '';
     }
   }, [generateExpressionFromConnections]);

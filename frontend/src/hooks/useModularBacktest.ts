@@ -30,8 +30,6 @@ export const useModularBacktest = (): UseModularBacktestReturn => {
     setError(null);
     
     try {
-      console.log('Running modular backtest with request:', request);
-      
       const result = await TradingAPI.runModularBacktest(request);
       
       // Validate response structure
@@ -51,7 +49,6 @@ export const useModularBacktest = (): UseModularBacktestReturn => {
         throw new Error('Missing or invalid individual_results in response');
       }
       
-      console.log('Modular backtest completed successfully:', result);
       setResponse(result);
       
       // Auto-scroll to results section
@@ -78,7 +75,7 @@ export const useModularBacktest = (): UseModularBacktestReturn => {
         errorMessage = err;
       }
       
-      console.error('Modular backtest failed:', errorMessage, err);
+      console.error('Modular backtest failed:', errorMessage);
       setError(errorMessage);
       setResponse(null);
       throw new Error(errorMessage); // Re-throw so Dashboard can show toast
@@ -102,7 +99,6 @@ export const useModularBacktest = (): UseModularBacktestReturn => {
       return result;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Validation failed';
-      console.error('Expression validation error:', errorMessage);
       // Return invalid response on error
       return {
         is_valid: false,

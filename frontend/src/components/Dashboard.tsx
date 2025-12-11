@@ -23,6 +23,10 @@ import LoginButton from './auth/LoginButton';
 import { useAuth } from '../hooks/useAuth';
 import { DateRangePicker } from './DateRangePicker';
 import { TokenSelector } from './TokenSelector';
+import { SignalFlowDiagram } from './strategy/SignalFlowDiagram';
+import { AndOrLogicVisualizer } from './strategy/AndOrLogicVisualizer';
+import { StrategyValidator } from './strategy/StrategyValidator';
+import { StrategyTemplates } from './strategy/StrategyTemplates';
 
 export const Dashboard: React.FC = () => {
   const [mode, setMode] = useState<'simple' | 'advanced'>('advanced');
@@ -94,8 +98,7 @@ export const Dashboard: React.FC = () => {
       };
       await runBacktest(requestWithDates);
     } catch (error) {
-      console.error('Backtest error in Dashboard:', error);
-      // Error is already handled by useBacktest hook, but we can add additional logging
+      // Error is already handled by useBacktest hook
     }
   }, [runBacktest, startDate, endDate]);
 
@@ -142,7 +145,6 @@ export const Dashboard: React.FC = () => {
       
       if (indicatorConditions.length > 0) {
         finalExpression = indicatorConditions.join(' AND ');
-        console.log('Generated default expression:', finalExpression);
       } else {
         toast.error('Please add indicators and build your strategy expression before running the backtest.');
         return;
@@ -218,7 +220,6 @@ export const Dashboard: React.FC = () => {
       await runModularBacktest(request);
       toast.success('Backtest completed successfully!');
     } catch (error) {
-      console.error('Modular backtest error in Dashboard:', error);
       const errorMessage = error instanceof Error ? error.message : 'Backtest failed';
       toast.error(errorMessage);
     }
@@ -425,7 +426,7 @@ export const Dashboard: React.FC = () => {
           hours_since_update: status.hours_since_update,
         });
       } catch (error) {
-        console.error('Failed to fetch data status:', error);
+        // Silently fail - data status is not critical
       }
     };
     fetchDataStatus();
@@ -640,6 +641,16 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
 
+          {/* Strategy Templates */}
+          <div className="bg-bg-tertiary rounded-xl border border-border-default p-6">
+            <ErrorBoundary>
+              <StrategyTemplates
+                onSelectTemplate={handleTemplateSelect}
+                availableIndicators={availableIndicators}
+              />
+            </ErrorBoundary>
+          </div>
+
           {/* Strategy Configuration */}
           <div className="space-y-6">
             {/* Visual Strategy Builder - Full Width */}
@@ -675,6 +686,54 @@ export const Dashboard: React.FC = () => {
                 />
               </ErrorBoundary>
             </div>
+
+            {/* Strategy Validator */}
+            {selectedIndicators.length > 0 && (
+              <div className="bg-bg-tertiary rounded-xl border border-border-default p-6">
+                <ErrorBoundary>
+                  <StrategyValidator
+                    selectedIndicators={selectedIndicators}
+                    availableIndicators={availableIndicators}
+                    expression={expression}
+                    longExpression={longExpression}
+                    cashExpression={cashExpression}
+                    shortExpression={shortExpression}
+                    useSeparateExpressions={useSeparateExpressions}
+                    strategyType={strategyType}
+                    initialCapital={initialCapital}
+                    startDate={startDate}
+                    endDate={endDate}
+                  />
+                </ErrorBoundary>
+              </div>
+            )}
+
+            {/* Signal Flow & Logic Visualization */}
+            {selectedIndicators.length > 0 && (expression || longExpression) && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-bg-tertiary rounded-xl border border-border-default p-6">
+                  <ErrorBoundary>
+                    <SignalFlowDiagram
+                      selectedIndicators={selectedIndicators}
+                      availableIndicators={availableIndicators}
+                      expression={useSeparateExpressions ? longExpression : expression}
+                      availableConditions={getAvailableConditions()}
+                      strategyType={strategyType}
+                    />
+                  </ErrorBoundary>
+                </div>
+                <div className="bg-bg-tertiary rounded-xl border border-border-default p-6">
+                  <ErrorBoundary>
+                    <AndOrLogicVisualizer
+                      expression={useSeparateExpressions ? longExpression : expression}
+                      availableConditions={getAvailableConditions()}
+                      selectedIndicators={selectedIndicators}
+                      availableIndicators={availableIndicators}
+                    />
+                  </ErrorBoundary>
+                </div>
+              </div>
+            )}
 
             {/* Advanced Expression Editor - Collapsed by Default */}
             {selectedIndicators.length > 0 && (

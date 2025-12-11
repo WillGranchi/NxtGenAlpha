@@ -47,10 +47,6 @@ const api = axios.create({
 // Request interceptor for logging and adding auth token
 api.interceptors.request.use(
   (config) => {
-    const fullUrl = `${config.baseURL}${config.url}`;
-    console.log(`[API] ${config.method?.toUpperCase()} ${fullUrl}`);
-    console.log(`[API] Base URL: ${config.baseURL || 'DEFAULT'}`);
-    
     // Add token from localStorage to Authorization header as fallback
     // (Backend also checks cookies, but this ensures it works if cookies fail)
     const token = localStorage.getItem('auth_token');
@@ -617,6 +613,94 @@ export class TradingAPI {
    */
   static async duplicateStrategy(strategyId: number): Promise<StrategyResponse> {
     const response: AxiosResponse<StrategyResponse> = await api.post(`/api/strategies/saved/${strategyId}/duplicate`);
+    return response.data;
+  }
+
+  // Custom Indicators API
+
+  /**
+   * Get example custom indicator code template.
+   */
+  static async getCustomIndicatorExample(): Promise<any> {
+    const response: AxiosResponse<any> = await api.get('/api/custom-indicators/example');
+    return response.data;
+  }
+
+  /**
+   * Validate custom indicator code.
+   */
+  static async validateCustomIndicator(request: { code: string; function_name: string }): Promise<any> {
+    const response: AxiosResponse<any> = await api.post('/api/custom-indicators/validate', request);
+    return response.data;
+  }
+
+  /**
+   * Create a custom indicator.
+   */
+  static async createCustomIndicator(request: {
+    name: string;
+    description?: string;
+    code: string;
+    function_name: string;
+    parameters: Record<string, any>;
+    conditions: Record<string, string>;
+    category?: string;
+    is_public?: boolean;
+  }): Promise<any> {
+    const response: AxiosResponse<any> = await api.post('/api/custom-indicators/', request);
+    return response.data;
+  }
+
+  /**
+   * List custom indicators.
+   */
+  static async listCustomIndicators(includePublic: boolean = false): Promise<any[]> {
+    const response: AxiosResponse<any[]> = await api.get('/api/custom-indicators/', {
+      params: { include_public: includePublic },
+    });
+    return response.data;
+  }
+
+  /**
+   * Get a custom indicator by ID.
+   */
+  static async getCustomIndicator(indicatorId: number): Promise<any> {
+    const response: AxiosResponse<any> = await api.get(`/api/custom-indicators/${indicatorId}`);
+    return response.data;
+  }
+
+  /**
+   * Update a custom indicator.
+   */
+  static async updateCustomIndicator(
+    indicatorId: number,
+    request: {
+      name?: string;
+      description?: string;
+      code?: string;
+      function_name?: string;
+      parameters?: Record<string, any>;
+      conditions?: Record<string, string>;
+      category?: string;
+      is_public?: boolean;
+    }
+  ): Promise<any> {
+    const response: AxiosResponse<any> = await api.put(`/api/custom-indicators/${indicatorId}`, request);
+    return response.data;
+  }
+
+  /**
+   * Delete a custom indicator.
+   */
+  static async deleteCustomIndicator(indicatorId: number): Promise<void> {
+    await api.delete(`/api/custom-indicators/${indicatorId}`);
+  }
+
+  /**
+   * Test a custom indicator with sample data.
+   */
+  static async testCustomIndicator(indicatorId: number, params: Record<string, any>): Promise<any> {
+    const response: AxiosResponse<any> = await api.post(`/api/custom-indicators/${indicatorId}/test`, params);
     return response.data;
   }
 }

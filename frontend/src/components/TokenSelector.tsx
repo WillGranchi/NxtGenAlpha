@@ -66,7 +66,6 @@ export const TokenSelector: React.FC<TokenSelectorProps> = ({
           setTokens(tokenList);
         }
       } catch (error) {
-        console.error('Failed to fetch tokens:', error);
         // Fallback to default tokens
         setTokens([
           { symbol: 'BTCUSDT', name: 'Bitcoin', chain: 'Bitcoin' },

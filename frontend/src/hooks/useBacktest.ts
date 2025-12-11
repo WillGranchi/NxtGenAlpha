@@ -29,14 +29,12 @@ export const useBacktest = (): UseBacktestReturn => {
   const [error, setError] = useState<string | null>(null);
 
   const runBacktest = useCallback(async (request: BacktestRequest) => {
-    console.log('Starting backtest with request:', request);
     setLoading(true);
     setError(null);
     setResults(null); // Clear previous results
     
     try {
       const response = await TradingAPI.runBacktest(request);
-      console.log('API Response received:', response);
       
       // Validate response structure
       if (!response) {
@@ -51,16 +49,7 @@ export const useBacktest = (): UseBacktestReturn => {
         throw new Error('Invalid API response format - missing results');
       }
       
-      if (!response.results.metrics) {
-        console.warn('Warning: No metrics in response');
-      }
-      
-      if (!response.results.equity_curve || !Array.isArray(response.results.equity_curve)) {
-        console.warn('Warning: No equity curve data in response');
-      }
-      
       setResults(response);
-      console.log('Backtest completed successfully:', response);
       
       // Smooth scroll to results after a short delay
       setTimeout(() => {
@@ -74,16 +63,13 @@ export const useBacktest = (): UseBacktestReturn => {
       }, 300);
       
     } catch (err: any) {
-      console.error('Detailed backtest error:', err);
-      console.error('Error stack:', err.stack);
-      
       const errorMessage = err.response?.data?.detail || 
                           err.response?.data?.message || 
                           err.message || 
                           'An unknown error occurred during backtest';
       
       setError(errorMessage);
-      console.error('Backtest failed with message:', errorMessage);
+      console.error('Backtest failed:', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -95,24 +81,16 @@ export const useBacktest = (): UseBacktestReturn => {
     // This prevents showing "Network Error" on page load
     
     try {
-      console.log(`Loading data info for ${symbol || 'default'}...`);
       const response = await TradingAPI.getDataInfo(symbol);
       setDataInfo(response);
-      console.log('Data info loaded successfully:', response);
       // Clear any previous errors on successful load
       setError(null);
     } catch (err: any) {
       const errorMessage = err.response?.data?.detail || err.message || 'Failed to load data info';
       // Only set error for critical failures, not for initial page load
-      // Log the error but don't show it as a persistent error banner
-      console.error('Failed to load data info:', errorMessage);
-      // Only set error if it's a critical failure (not a network timeout or similar)
       if (err.response?.status && err.response.status >= 500) {
         setError(errorMessage);
-      } else {
-        // For 4xx errors or network issues, just log them
-        // Don't show as persistent error to avoid "Network Error" on page load
-        console.warn('Data info load failed (non-critical):', errorMessage);
+        console.error('Failed to load data info:', errorMessage);
       }
     } finally {
       setLoading(false);
@@ -124,10 +102,8 @@ export const useBacktest = (): UseBacktestReturn => {
     setError(null);
     
     try {
-      console.log('Loading strategies...');
       const response = await TradingAPI.getAvailableStrategies();
       setStrategies(response);
-      console.log('Strategies loaded successfully:', response);
     } catch (err: any) {
       const errorMessage = err.response?.data?.detail || err.message || 'Failed to load strategies';
       setError(errorMessage);

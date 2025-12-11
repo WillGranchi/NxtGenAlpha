@@ -28,7 +28,6 @@ const StrategyManager: React.FC<StrategyManagerProps> = ({
       setStrategies(response.strategies);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load strategies');
-      console.error('Failed to load strategies:', err);
     } finally {
       setIsLoading(false);
     }
@@ -48,7 +47,6 @@ const StrategyManager: React.FC<StrategyManagerProps> = ({
       }
     } catch (err: any) {
       alert(err.response?.data?.detail || 'Failed to delete strategy');
-      console.error('Failed to delete strategy:', err);
     } finally {
       setDeletingId(null);
     }
@@ -64,7 +62,6 @@ const StrategyManager: React.FC<StrategyManagerProps> = ({
       }
     } catch (err: any) {
       alert(err.response?.data?.detail || 'Failed to duplicate strategy');
-      console.error('Failed to duplicate strategy:', err);
     } finally {
       setDuplicatingId(null);
     }
@@ -78,7 +75,6 @@ const StrategyManager: React.FC<StrategyManagerProps> = ({
       }
     } catch (err: any) {
       alert(err.response?.data?.detail || 'Failed to load strategy');
-      console.error('Failed to load strategy:', err);
     }
   };
 

@@ -374,14 +374,6 @@ def fetch_crypto_data_hybrid(symbol: str = "BTCUSDT", days: int = 1825) -> Tuple
         except Exception as e:
             logger.error(f"CoinGecko fetch failed for {symbol}: {e}")
     
-    # TODO: Add The Graph API integration for Ethereum-based tokens
-    # if symbol in ["ETHUSDT", "LINKUSDT", "UNIUSDT"]:
-    #     try:
-    #         df = fetch_crypto_data_from_thegraph(symbol=symbol, days=days)
-    #         return df, "thegraph", "full_ohlcv"
-    #     except Exception as e:
-    #         logger.error(f"The Graph fetch failed for {symbol}: {e}")
-    
     raise Exception(f"All data sources failed for {symbol}")
 
 
@@ -691,22 +683,6 @@ def get_data_summary(df: pd.DataFrame) -> dict:
     }
     
     return summary
-
-
-if __name__ == "__main__":
-    # Test the data loader
-    try:
-        df = load_btc_data("../data/btc_price.csv")
-        print("\nData Summary:")
-        summary = get_data_summary(df)
-        for key, value in summary.items():
-            print(f"{key}: {value}")
-        
-        print("\nFirst 5 rows:")
-        print(df.head())
-        
-        print("\nLast 5 rows:")
-        print(df.tail())
         
     except Exception as e:
         print(f"Error: {e}")

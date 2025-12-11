@@ -503,28 +503,3 @@ def format_metrics(metrics: Dict) -> pd.DataFrame:
     return pd.DataFrame(formatted_data)
 
 
-if __name__ == "__main__":
-    # Test the metrics calculations
-    import sys
-    sys.path.append('..')
-    from data_loader import load_btc_data
-    from strategy import SMAStrategy
-    from backtest import run_backtest
-    
-    try:
-        # Load sample data and run backtest
-        df = load_btc_data("../data/btc_price.csv")
-        sma_strategy = SMAStrategy(50, 200)
-        df_with_signals = sma_strategy.generate_signals(df)
-        results = run_backtest(df_with_signals, "SMA 50/200", 10000, 0.001)
-        
-        # Calculate all metrics
-        metrics = calculate_all_metrics(results)
-        
-        # Format and display
-        formatted_metrics = format_metrics(metrics)
-        print("Performance Metrics:")
-        print(formatted_metrics.to_string(index=False))
-        
-    except Exception as e:
-        print(f"Error: {e}")

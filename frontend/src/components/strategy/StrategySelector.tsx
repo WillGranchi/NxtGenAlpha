@@ -30,7 +30,6 @@ const StrategySelector: React.FC<StrategySelectorProps> = ({
       }
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load strategies');
-      console.error('Failed to load strategies:', err);
     } finally {
       setIsLoading(false);
     }
