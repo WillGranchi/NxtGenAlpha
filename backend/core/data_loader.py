@@ -668,21 +668,28 @@ def get_data_summary(df: pd.DataFrame) -> dict:
     Returns:
         dict: Summary statistics
     """
-    summary = {
-        'total_rows': len(df),
-        'date_range': {
-            'start': df.index.min().strftime('%Y-%m-%d'),
-            'end': df.index.max().strftime('%Y-%m-%d')
-        },
-        'price_range': {
-            'min': df['Close'].min(),
-            'max': df['Close'].max(),
-            'current': df['Close'].iloc[-1]
-        },
-        'columns': list(df.columns)
-    }
-    
-    return summary
+    try:
+        summary = {
+            'total_rows': len(df),
+            'date_range': {
+                'start': df.index.min().strftime('%Y-%m-%d'),
+                'end': df.index.max().strftime('%Y-%m-%d')
+            },
+            'price_range': {
+                'min': df['Close'].min(),
+                'max': df['Close'].max(),
+                'current': df['Close'].iloc[-1]
+            },
+            'columns': list(df.columns)
+        }
         
+        return summary
     except Exception as e:
-        print(f"Error: {e}")
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error generating data summary: {e}")
+        return {
+            'total_rows': 0,
+            'date_range': {'start': None, 'end': None},
+            'price_range': {'min': None, 'max': None, 'current': None},
+            'columns': []
+        }
