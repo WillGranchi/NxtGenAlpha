@@ -183,28 +183,27 @@ export const EquityChart: React.FC<EquityChartProps> = ({
         l: isMobile ? 50 : 60,
         r: isMobile ? 10 : 20,
       },
-    height: isMobile ? Math.min(height, 400) : height,
-    font: { size: isMobile ? 10 : 12 },
-    dragmode: 'pan' as const, // Better for mobile
+      height: isMobile ? Math.min(height, 400) : height,
+      font: { size: isMobile ? 10 : 12 },
+      dragmode: 'pan' as const, // Better for mobile
+      annotations: [
+        {
+          x: 0.02,
+          y: 0.98,
+          xref: 'paper' as const,
+          yref: 'paper' as const,
+          text: strategyType === 'long_short' 
+            ? '🟢 Long | 🟠 Cash | 🔴 Short'
+            : '🟢 Long | 🟠 Cash',
+          showarrow: false,
+          font: { size: 12 },
+          bgcolor: 'rgba(255,255,255,0.8)',
+          bordercolor: 'rgba(0,0,0,0.2)',
+          borderwidth: 1,
+        },
+      ],
     };
   }, [title, height, strategyType, showIndividualLegend]);
-    annotations: [
-      {
-        x: 0.02,
-        y: 0.98,
-        xref: 'paper' as const,
-        yref: 'paper' as const,
-        text: strategyType === 'long_short' 
-          ? '🟢 Long | 🟠 Cash | 🔴 Short'
-          : '🟢 Long | 🟠 Cash',
-        showarrow: false,
-        font: { size: 12 },
-        bgcolor: 'rgba(255,255,255,0.8)',
-        bordercolor: 'rgba(0,0,0,0.2)',
-        borderwidth: 1,
-      },
-    ],
-  }), [title, height, strategyType]);
 
   // Memoize config
   const config = useMemo(() => ({
