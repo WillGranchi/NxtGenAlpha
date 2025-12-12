@@ -72,17 +72,19 @@ export const MobileMetrics: React.FC<MobileMetricsProps> = ({
       {isExpanded && (
         <div className="px-4 pb-4 border-t border-border-default pt-4">
           <div className="grid grid-cols-2 gap-3">
-            {additionalMetrics.map((metric, index) => (
-              <div
-                key={index}
-                className="bg-bg-tertiary rounded-lg p-3 border border-border-default"
-              >
-                <div className="text-xs text-text-muted mb-1">{metric.label}</div>
-                <div className="text-base font-semibold text-text-primary">
-                  {metric.format(metric.value)}
+            {additionalMetrics
+              .filter(metric => metric.value !== undefined && metric.value !== null)
+              .map((metric, index) => (
+                <div
+                  key={index}
+                  className="bg-bg-tertiary rounded-lg p-3 border border-border-default"
+                >
+                  <div className="text-xs text-text-muted mb-1">{metric.label}</div>
+                  <div className="text-base font-semibold text-text-primary">
+                    {metric.format(metric.value as number)}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
           </div>
         </div>
       )}
