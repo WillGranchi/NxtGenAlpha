@@ -19,7 +19,7 @@ import IndicatorTileGrid from './results/IndicatorTileGrid';
 import ResultsSection from './ResultsSection';
 import { useToast } from '../hooks/useToast';
 import { ToastContainer } from './Toast';
-import { BacktestRequest, ModularBacktestRequest, SavedStrategy } from '../services/api';
+import { BacktestRequest, ModularBacktestRequest, SavedStrategy, IndicatorConfig } from '../services/api';
 import LoginButton from './auth/LoginButton';
 import { useAuth } from '../hooks/useAuth';
 import { DateRangePicker } from './DateRangePicker';
@@ -30,6 +30,8 @@ import { StrategyValidator } from './strategy/StrategyValidator';
 import { StrategyTemplates } from './strategy/StrategyTemplates';
 import { MobileStrategyBuilder } from './mobile/MobileStrategyBuilder';
 import { useMobile } from '../hooks/useMobile';
+import { useNavigation } from '../contexts/NavigationContext';
+import { Menu, ChevronDown, ChevronUp } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
   const [mode, setMode] = useState<'simple' | 'advanced'>('advanced');
@@ -45,6 +47,9 @@ export const Dashboard: React.FC = () => {
   const [overlayStates, setOverlayStates] = useState<Record<string, boolean>>({});
   const toast = useToast();
   const { isAuthenticated } = useAuth();
+  const { isMobile } = useMobile();
+  const { setIsOpen: setNavOpen, isMobile: isNavMobile } = useNavigation();
+  const [isHeaderExpanded, setIsHeaderExpanded] = useState(false);
   const [dataStatus, setDataStatus] = useState<{ last_update: string | null; is_fresh: boolean; hours_since_update: number | null } | null>(null);
   const [isRefreshingData, setIsRefreshingData] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState<string>(() => {
@@ -505,18 +510,63 @@ export const Dashboard: React.FC = () => {
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                Bitcoin Trading Strategy Dashboard
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-1">
-                Backtest and analyze Bitcoin trading strategies
-              </p>
+          <div className={`flex justify-between items-start ${isMobile ? 'py-4' : 'py-6'}`}>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start gap-3">
+                {/* Hamburger menu button (mobile only) */}
+                {isNavMobile && (
+                  <button
+                    onClick={() => setNavOpen(true)}
+                    className="mt-1 p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors lg:hidden touch-manipulation"
+                    aria-label="Open navigation menu"
+                  >
+                    <Menu className="w-6 h-6" />
+                  </button>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <h1 className={`font-bold text-gray-900 dark:text-white break-words ${
+                      isMobile ? 'text-xl' : 'text-2xl lg:text-3xl'
+                    }`}>
+                      Bitcoin Trading Strategy Dashboard
+                    </h1>
+                    {isMobile && (
+                      <button
+                        onClick={() => setIsHeaderExpanded(!isHeaderExpanded)}
+                        className="p-1 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors touch-manipulation flex-shrink-0"
+                        aria-label={isHeaderExpanded ? 'Collapse header' : 'Expand header'}
+                      >
+                        {isHeaderExpanded ? (
+                          <ChevronUp className="w-5 h-5" />
+                        ) : (
+                          <ChevronDown className="w-5 h-5" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+                  {(isMobile ? isHeaderExpanded : true) && (
+                    <>
+                      <p className={`text-gray-600 dark:text-gray-400 mt-1 break-words ${
+                        isMobile ? 'text-sm' : ''
+                      }`}>
+                        Backtest and analyze Bitcoin trading strategies
+                      </p>
+                      {isMobile && dataInfo?.data_info && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                          <span className="font-medium">{dataInfo.data_info.total_records.toLocaleString()}</span> records
+                          <span className="mx-2">•</span>
+                          <span>{dataInfo.data_info.date_range.start}</span> to{' '}
+                          <span>{dataInfo.data_info.date_range.end}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="flex items-center space-x-4">
-              {dataInfo?.data_info && (
-                <div className="text-sm text-gray-500 dark:text-gray-400">
+            <div className={`flex items-center space-x-4 flex-shrink-0 ${isMobile ? 'ml-2' : ''}`}>
+              {!isMobile && dataInfo?.data_info && (
+                <div className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
                   <span className="font-medium">{dataInfo.data_info.total_records.toLocaleString()}</span> records
                   <span className="mx-2">•</span>
                   <span>{dataInfo.data_info.date_range.start}</span> to{' '}
@@ -530,13 +580,15 @@ export const Dashboard: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-8">
+      <main className="max-w-7xl mx-auto py-4 sm:py-6 lg:py-8 w-full">
+        <div className={`space-y-4 sm:space-y-6 lg:space-y-8`}>
           {/* Token Selector and Data Freshness Indicator */}
           <div className="bg-bg-secondary border border-border-default rounded-lg p-4 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
-                Select Cryptocurrency
+              <label className={`block font-medium text-text-secondary mb-2 break-words ${
+                isMobile ? 'text-xs' : 'text-sm'
+              }`}>
+                {isMobile ? 'Select Crypto' : 'Select Cryptocurrency'}
               </label>
               <TokenSelector
                 selectedSymbol={selectedSymbol}
@@ -624,8 +676,10 @@ export const Dashboard: React.FC = () => {
 
           {/* Date Range Picker */}
           {dataInfo?.data_info && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Backtest Date Range</h2>
+            <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-md ${isMobile ? 'p-4' : 'p-6'}`}>
+              <h2 className={`font-semibold text-gray-900 dark:text-white mb-4 break-words ${
+                isMobile ? 'text-base' : 'text-lg'
+              }`}>Backtest Date Range</h2>
               <DateRangePicker
                 startDate={startDate}
                 endDate={endDate}
@@ -638,13 +692,17 @@ export const Dashboard: React.FC = () => {
           )}
 
           {/* Strategy Type Toggle */}
-          <div className="bg-bg-tertiary rounded-xl border border-border-default p-4 sm:p-6">
+          <div className={`bg-bg-tertiary rounded-xl border border-border-default ${isMobile ? 'p-4' : 'p-4 sm:p-6'}`}>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-semibold text-text-primary mb-2">
+              <div className="flex-1 min-w-0">
+                <h3 className={`font-semibold text-text-primary mb-2 break-words ${
+                  isMobile ? 'text-base' : 'text-lg'
+                }`}>
                   Strategy Type
                 </h3>
-                <p className="text-sm text-text-secondary">
+                <p className={`text-text-secondary break-words ${
+                  isMobile ? 'text-xs' : 'text-sm'
+                }`}>
                   {strategyType === 'long_cash' 
                     ? 'Long/Cash: Strategy can go long or hold cash. Returns stay at or above initial capital.'
                     : 'Long/Short: Strategy can go long or short. Returns can go negative with short positions.'
@@ -677,7 +735,7 @@ export const Dashboard: React.FC = () => {
           </div>
 
           {/* Strategy Templates */}
-          <div className="bg-bg-tertiary rounded-xl border border-border-default p-6">
+          <div className={`bg-bg-tertiary rounded-xl border border-border-default ${isMobile ? 'p-4' : 'p-6'}`}>
             <ErrorBoundary>
               <StrategyTemplates
                 onSelectTemplate={handleTemplateSelect}
@@ -691,7 +749,7 @@ export const Dashboard: React.FC = () => {
             {/* Mobile Strategy Builder */}
             {isMobile ? (
               <div className="bg-bg-tertiary rounded-xl border border-border-default p-4">
-                <h3 className="text-lg font-semibold text-text-primary mb-4">
+                <h3 className="text-base font-semibold text-text-primary mb-4 break-words">
                   Strategy Builder
                 </h3>
                 <ErrorBoundary>
@@ -715,11 +773,15 @@ export const Dashboard: React.FC = () => {
               </div>
             ) : (
               /* Desktop Visual Strategy Builder */
-              <div className="bg-bg-tertiary rounded-xl border border-border-default p-6">
-                <h3 className="text-lg font-semibold text-text-primary mb-4">
+              <div className={`bg-bg-tertiary rounded-xl border border-border-default ${isMobile ? 'p-4' : 'p-6'}`}>
+                <h3 className={`font-semibold text-text-primary mb-4 break-words ${
+                  isMobile ? 'text-base' : 'text-lg'
+                }`}>
                   Visual Strategy Builder
                 </h3>
-                <p className="text-sm text-text-secondary mb-4">
+                <p className={`text-text-secondary mb-4 break-words ${
+                  isMobile ? 'text-xs' : 'text-sm'
+                }`}>
                   Click indicators in the library to add them to the canvas, or drag them. Connect indicators with AND/OR logic by clicking the connection points.
                 </p>
                 <ErrorBoundary>
@@ -751,7 +813,7 @@ export const Dashboard: React.FC = () => {
 
             {/* Strategy Validator */}
             {selectedIndicators.length > 0 && (
-              <div className="bg-bg-tertiary rounded-xl border border-border-default p-6">
+              <div className={`bg-bg-tertiary rounded-xl border border-border-default ${isMobile ? 'p-4' : 'p-6'}`}>
                 <ErrorBoundary>
                   <StrategyValidator
                     selectedIndicators={selectedIndicators}
@@ -772,8 +834,8 @@ export const Dashboard: React.FC = () => {
 
             {/* Signal Flow & Logic Visualization */}
             {selectedIndicators.length > 0 && (expression || longExpression) && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-bg-tertiary rounded-xl border border-border-default p-6">
+              <div className={`grid grid-cols-1 lg:grid-cols-2 ${isMobile ? 'gap-4' : 'gap-6'}`}>
+                <div className={`bg-bg-tertiary rounded-xl border border-border-default ${isMobile ? 'p-4' : 'p-6'}`}>
                   <ErrorBoundary>
                     <SignalFlowDiagram
                       selectedIndicators={selectedIndicators}
@@ -784,7 +846,7 @@ export const Dashboard: React.FC = () => {
                     />
                   </ErrorBoundary>
                 </div>
-                <div className="bg-bg-tertiary rounded-xl border border-border-default p-6">
+                <div className={`bg-bg-tertiary rounded-xl border border-border-default ${isMobile ? 'p-4' : 'p-6'}`}>
                   <ErrorBoundary>
                     <AndOrLogicVisualizer
                       expression={useSeparateExpressions ? longExpression : expression}
@@ -800,10 +862,12 @@ export const Dashboard: React.FC = () => {
             {/* Advanced Expression Editor - Collapsed by Default */}
             {selectedIndicators.length > 0 && (
               <details className="bg-bg-tertiary rounded-xl border border-border-default overflow-hidden">
-                <summary className="p-4 cursor-pointer text-text-primary font-medium hover:bg-bg-elevated transition-colors">
+                <summary className={`cursor-pointer text-text-primary font-medium hover:bg-bg-elevated transition-colors break-words ${
+                  isMobile ? 'p-3 text-sm' : 'p-4'
+                }`}>
                   Advanced Expression Editor (Optional)
                 </summary>
-                <div className="p-6 border-t border-border-default">
+                <div className={`border-t border-border-default ${isMobile ? 'p-4' : 'p-6'}`}>
                   <StrategyMakeup
                     selectedIndicators={selectedIndicators}
                     availableIndicators={availableIndicators}
@@ -852,7 +916,7 @@ export const Dashboard: React.FC = () => {
 
           {/* Results Section */}
           {(legacyResults || modularResponse) && (
-            <div id="results-section" className="space-y-6 animate-fade-in">
+            <div id="results-section" className={`animate-fade-in ${isMobile ? 'space-y-4' : 'space-y-6'}`}>
               {/* Legacy Results */}
               {legacyResults && legacyResults.results && (
                 <>
@@ -911,16 +975,20 @@ export const Dashboard: React.FC = () => {
 
           {/* No Results State */}
           {!legacyResults && !modularResponse && !legacyLoading && !modularLoading && (
-            <div className="bg-white rounded-lg shadow-md p-12 text-center">
+            <div className={`bg-white rounded-lg shadow-md text-center ${isMobile ? 'p-6' : 'p-12'}`}>
               <div className="text-gray-400 mb-4">
-                <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className={`mx-auto ${isMobile ? 'h-8 w-8' : 'h-12 w-12'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <h3 className={`font-medium text-gray-900 mb-2 break-words ${
+                isMobile ? 'text-base' : 'text-lg'
+              }`}>
                 Ready to Run a Backtest
               </h3>
-              <p className="text-gray-500">
+              <p className={`text-gray-500 break-words ${
+                isMobile ? 'text-sm' : ''
+              }`}>
                 {mode === 'simple' 
                   ? 'Select a strategy and configure parameters to get started.'
                   : 'Add indicators to your strategy and configure parameters to get started.'
@@ -935,9 +1003,11 @@ export const Dashboard: React.FC = () => {
       <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
 
       {/* Footer */}
-      <footer className="bg-white border-t mt-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="text-center text-sm text-gray-500">
+      <footer className="bg-white border-t mt-8 sm:mt-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+          <div className={`text-center text-gray-500 break-words ${
+            isMobile ? 'text-xs' : 'text-sm'
+          }`}>
             <p>
               Bitcoin Trading Strategy Dashboard - Built with React, FastAPI, and Plotly
             </p>

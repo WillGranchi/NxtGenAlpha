@@ -3,7 +3,7 @@
  * Shows as sidebar on desktop, collapsible drawer on mobile
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -18,12 +18,12 @@ import {
 import { useAuth } from '../../hooks/useAuth';
 import { Button } from '../ui/Button';
 import { useSwipe } from '../../hooks/useSwipe';
+import { useNavigation } from '../../contexts/NavigationContext';
 
 export const MobileNavigation: React.FC = () => {
   const location = useLocation();
   const { isAuthenticated, logout, user } = useAuth();
-  const [isOpen, setIsOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const { isOpen, setIsOpen, isMobile } = useNavigation();
   
   // Swipe gestures for mobile
   const swipeHandlers = useSwipe({
@@ -31,27 +31,12 @@ export const MobileNavigation: React.FC = () => {
     onSwipeLeft: () => setIsOpen(false),
   });
 
-  // Detect mobile screen size
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024); // lg breakpoint
-      // Auto-close on mobile when navigating
-      if (window.innerWidth < 1024) {
-        setIsOpen(false);
-      }
-    };
-
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
   // Close on route change (mobile)
   useEffect(() => {
     if (isMobile) {
       setIsOpen(false);
     }
-  }, [location.pathname, isMobile]);
+  }, [location.pathname, isMobile, setIsOpen]);
 
   if (!isAuthenticated) {
     return null;
@@ -64,22 +49,6 @@ export const MobileNavigation: React.FC = () => {
   ];
 
   const isActive = (path: string) => location.pathname === path;
-
-  // Mobile: Collapsed tab trigger
-  if (isMobile && !isOpen) {
-    return (
-      <>
-        {/* Small tab trigger */}
-        <button
-          onClick={() => setIsOpen(true)}
-          className="fixed left-0 top-1/2 -translate-y-1/2 z-50 bg-primary-500 text-white p-2 rounded-r-lg shadow-lg hover:bg-primary-600 transition-colors"
-          aria-label="Open navigation"
-        >
-          <ChevronRight className="w-5 h-5" />
-        </button>
-      </>
-    );
-  }
 
   return (
     <>

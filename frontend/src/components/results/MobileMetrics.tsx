@@ -21,7 +21,7 @@ export const MobileMetrics: React.FC<MobileMetricsProps> = ({
   // Key metrics to show by default
   const keyMetrics = [
     { label: 'Total Return', value: metrics.total_return, format: (v: number) => `${(v * 100).toFixed(2)}%`, icon: TrendingUp },
-    { label: 'Final Value', value: metrics.final_value, format: (v: number) => `$${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: DollarSign },
+    { label: 'Final Value', value: metrics.final_portfolio_value, format: (v: number) => `$${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: DollarSign },
     { label: 'Sharpe Ratio', value: metrics.sharpe_ratio, format: (v: number) => v.toFixed(2), icon: BarChart3 },
     { label: 'Max Drawdown', value: metrics.max_drawdown, format: (v: number) => `${(v * 100).toFixed(2)}%`, icon: TrendingDown },
   ];
@@ -33,7 +33,6 @@ export const MobileMetrics: React.FC<MobileMetricsProps> = ({
     { label: 'Profit Factor', value: metrics.profit_factor, format: (v: number) => v.toFixed(2) },
     { label: 'Sortino Ratio', value: metrics.sortino_ratio, format: (v: number) => v.toFixed(2) },
     { label: 'Calmar Ratio', value: metrics.calmar_ratio, format: (v: number) => v.toFixed(2) },
-    { label: 'Volatility', value: metrics.volatility, format: (v: number) => `${(v * 100).toFixed(2)}%` },
     { label: 'Total Trades', value: metrics.total_trades, format: (v: number) => v.toString() },
     { label: 'Average Trade', value: metrics.avg_trade_return, format: (v: number) => `${(v * 100).toFixed(2)}%` },
   ];

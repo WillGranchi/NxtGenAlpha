@@ -8,11 +8,9 @@ import ErrorBoundary from '../components/ErrorBoundary';
 
 const DashboardPage: React.FC = () => {
   return (
-    <div className="p-6">
-      <ErrorBoundary>
-        <Dashboard />
-      </ErrorBoundary>
-    </div>
+    <ErrorBoundary>
+      <Dashboard />
+    </ErrorBoundary>
   );
 };
 
