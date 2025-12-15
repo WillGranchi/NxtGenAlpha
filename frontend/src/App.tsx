@@ -12,6 +12,7 @@ import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import DashboardPage from './pages/DashboardPage';
 import StrategyLibraryPage from './pages/StrategyLibraryPage';
+import SettingsPage from './pages/SettingsPage';
 
 export const App: React.FC = () => {
   return (
@@ -40,6 +41,26 @@ export const App: React.FC = () => {
               <ProtectedRoute>
                 <Layout>
                   <StrategyLibraryPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <SettingsPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <SettingsPage />
                 </Layout>
               </ProtectedRoute>
             }

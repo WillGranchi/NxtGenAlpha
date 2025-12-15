@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 
 const LoginButton: React.FC = () => {
   const { user, isLoading, isAuthenticated, login, logout } = useAuth();
+  const navigate = useNavigate();
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -35,7 +37,7 @@ const LoginButton: React.FC = () => {
   }
 
   if (isAuthenticated && user) {
-    // Get initials for avatar
+    // Get initials for avatar fallback
     const initials = user.name
       ? user.name
           .split(' ')
@@ -45,13 +47,34 @@ const LoginButton: React.FC = () => {
           .slice(0, 2)
       : user.email[0].toUpperCase();
 
+    // Generate default avatar URL if no profile picture
+    const getAvatarUrl = (): string => {
+      if (user.profile_picture_url) {
+        return user.profile_picture_url;
+      }
+      const name = user.name || user.email || 'User';
+      return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
+    };
+
     return (
       <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => setShowDropdown(!showDropdown)}
           className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
         >
-          <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-sm font-semibold">
+          <img
+            src={getAvatarUrl()}
+            alt={user.name || user.email}
+            className="w-8 h-8 rounded-full border-2 border-white/20 object-cover"
+            onError={(e) => {
+              // Fallback to initials if image fails to load
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+              const fallback = target.nextElementSibling as HTMLElement;
+              if (fallback) fallback.style.display = 'flex';
+            }}
+          />
+          <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-sm font-semibold hidden">
             {initials}
           </div>
           <span className="hidden md:block">{user.name || user.email}</span>
@@ -73,7 +96,7 @@ const LoginButton: React.FC = () => {
             </div>
             <button
               onClick={() => {
-                window.location.href = '/profile';
+                navigate('/settings');
                 setShowDropdown(false);
               }}
               className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"

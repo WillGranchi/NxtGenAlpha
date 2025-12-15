@@ -6,6 +6,7 @@ interface User {
   email: string;
   name: string;
   theme: 'light' | 'dark';
+  profile_picture_url?: string;
   created_at?: string;
 }
 
@@ -18,7 +19,7 @@ interface AuthContextType {
   signup: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
   updateTheme: (theme: 'light' | 'dark') => Promise<void>;
-  updateProfile: (name?: string, email?: string) => Promise<void>;
+  updateProfile: (name?: string, email?: string, profilePictureUrl?: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -218,9 +219,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     await loadUser();
   };
 
-  const updateProfile = async (name?: string, email?: string) => {
+  const updateProfile = async (name?: string, email?: string, profilePictureUrl?: string) => {
     try {
-      const response = await TradingAPI.updateProfile(name, email);
+      const response = await TradingAPI.updateProfile(name, email, profilePictureUrl);
       if (response.user) {
         setUser(response.user);
         // Apply theme if it changed

@@ -330,6 +330,7 @@ export interface User {
   email: string;
   name: string;
   theme: 'light' | 'dark';
+  profile_picture_url?: string;
   created_at?: string;
 }
 
@@ -538,12 +539,13 @@ export class TradingAPI {
   }
 
   /**
-   * Update user profile (name and/or email).
+   * Update user profile (name, email, and/or profile picture URL).
    */
-  static async updateProfile(name?: string, email?: string): Promise<{ message: string; user: User }> {
+  static async updateProfile(name?: string, email?: string, profilePictureUrl?: string): Promise<{ message: string; user: User }> {
     const response = await api.put('/api/auth/profile', {
       name,
       email,
+      profile_picture_url: profilePictureUrl,
     });
     return response.data;
   }

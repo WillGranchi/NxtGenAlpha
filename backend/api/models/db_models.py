@@ -21,6 +21,7 @@ class User(Base):
     password_hash = Column(String(255), nullable=True)  # For email/password auth
     google_id = Column(String(255), unique=True, index=True, nullable=True)
     theme = Column(String(20), default="dark", nullable=False)  # 'light' or 'dark'
+    profile_picture_url = Column(String(500), nullable=True)  # URL to profile picture
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     

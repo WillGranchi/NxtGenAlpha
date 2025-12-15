@@ -93,6 +93,7 @@ class LoginRequest(BaseModel):
 class UpdateProfileRequest(BaseModel):
     name: Optional[str] = None
     email: Optional[EmailStr] = None
+    profile_picture_url: Optional[str] = None
 
 
 class ChangePasswordRequest(BaseModel):
@@ -483,6 +484,7 @@ async def get_me(current_user: Optional[User] = Depends(get_current_user_optiona
             "email": current_user.email,
             "name": current_user.name,
             "theme": current_user.theme,
+            "profile_picture_url": current_user.profile_picture_url,
             "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
         }
     }
@@ -543,6 +545,11 @@ async def update_profile(
             current_user.email = request.email
             updated = True
         
+        # Update profile picture URL if provided
+        if request.profile_picture_url is not None:
+            current_user.profile_picture_url = request.profile_picture_url
+            updated = True
+        
         if not updated:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -559,6 +566,7 @@ async def update_profile(
                 "email": current_user.email,
                 "name": current_user.name,
                 "theme": current_user.theme,
+                "profile_picture_url": current_user.profile_picture_url,
                 "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
             }
         }
