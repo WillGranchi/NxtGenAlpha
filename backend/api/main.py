@@ -84,8 +84,30 @@ async def scheduled_data_update():
 # Initialize database on startup
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database tables and scheduler on application startup."""
+    """Initialize database tables, run migrations, and scheduler on application startup."""
     try:
+        # Run Alembic migrations first
+        try:
+            import subprocess
+            import sys
+            result = subprocess.run(
+                [sys.executable, "-m", "alembic", "-c", "backend/alembic.ini", "upgrade", "head"],
+                cwd="/app",
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            if result.returncode == 0:
+                logger.info("Database migrations completed successfully")
+            else:
+                logger.warning(f"Migration output: {result.stdout}")
+                logger.warning(f"Migration errors: {result.stderr}")
+                # Continue anyway - migrations might already be applied
+        except Exception as migration_error:
+            logger.warning(f"Failed to run migrations: {migration_error}")
+            # Continue - migrations might already be applied or can be run manually
+        
+        # Initialize database tables (creates tables if they don't exist)
         init_db()
         logger.info("Database initialized successfully")
     except Exception as e:
