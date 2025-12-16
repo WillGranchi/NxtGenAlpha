@@ -102,9 +102,23 @@ async def startup_event():
             else:
                 logger.warning(f"Migration output: {result.stdout}")
                 logger.warning(f"Migration errors: {result.stderr}")
+                # Try fallback migration script for profile_picture_url
+                try:
+                    from backend.migrations.add_profile_picture_url import add_profile_picture_url_column
+                    add_profile_picture_url_column()
+                    logger.info("Fallback migration script completed successfully")
+                except Exception as fallback_error:
+                    logger.warning(f"Fallback migration also failed: {fallback_error}")
                 # Continue anyway - migrations might already be applied
         except Exception as migration_error:
             logger.warning(f"Failed to run migrations: {migration_error}")
+            # Try fallback migration script
+            try:
+                from backend.migrations.add_profile_picture_url import add_profile_picture_url_column
+                add_profile_picture_url_column()
+                logger.info("Fallback migration script completed successfully")
+            except Exception as fallback_error:
+                logger.warning(f"Fallback migration also failed: {fallback_error}")
             # Continue - migrations might already be applied or can be run manually
         
         # Initialize database tables (creates tables if they don't exist)
