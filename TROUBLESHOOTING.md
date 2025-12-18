@@ -59,6 +59,54 @@ The backend uses `SameSite=None` with `Secure=True` for OAuth cookies:
 - If Authorization header missing: Verify frontend code is deployed
 - If 401 error: Check token is valid and backend is reading it
 
+### Problem: 404 Error on Signup/Login Endpoints
+
+**Symptoms:**
+- Getting 404 error when trying to signup/login
+- `Request failed with status code 404`
+- Endpoints `/api/auth/signup` or `/api/auth/login` not found
+
+**Root Cause:**
+- Backend server needs to be restarted to load new routes
+- Routes not registered properly
+
+**Fix Steps:**
+
+1. **Restart Backend Server:**
+   - **Local:** Stop server (Ctrl+C), then restart:
+     ```bash
+     cd backend
+     uvicorn backend.api.main:app --reload --host 0.0.0.0 --port 8000
+     ```
+   - **Railway:** Trigger redeploy or wait for auto-reload
+
+2. **Verify Routes are Registered:**
+   - Visit: `http://localhost:8000/docs` (or Railway backend URL + `/docs`)
+   - Should show `/api/auth/signup` and `/api/auth/login` endpoints
+
+3. **Test Endpoint Directly:**
+   ```bash
+   curl -X POST http://localhost:8000/api/auth/signup \
+     -H "Content-Type: application/json" \
+     -d '{"email":"test@example.com","password":"test123456","name":"Test User"}'
+   ```
+   Should return response (not 404)
+
+4. **Check Database Migration:**
+   - Ensure `password_hash` column exists in users table
+   - Run migration if needed:
+     ```bash
+     cd backend
+     python migrations/add_password_hash.py
+     # Or with Alembic:
+     alembic upgrade head
+     ```
+
+**Common Issues:**
+- Module import errors: Check Python path is set correctly
+- Port conflicts: Ensure port 8000 is available
+- Database errors: Run migration scripts
+
 ---
 
 ## API Errors
@@ -69,34 +117,71 @@ The backend uses `SameSite=None` with `Secure=True` for OAuth cookies:
 - `/api/data/info` returns 404
 - `/api/strategies` returns 404
 - Other API endpoints return 404
+- ALL endpoints return 404 (including `/` and `/health`)
 
 **Possible Causes:**
-1. Backend service not running
+1. Backend service not running or crashed
 2. Data file missing (prevents backend from starting)
 3. Routes not registered
 4. Backend deployment failed
+5. Port configuration issues
 
 **Fix Steps:**
 
-1. **Check Backend Health:**
-   ```
-   https://web-production-776f1.up.railway.app/health
+1. **Check Backend Deployment Status:**
+   - Railway Dashboard → Backend Service → Deployments
+   - Latest deployment should be "Active" or "Success"
+   - If "Failed": Check build logs for errors
+
+2. **Check Backend Logs:**
+   - Railway Dashboard → Backend Service → Logs tab
+   - **Good Signs:**
+     ```
+     INFO:     Started server process [1]
+     INFO:     Waiting for application startup.
+     INFO:     Application startup complete.
+     INFO:     Uvicorn running on http://0.0.0.0:XXXX
+     ```
+   - **Bad Signs:**
+     - `ModuleNotFoundError` or `ImportError`
+     - `FileNotFoundError` (especially data files)
+     - `Database connection failed`
+     - `Traceback` or `Exception`
+     - No "Uvicorn running" message
+
+3. **Check Backend Health:**
+   ```bash
+   curl https://your-backend-url/health
    ```
    - Should return: `{"status": "healthy", ...}`
    - If "unhealthy": See [Data File Issues](#data-file-issues)
+   - If 404: Backend is not running (see above)
 
-2. **Verify Backend is Running:**
-   - Railway Dashboard → Backend Service → Deployments
-   - Status should be "Deployed" (green)
-   - Check logs for errors
-
-3. **Test API Routes Directly:**
-   - Visit: `https://web-production-776f1.up.railway.app/api/data/info`
+4. **Test API Routes Directly:**
+   - Visit: `https://your-backend-url/api/data/info`
    - Should return JSON (not 404)
 
-4. **Check Backend Logs:**
-   - Look for: `Application startup complete`
-   - Look for route registration errors
+5. **Common Backend Startup Issues:**
+
+   **Missing Data File:**
+   - Error: `FileNotFoundError: Bitcoin Historical Data4.csv`
+   - Fix: Ensure file is committed to git and pushed
+   - Verify: `git ls-files | grep "Bitcoin Historical Data4.csv"`
+
+   **Import Errors:**
+   - Error: `ModuleNotFoundError: No module named 'backend'`
+   - Fix: Verify `PYTHONPATH=/app` is set in Railway
+   - Check Dockerfile copies backend correctly
+
+   **Database Connection Failed:**
+   - Error: `Failed to initialize database`
+   - Fix: Check `DATABASE_URL` is set correctly
+   - Verify PostgreSQL service is running
+
+   **Port Configuration:**
+   - Error: Port binding issues
+   - Fix: Verify Railway sets `PORT` environment variable
+   - Check Dockerfile uses `$PORT` correctly
 
 ---
 
@@ -349,8 +434,144 @@ but requested an insecure XMLHttpRequest endpoint 'http://web-production-776f1.u
 **Frontend URL:** `https://nxtgenalpha.com`  
 **Google Cloud Console:** https://console.cloud.google.com
 
+## Frontend Issues
+
+### Problem: Frontend Shows Backend JSON Instead of React App
+
+**Symptoms:**
+- Visiting frontend URL shows backend API response
+- JSON data instead of HTML
+- Domain routing issue
+
+**Root Cause:**
+- Domain attached to wrong service (Backend instead of Frontend)
+- Frontend service not running
+
+**Fix Steps:**
+
+1. **Check Domain Attachment:**
+   - Railway → Frontend → Settings → Networking
+   - Ensure frontend has public domain
+   - Railway → Backend → Settings → Networking
+   - Ensure backend domain is DIFFERENT from frontend
+
+2. **Test Railway URLs Directly:**
+   - Frontend Railway URL: `https://frontend-production-xxxx.up.railway.app`
+   - Backend Railway URL: `https://backend-production-xxxx.up.railway.app`
+   - They should be different!
+
+3. **Verify Frontend Service:**
+   - Railway → Frontend Service → Deployments
+   - Status should be "Active" or "Success"
+   - Check logs show nginx running (not uvicorn)
+
+### Problem: Frontend Shows Blank White Page
+
+**Symptoms:**
+- Page loads but shows blank white screen
+- No errors in Railway logs
+- Browser console shows JavaScript errors
+
+**Fix Steps:**
+
+1. **Open Browser DevTools (F12):**
+   - Console tab - Look for errors:
+     - `Uncaught ReferenceError`
+     - `Failed to load resource`
+     - `Mixed Content` errors
+
+2. **Check Network Tab:**
+   - Verify files are loading:
+     - `index.html` should load
+     - `index-xxxxx.js` should load
+     - `index-xxxxx.css` should load
+
+3. **Check Build:**
+   - Railway → Frontend → Deployments → Latest → Build Logs
+   - Look for `npm run build` completion
+   - Verify `dist/` directory was created
+
+4. **Clear Browser Cache:**
+   - Hard refresh: `Ctrl+Shift+R` (Windows) or `Cmd+Shift+R` (Mac)
+   - Or use incognito window
+
+### Problem: Frontend Build Failed
+
+**Symptoms:**
+- Frontend deployment shows "Failed"
+- Build logs show errors
+
+**Common Causes:**
+
+1. **TypeScript Compilation Errors:**
+   - Fix: Resolve all TypeScript errors
+   - Check build logs for specific error messages
+
+2. **Missing Dependencies:**
+   - Fix: Ensure `package.json` dependencies are correct
+   - Verify `npm install` completes successfully
+
+3. **Build Timeout:**
+   - Fix: Check build logs for timeout
+   - May need to optimize build process
+
+### Problem: Frontend Can't Connect to Backend
+
+**Symptoms:**
+- Frontend loads but API calls fail
+- Console shows: `API URL is HTTP but page is HTTPS`
+- Network requests fail
+
+**Fix Steps:**
+
+1. **Check VITE_API_URL:**
+   - Railway → Frontend → Variables tab
+   - Must be HTTPS (not HTTP)
+   - Must match backend URL
+   - No trailing slash
+
+2. **Verify Backend is Running:**
+   - Check backend health endpoint
+   - Verify backend service is active
+
+3. **Check CORS Configuration:**
+   - See [CORS Issues](#cors-issues) section
+
+## Backend Startup Issues
+
+### Problem: Backend Crashes on Startup
+
+**Common Errors:**
+
+1. **Missing Data File:**
+   ```
+   FileNotFoundError: Bitcoin Historical Data4.csv
+   ```
+   - Fix: Ensure file is in git repository
+   - Verify: `git ls-files | grep "Bitcoin Historical Data4.csv"`
+
+2. **Import Errors:**
+   ```
+   ModuleNotFoundError: No module named 'backend'
+   ```
+   - Fix: Verify `PYTHONPATH=/app` is set
+   - Check Dockerfile copies backend correctly
+
+3. **Database Connection Failed:**
+   ```
+   Failed to initialize database
+   ```
+   - Fix: Check `DATABASE_URL` format
+   - Verify PostgreSQL service is running
+
+4. **Port Binding Errors:**
+   ```
+   Address already in use
+   ```
+   - Fix: Railway handles ports automatically
+   - Verify Dockerfile uses `$PORT` correctly
+
 **Related Documentation:**
-- `DEPLOYMENT_VERIFICATION.md` - Step-by-step verification guide
-- `RAILWAY_DEPLOYMENT.md` - Railway deployment guide
+- `RAILWAY_DEPLOYMENT.md` - Railway deployment guide with troubleshooting
 - `GOOGLE_OAUTH_SETUP.md` - OAuth setup guide
 

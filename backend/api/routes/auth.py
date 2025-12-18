@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from pydantic import BaseModel, EmailStr
 
-from backend.core.database import get_db
+from backend.core.database import get_db, engine
 import os
+from sqlalchemy import inspect, text
 from backend.core.auth import (
     create_access_token,
     get_current_user,
@@ -23,8 +24,29 @@ from backend.core.auth import (
 )
 from backend.api.models.db_models import User
 from backend.utils.helpers import get_logger
+import json
+from pathlib import Path
 
 logger = get_logger(__name__)
+
+# #region agent log
+def _log_debug(session_id, run_id, hypothesis_id, location, message, data):
+    try:
+        log_path = Path("/Users/willgranchi/TradingPlat/.cursor/debug.log")
+        log_entry = {
+            "sessionId": session_id,
+            "runId": run_id,
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": int(__import__("time").time() * 1000)
+        }
+        with open(log_path, "a") as f:
+            f.write(json.dumps(log_entry) + "\n")
+    except Exception:
+        pass
+# #endregion agent log
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -228,9 +250,58 @@ async def login(
     """
     Login user with email and password.
     """
+    # #region agent log
+    _log_debug("debug-session", "run1", "A", "auth.py:244", "Login endpoint called", {"email": request.email})
+    # Check database connection info
+    db_url_redacted = os.getenv("DATABASE_URL", "").split("@")[-1] if "@" in os.getenv("DATABASE_URL", "") else "not_set"
+    _log_debug("debug-session", "run1", "E", "auth.py:247", "Database connection info", {"db_host": db_url_redacted})
+    # #endregion agent log
     try:
+        # #region agent log
+        # Check database schema before querying
+        try:
+            inspector = inspect(engine)
+            users_columns = [col['name'] for col in inspector.get_columns('users')]
+            has_profile_pic_col = 'profile_picture_url' in users_columns
+            _log_debug("debug-session", "run1", "A", "auth.py:256", "Database schema check", {
+                "users_columns": users_columns,
+                "has_profile_picture_url": has_profile_pic_col,
+                "total_columns": len(users_columns)
+            })
+            # Check migration file existence (check both relative and absolute paths)
+            migration_file_rel = Path("backend/alembic/versions/55f96e77095c_add_profile_picture_url_to_users.py")
+            migration_file_abs = Path(__file__).parent.parent.parent / "alembic" / "versions" / "55f96e77095c_add_profile_picture_url_to_users.py"
+            migration_exists_rel = migration_file_rel.exists()
+            migration_exists_abs = migration_file_abs.exists()
+            _log_debug("debug-session", "run1", "B", "auth.py:263", "Migration file check", {
+                "relative_path": str(migration_file_rel),
+                "relative_exists": migration_exists_rel,
+                "absolute_path": str(migration_file_abs),
+                "absolute_exists": migration_exists_abs,
+                "cwd": str(Path.cwd())
+            })
+            # Check alembic version table to see if migration was run
+            try:
+                with engine.connect() as conn:
+                    result = conn.execute(text("SELECT version_num FROM alembic_version LIMIT 1"))
+                    alembic_version = result.fetchone()
+                    _log_debug("debug-session", "run1", "B", "auth.py:275", "Alembic version check", {
+                        "alembic_version": alembic_version[0] if alembic_version else None
+                    })
+            except Exception as alembic_err:
+                _log_debug("debug-session", "run1", "B", "auth.py:279", "Alembic version check failed", {"error": str(alembic_err)})
+        except Exception as schema_err:
+            _log_debug("debug-session", "run1", "C", "auth.py:281", "Schema check failed", {"error": str(schema_err), "error_type": type(schema_err).__name__})
+        # #endregion agent log
+        
         # Find user by email
+        # #region agent log
+        _log_debug("debug-session", "run1", "D", "auth.py:272", "Querying user before", {"email": request.email})
+        # #endregion agent log
         user = db.query(User).filter(User.email == request.email).first()
+        # #region agent log
+        _log_debug("debug-session", "run1", "D", "auth.py:275", "Querying user after", {"user_found": user is not None, "user_id": user.id if user else None})
+        # #endregion agent log
         
         if not user:
             raise HTTPException(

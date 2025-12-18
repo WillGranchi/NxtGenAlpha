@@ -705,6 +705,67 @@ export class TradingAPI {
     const response: AxiosResponse<any> = await api.post(`/api/custom-indicators/${indicatorId}/test`, params);
     return response.data;
   }
+
+  // Valuation API
+
+  /**
+   * Get available valuation indicators.
+   */
+  static async getValuationIndicators(): Promise<{
+    success: boolean;
+    indicators: Array<{
+      id: string;
+      name: string;
+      category: 'technical' | 'fundamental';
+      description: string;
+    }>;
+  }> {
+    const response: AxiosResponse<any> = await api.get('/api/valuation/indicators');
+    return response.data;
+  }
+
+  /**
+   * Calculate z-scores for selected indicators.
+   */
+  static async calculateValuationZScores(request: {
+    indicators: string[];
+    symbol?: string;
+    zscore_method?: 'rolling' | 'all_time';
+    rolling_window?: number;
+    start_date?: string;
+    end_date?: string;
+  }): Promise<{
+    success: boolean;
+    data: Array<{
+      date: string;
+      price: number;
+      indicators: Record<string, { value: number; zscore: number }>;
+    }>;
+    averages: Record<string, number>;
+  }> {
+    const response: AxiosResponse<any> = await api.post('/api/valuation/zscores', request);
+    return response.data;
+  }
+
+  /**
+   * Get valuation data (price + indicator values without z-scores).
+   */
+  static async getValuationData(params: {
+    symbol?: string;
+    indicators?: string[];
+    start_date?: string;
+    end_date?: string;
+  }): Promise<{
+    success: boolean;
+    data: Array<{
+      date: string;
+      price: number;
+      indicators: Record<string, number>;
+    }>;
+  }> {
+    const response: AxiosResponse<any> = await api.get('/api/valuation/data', { params });
+    return response.data;
+  }
 }
 
 export default TradingAPI;

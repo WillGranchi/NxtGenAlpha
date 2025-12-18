@@ -51,9 +51,7 @@ A comprehensive web application for building, testing, and saving Bitcoin tradin
 
 For deploying to Railway with your domain `nxtgenalpha.com`, see:
 
-- **[RAILWAY_DEPLOYMENT.md](./RAILWAY_DEPLOYMENT.md)** - Step-by-step Railway deployment guide
-- **[RAILWAY_ENV_CHECKLIST.md](./RAILWAY_ENV_CHECKLIST.md)** - Environment variables setup checklist
-- **[DEPLOYMENT_VERIFICATION.md](./DEPLOYMENT_VERIFICATION.md)** - Complete verification checklist
+- **[RAILWAY_DEPLOYMENT.md](./RAILWAY_DEPLOYMENT.md)** - Complete Railway deployment guide with step-by-step instructions, environment variables, verification checklist, and troubleshooting
 
 ### Quick Railway Deployment Checklist
 
@@ -67,33 +65,24 @@ For deploying to Railway with your domain `nxtgenalpha.com`, see:
 8. ⬜ Run database migrations
 9. ⬜ Test deployment
 
-See **RAILWAY_DEPLOYMENT.md** for detailed instructions.
-
-## Production Deployment (General)
-
-For production deployment, see the comprehensive [DEPLOYMENT.md](./DEPLOYMENT.md) guide which covers:
-- Environment configuration
-- SSL/HTTPS setup
-- Database setup
-- Google OAuth production configuration
-- Monitoring and health checks
-- Troubleshooting
+See **RAILWAY_DEPLOYMENT.md** for detailed instructions and verification checklist.
 
 ## Documentation
 
 ### Setup & Deployment
 - **[GOOGLE_OAUTH_SETUP.md](./GOOGLE_OAUTH_SETUP.md)** - Step-by-step guide for configuring Google OAuth
-- **[RAILWAY_DEPLOYMENT.md](./RAILWAY_DEPLOYMENT.md)** - Railway deployment guide
-- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - General production deployment guide
-- **[DOCKER_SETUP.md](./DOCKER_SETUP.md)** - Docker installation and troubleshooting guide
-- **[RAILWAY_ENV_CHECKLIST.md](./RAILWAY_ENV_CHECKLIST.md)** - Environment variables reference
+- **[RAILWAY_DEPLOYMENT.md](./RAILWAY_DEPLOYMENT.md)** - Complete Railway deployment guide (includes environment variables and verification checklist)
+- **[DATABASE_SETUP.md](./DATABASE_SETUP.md)** - Database configuration guide
+- **[DOCKER_SETUP.md](./DOCKER_SETUP.md)** - Docker installation and troubleshooting guide (if available)
 
-### Verification & Troubleshooting
-- **[DEPLOYMENT_VERIFICATION.md](./DEPLOYMENT_VERIFICATION.md)** - Complete deployment verification checklist
-- **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** - Common issues and solutions
+### Troubleshooting
+- **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** - Comprehensive troubleshooting guide covering authentication, API errors, CORS, frontend issues, and more
 
 ### Testing
 - **[TESTING.md](./TESTING.md)** - Testing documentation and test scripts
+
+### Architecture
+- **[CODEBASE_OVERVIEW.md](./CODEBASE_OVERVIEW.md)** - Comprehensive codebase structure and architecture documentation
 
 ## Authentication & User Accounts
 
@@ -171,6 +160,9 @@ docker-compose up --build
 #### Backend Setup
 
 ```bash
+# Kill any existing processes on port 8000
+kill -9 $(lsof -ti:8000) 2>/dev/null
+
 # Create virtual environment
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
@@ -180,8 +172,13 @@ pip install -r requirements.txt
 
 # Start backend server
 cd backend
-uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn backend.api.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+**Verify backend is running:**
+- Should see: `INFO:     Uvicorn running on http://0.0.0.0:8000`
+- Test endpoint: `curl http://localhost:8000/health`
+- API docs: http://localhost:8000/docs
 
 #### Frontend Setup
 
@@ -436,7 +433,12 @@ For detailed troubleshooting guides, see **[TROUBLESHOOTING.md](./TROUBLESHOOTIN
 
 5. **Authentication not working**
    - See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md#authentication-issues)
-   - See [DEPLOYMENT_VERIFICATION.md](./DEPLOYMENT_VERIFICATION.md#step-5-verify-authentication)
+   - Verify OAuth configuration in [GOOGLE_OAUTH_SETUP.md](./GOOGLE_OAUTH_SETUP.md)
+
+6. **Backend 404 errors**
+   - Check backend logs for startup errors
+   - Verify backend service is running
+   - See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md#api-errors)
 
 ### Debug Mode
 

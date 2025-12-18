@@ -13,6 +13,7 @@ import SignupPage from './pages/SignupPage';
 import DashboardPage from './pages/DashboardPage';
 import StrategyLibraryPage from './pages/StrategyLibraryPage';
 import SettingsPage from './pages/SettingsPage';
+import ValuationPage from './pages/ValuationPage';
 
 export const App: React.FC = () => {
   return (
@@ -61,6 +62,16 @@ export const App: React.FC = () => {
               <ProtectedRoute>
                 <Layout>
                   <SettingsPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/valuation"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ValuationPage />
                 </Layout>
               </ProtectedRoute>
             }

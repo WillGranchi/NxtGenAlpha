@@ -1,0 +1,342 @@
+/**
+ * Valuation Controls Component
+ * Provides controls for selecting indicators, z-score settings, and thresholds
+ */
+
+import React, { useState, useMemo } from 'react';
+import { ChevronDown, ChevronUp, Search } from 'lucide-react';
+import { DateRangePicker } from '../DateRangePicker';
+import { TokenSelector } from '../TokenSelector';
+import { Input } from '../ui/Input';
+import { ValuationIndicator } from '../../hooks/useValuation';
+
+interface ValuationControlsProps {
+  availableIndicators: ValuationIndicator[];
+  selectedIndicators: string[];
+  onIndicatorsChange: (indicators: string[]) => void;
+  zscoreMethod: 'rolling' | 'all_time';
+  onZscoreMethodChange: (method: 'rolling' | 'all_time') => void;
+  rollingWindow: number;
+  onRollingWindowChange: (window: number) => void;
+  overboughtThreshold: number;
+  onOverboughtThresholdChange: (threshold: number) => void;
+  oversoldThreshold: number;
+  onOversoldThresholdChange: (threshold: number) => void;
+  startDate: string;
+  onStartDateChange: (date: string) => void;
+  endDate: string;
+  onEndDateChange: (date: string) => void;
+  symbol: string;
+  onSymbolChange: (symbol: string) => void;
+  isLoading?: boolean;
+}
+
+export const ValuationControls: React.FC<ValuationControlsProps> = ({
+  availableIndicators,
+  selectedIndicators,
+  onIndicatorsChange,
+  zscoreMethod,
+  onZscoreMethodChange,
+  rollingWindow,
+  onRollingWindowChange,
+  overboughtThreshold,
+  onOverboughtThresholdChange,
+  oversoldThreshold,
+  onOversoldThresholdChange,
+  startDate,
+  onStartDateChange,
+  endDate,
+  onEndDateChange,
+  symbol,
+  onSymbolChange,
+  isLoading = false,
+}) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
+    technical: true,
+    fundamental: true,
+  });
+
+  // Group indicators by category
+  const indicatorsByCategory = useMemo(() => {
+    const grouped: Record<string, ValuationIndicator[]> = {
+      technical: [],
+      fundamental: [],
+    };
+
+    availableIndicators.forEach((indicator) => {
+      if (grouped[indicator.category]) {
+        grouped[indicator.category].push(indicator);
+      }
+    });
+
+    return grouped;
+  }, [availableIndicators]);
+
+  // Filter indicators by search query
+  const filteredIndicators = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return indicatorsByCategory;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const filtered: Record<string, ValuationIndicator[]> = {
+      technical: [],
+      fundamental: [],
+    };
+
+    Object.entries(indicatorsByCategory).forEach(([category, indicators]) => {
+      filtered[category] = indicators.filter(
+        (ind) =>
+          ind.name.toLowerCase().includes(query) ||
+          ind.id.toLowerCase().includes(query) ||
+          ind.description.toLowerCase().includes(query)
+      );
+    });
+
+    return filtered;
+  }, [indicatorsByCategory, searchQuery]);
+
+  const toggleIndicator = (indicatorId: string) => {
+    if (selectedIndicators.includes(indicatorId)) {
+      onIndicatorsChange(selectedIndicators.filter((id) => id !== indicatorId));
+    } else {
+      onIndicatorsChange([...selectedIndicators, indicatorId]);
+    }
+  };
+
+  const toggleCategory = (category: string) => {
+    setExpandedCategories((prev) => ({
+      ...prev,
+      [category]: !prev[category],
+    }));
+  };
+
+  const selectAllInCategory = (category: string) => {
+    const categoryIndicators = filteredIndicators[category] || [];
+    const categoryIds = categoryIndicators.map((ind) => ind.id);
+    const newSelected = [
+      ...selectedIndicators.filter((id) => {
+        const ind = availableIndicators.find((i) => i.id === id);
+        return ind?.category !== category;
+      }),
+      ...categoryIds,
+    ];
+    onIndicatorsChange(newSelected);
+  };
+
+  const deselectAllInCategory = (category: string) => {
+    onIndicatorsChange(
+      selectedIndicators.filter((id) => {
+        const ind = availableIndicators.find((i) => i.id === id);
+        return ind?.category !== category;
+      })
+    );
+  };
+
+  return (
+    <div className="bg-bg-secondary border border-border-default rounded-lg p-6 space-y-6">
+      <div>
+        <h2 className="text-xl font-semibold text-text-primary mb-4">Valuation Settings</h2>
+      </div>
+
+      {/* Symbol Selector */}
+      <div>
+        <label className="block text-sm font-medium text-text-secondary mb-2">
+          Cryptocurrency
+        </label>
+        <TokenSelector selectedSymbol={symbol} onSymbolChange={onSymbolChange} />
+      </div>
+
+      {/* Date Range */}
+      <div>
+        <label className="block text-sm font-medium text-text-secondary mb-2">
+          Date Range
+        </label>
+        <DateRangePicker
+          startDate={startDate}
+          endDate={endDate}
+          onStartDateChange={onStartDateChange}
+          onEndDateChange={onEndDateChange}
+        />
+      </div>
+
+      {/* Z-Score Method */}
+      <div>
+        <label className="block text-sm font-medium text-text-secondary mb-2">
+          Z-Score Calculation Method
+        </label>
+        <div className="flex gap-4">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="zscore-method"
+              value="rolling"
+              checked={zscoreMethod === 'rolling'}
+              onChange={() => onZscoreMethodChange('rolling')}
+              className="w-4 h-4 text-primary-500 focus:ring-primary-500"
+            />
+            <span className="text-text-primary">Rolling Window</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="zscore-method"
+              value="all_time"
+              checked={zscoreMethod === 'all_time'}
+              onChange={() => onZscoreMethodChange('all_time')}
+              className="w-4 h-4 text-primary-500 focus:ring-primary-500"
+            />
+            <span className="text-text-primary">All-Time</span>
+          </label>
+        </div>
+      </div>
+
+      {/* Rolling Window */}
+      {zscoreMethod === 'rolling' && (
+        <div>
+          <Input
+            type="number"
+            label="Rolling Window Size"
+            value={rollingWindow}
+            onChange={(e) => onRollingWindowChange(parseInt(e.target.value) || 200)}
+            min={10}
+            max={1000}
+            helperText="Number of periods for rolling mean/std calculation"
+          />
+        </div>
+      )}
+
+      {/* Thresholds */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Input
+            type="number"
+            label="Overbought Threshold"
+            value={overboughtThreshold}
+            onChange={(e) => onOverboughtThresholdChange(parseFloat(e.target.value) || 1.0)}
+            step={0.1}
+            helperText="Z-score threshold for overbought"
+          />
+        </div>
+        <div>
+          <Input
+            type="number"
+            label="Oversold Threshold"
+            value={oversoldThreshold}
+            onChange={(e) => onOversoldThresholdChange(parseFloat(e.target.value) || -1.0)}
+            step={0.1}
+            helperText="Z-score threshold for oversold"
+          />
+        </div>
+      </div>
+
+      {/* Indicator Selection */}
+      <div>
+        <label className="block text-sm font-medium text-text-secondary mb-2">
+          Select Indicators
+        </label>
+
+        {/* Search */}
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-text-muted" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search indicators..."
+            className="w-full pl-10 pr-4 py-2 bg-bg-tertiary border border-border-default rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:border-primary-500"
+          />
+        </div>
+
+        {/* Indicator List */}
+        <div className="space-y-4 max-h-96 overflow-y-auto">
+          {(['technical', 'fundamental'] as const).map((category) => {
+            const indicators = filteredIndicators[category] || [];
+            const isExpanded = expandedCategories[category];
+            const categorySelected = indicators.filter((ind) =>
+              selectedIndicators.includes(ind.id)
+            ).length;
+
+            if (indicators.length === 0) return null;
+
+            return (
+              <div key={category} className="border border-border-default rounded-lg overflow-hidden">
+                {/* Category Header */}
+                <button
+                  onClick={() => toggleCategory(category)}
+                  className="w-full px-4 py-3 bg-bg-tertiary hover:bg-bg-elevated transition-colors flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-semibold text-text-primary capitalize">
+                      {category} ({categorySelected}/{indicators.length})
+                    </span>
+                  </div>
+                  {isExpanded ? (
+                    <ChevronUp className="w-4 h-4 text-text-muted" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-text-muted" />
+                  )}
+                </button>
+
+                {/* Category Actions */}
+                {isExpanded && (
+                  <div className="px-4 py-2 bg-bg-tertiary border-t border-border-default flex gap-2">
+                    <button
+                      onClick={() => selectAllInCategory(category)}
+                      className="text-xs text-primary-400 hover:text-primary-300"
+                    >
+                      Select All
+                    </button>
+                    <span className="text-text-muted">|</span>
+                    <button
+                      onClick={() => deselectAllInCategory(category)}
+                      className="text-xs text-primary-400 hover:text-primary-300"
+                    >
+                      Deselect All
+                    </button>
+                  </div>
+                )}
+
+                {/* Indicator Checkboxes */}
+                {isExpanded && (
+                  <div className="p-2 space-y-1">
+                    {indicators.map((indicator) => {
+                      const isSelected = selectedIndicators.includes(indicator.id);
+                      return (
+                        <label
+                          key={indicator.id}
+                          className={`flex items-start gap-3 p-2 rounded cursor-pointer transition-colors ${
+                            isSelected
+                              ? 'bg-primary-500/10 hover:bg-primary-500/20'
+                              : 'hover:bg-bg-elevated'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleIndicator(indicator.id)}
+                            disabled={isLoading}
+                            className="mt-1 w-4 h-4 text-primary-500 focus:ring-primary-500 rounded border-border-default"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-text-primary">
+                              {indicator.name}
+                            </div>
+                            <div className="text-xs text-text-muted line-clamp-1">
+                              {indicator.description}
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};

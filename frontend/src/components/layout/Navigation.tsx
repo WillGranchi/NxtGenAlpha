@@ -9,7 +9,8 @@ import {
   Library, 
   Settings, 
   LogOut,
-  User 
+  User,
+  BarChart3
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { Button } from '../ui/Button';
@@ -24,6 +25,7 @@ export const Navigation: React.FC = () => {
 
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/valuation', label: 'Valuation', icon: BarChart3 },
     { path: '/library', label: 'Strategy Library', icon: Library },
     { path: '/settings', label: 'Settings', icon: Settings },
   ];
