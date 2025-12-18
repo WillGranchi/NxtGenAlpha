@@ -121,7 +121,6 @@ export const ValuationChart: React.FC<ValuationChartProps> = memo(({
           line: {
             color: '#F59E0B', // Amber color for average
             width: 3,
-            dash: 'dash',
           },
           hovertemplate: '<b>Average Z-Score</b><br>' +
             'Date: %{x}<br>' +

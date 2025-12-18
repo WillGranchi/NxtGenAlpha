@@ -55,6 +55,8 @@ const ValuationPage: React.FC = () => {
     setStartDate,
     endDate,
     setEndDate,
+    timeframe,
+    setTimeframe,
     symbol,
     setSymbol,
   } = useValuation();
@@ -278,6 +280,8 @@ const ValuationPage: React.FC = () => {
                 onStartDateChange={setStartDate}
                 endDate={endDate}
                 onEndDateChange={setEndDate}
+                timeframe={timeframe}
+                onTimeframeChange={setTimeframe}
                 symbol={symbol}
                 onSymbolChange={setSymbol}
                 isLoading={indicatorsLoading || zscoresLoading}

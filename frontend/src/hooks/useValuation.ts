@@ -55,6 +55,8 @@ export interface UseValuationReturn {
   setStartDate: (date: string) => void;
   endDate: string;
   setEndDate: (date: string) => void;
+  timeframe: '12h' | '1h' | '4h' | '1w' | 'custom' | null;
+  setTimeframe: (timeframe: '12h' | '1h' | '4h' | '1w' | 'custom' | null) => void;
   
   // Symbol
   symbol: string;
@@ -90,6 +92,7 @@ export const useValuation = (): UseValuationReturn => {
   // Date range
   const [startDate, setStartDate] = useState<string>('2018-01-01');
   const [endDate, setEndDate] = useState<string>('');
+  const [timeframe, setTimeframe] = useState<'12h' | '1h' | '4h' | '1w' | 'custom' | null>(null);
   
   // Symbol
   const [symbol, setSymbol] = useState<string>('BTCUSDT');
@@ -160,6 +163,42 @@ export const useValuation = (): UseValuationReturn => {
     await calculateZScores();
   }, [calculateZScores]);
   
+  // Calculate date range from timeframe
+  useEffect(() => {
+    if (timeframe && timeframe !== 'custom') {
+      const now = new Date();
+      let start: Date;
+      
+      switch (timeframe) {
+        case '1h':
+          start = new Date(now.getTime() - 60 * 60 * 1000); // 1 hour ago
+          break;
+        case '4h':
+          start = new Date(now.getTime() - 4 * 60 * 60 * 1000); // 4 hours ago
+          break;
+        case '12h':
+          start = new Date(now.getTime() - 12 * 60 * 60 * 1000); // 12 hours ago
+          break;
+        case '1w':
+          start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
+          break;
+        default:
+          return;
+      }
+      
+      // Format dates as YYYY-MM-DD
+      const formatDate = (date: Date): string => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+      
+      setStartDate(formatDate(start));
+      setEndDate(formatDate(now));
+    }
+  }, [timeframe]);
+  
   // Fetch indicators on mount
   useEffect(() => {
     fetchAvailableIndicators();
@@ -203,6 +242,8 @@ export const useValuation = (): UseValuationReturn => {
     setStartDate,
     endDate,
     setEndDate,
+    timeframe,
+    setTimeframe,
     
     // Symbol
     symbol,

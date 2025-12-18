@@ -30,6 +30,8 @@ interface ValuationControlsProps {
   onStartDateChange: (date: string) => void;
   endDate: string;
   onEndDateChange: (date: string) => void;
+  timeframe: '12h' | '1h' | '4h' | '1w' | 'custom' | null;
+  onTimeframeChange: (timeframe: '12h' | '1h' | '4h' | '1w' | 'custom' | null) => void;
   symbol: string;
   onSymbolChange: (symbol: string) => void;
   isLoading?: boolean;
@@ -55,6 +57,8 @@ export const ValuationControls: React.FC<ValuationControlsProps> = ({
   onStartDateChange,
   endDate,
   onEndDateChange,
+  timeframe,
+  onTimeframeChange,
   symbol,
   onSymbolChange,
   isLoading = false,
@@ -156,6 +160,34 @@ export const ValuationControls: React.FC<ValuationControlsProps> = ({
         <TokenSelector selectedSymbol={symbol} onSymbolChange={onSymbolChange} />
       </div>
 
+      {/* Timeframe Presets */}
+      <div>
+        <label className="block text-sm font-medium text-text-secondary mb-2">
+          Timeframe
+        </label>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {(['1h', '4h', '12h', '1w', 'custom'] as const).map((tf) => (
+            <button
+              key={tf}
+              type="button"
+              onClick={() => onTimeframeChange(tf === 'custom' ? null : tf)}
+              disabled={isLoading}
+              className={`
+                px-3 py-1.5 text-sm font-medium rounded-lg transition-all
+                ${
+                  (timeframe === tf) || (tf === 'custom' && timeframe === null)
+                    ? 'bg-primary-500 text-white shadow-md'
+                    : 'bg-bg-tertiary text-text-secondary hover:bg-bg-elevated hover:text-text-primary border border-border-default'
+                }
+                disabled:opacity-50 disabled:cursor-not-allowed
+              `}
+            >
+              {tf === 'custom' ? 'Custom' : tf.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Date Range */}
       <div>
         <label className="block text-sm font-medium text-text-secondary mb-2">
@@ -164,8 +196,20 @@ export const ValuationControls: React.FC<ValuationControlsProps> = ({
         <DateRangePicker
           startDate={startDate}
           endDate={endDate}
-          onStartDateChange={onStartDateChange}
-          onEndDateChange={onEndDateChange}
+          onStartDateChange={(date) => {
+            onStartDateChange(date);
+            // When manually changing dates, set timeframe to custom
+            if (timeframe !== null && timeframe !== 'custom') {
+              onTimeframeChange(null);
+            }
+          }}
+          onEndDateChange={(date) => {
+            onEndDateChange(date);
+            // When manually changing dates, set timeframe to custom
+            if (timeframe !== null && timeframe !== 'custom') {
+              onTimeframeChange(null);
+            }
+          }}
         />
       </div>
 
