@@ -2,7 +2,7 @@
 Database models for user accounts and saved strategies.
 """
 
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, JSON, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, JSON, Boolean, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -28,6 +28,7 @@ class User(Base):
     # Relationships
     strategies = relationship("Strategy", back_populates="user", cascade="all, delete-orphan")
     custom_indicators = relationship("CustomIndicator", back_populates="user", cascade="all, delete-orphan")
+    valuations = relationship("Valuation", back_populates="user", cascade="all, delete-orphan")
 
 
 class Strategy(Base):
@@ -81,4 +82,33 @@ class CustomIndicator(Base):
     
     # Relationships
     user = relationship("User", back_populates="custom_indicators")
+
+
+class Valuation(Base):
+    """Saved valuation configuration model."""
+    
+    __tablename__ = "valuations"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    
+    # Valuation configuration
+    indicators = Column(JSON, nullable=False)  # List of selected indicator IDs
+    zscore_method = Column(String(20), nullable=False)  # 'rolling' or 'all_time'
+    rolling_window = Column(Integer, nullable=False)
+    average_window = Column(Integer, nullable=True)  # Optional window for smoothing average
+    show_average = Column(Boolean, default=False, nullable=False)
+    overbought_threshold = Column(Float, nullable=False)
+    oversold_threshold = Column(Float, nullable=False)
+    symbol = Column(String(20), nullable=False)
+    start_date = Column(String(20), nullable=True)
+    end_date = Column(String(20), nullable=True)
+    
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    user = relationship("User", back_populates="valuations")
 

@@ -43,6 +43,16 @@ class ValuationZScoreRequest(BaseModel):
         ge=10,
         le=1000
     )
+    show_average: bool = Field(
+        default=False,
+        description="Whether to calculate and include average z-score across all indicators"
+    )
+    average_window: Optional[int] = Field(
+        default=None,
+        description="Window size for smoothing the average z-score (if None, no smoothing)",
+        ge=1,
+        le=1000
+    )
     start_date: Optional[str] = Field(
         default=None,
         description="Start date in YYYY-MM-DD format"
@@ -62,7 +72,7 @@ class ValuationZScoreResponse(BaseModel):
     )
     averages: Dict[str, float] = Field(
         ..., 
-        description="Average z-score for each indicator"
+        description="Average z-score for each indicator (includes 'average' key if show_average is true)"
     )
 
 
@@ -113,3 +123,71 @@ class ValuationDataResponse(BaseModel):
         ..., 
         description="Time series data with price and indicator values"
     )
+
+
+# Saved Valuation CRUD Models
+
+class SaveValuationRequest(BaseModel):
+    """Request model for saving a valuation."""
+    name: str = Field(..., description="Valuation name", min_length=1, max_length=255)
+    description: Optional[str] = Field(None, description="Valuation description")
+    indicators: List[str] = Field(..., description="List of selected indicator IDs", min_items=1)
+    zscore_method: Literal["rolling", "all_time"] = Field(..., description="Z-score calculation method")
+    rolling_window: int = Field(..., description="Rolling window size", ge=10, le=1000)
+    average_window: Optional[int] = Field(None, description="Average window size for smoothing", ge=1, le=1000)
+    show_average: bool = Field(default=False, description="Whether to show average z-score")
+    overbought_threshold: float = Field(..., description="Overbought threshold")
+    oversold_threshold: float = Field(..., description="Oversold threshold")
+    symbol: str = Field(..., description="Trading pair symbol", max_length=20)
+    start_date: Optional[str] = Field(None, description="Start date in YYYY-MM-DD format")
+    end_date: Optional[str] = Field(None, description="End date in YYYY-MM-DD format")
+
+
+class UpdateValuationRequest(BaseModel):
+    """Request model for updating a valuation."""
+    name: Optional[str] = Field(None, description="Valuation name", min_length=1, max_length=255)
+    description: Optional[str] = Field(None, description="Valuation description")
+    indicators: Optional[List[str]] = Field(None, description="List of selected indicator IDs", min_items=1)
+    zscore_method: Optional[Literal["rolling", "all_time"]] = Field(None, description="Z-score calculation method")
+    rolling_window: Optional[int] = Field(None, description="Rolling window size", ge=10, le=1000)
+    average_window: Optional[int] = Field(None, description="Average window size for smoothing", ge=1, le=1000)
+    show_average: Optional[bool] = Field(None, description="Whether to show average z-score")
+    overbought_threshold: Optional[float] = Field(None, description="Overbought threshold")
+    oversold_threshold: Optional[float] = Field(None, description="Oversold threshold")
+    symbol: Optional[str] = Field(None, description="Trading pair symbol", max_length=20)
+    start_date: Optional[str] = Field(None, description="Start date in YYYY-MM-DD format")
+    end_date: Optional[str] = Field(None, description="End date in YYYY-MM-DD format")
+
+
+class ValuationListItem(BaseModel):
+    """Valuation list item model."""
+    id: int = Field(..., description="Valuation ID")
+    name: str = Field(..., description="Valuation name")
+    description: Optional[str] = Field(None, description="Valuation description")
+    created_at: str = Field(..., description="Creation timestamp")
+    updated_at: str = Field(..., description="Last update timestamp")
+
+
+class ValuationListResponse(BaseModel):
+    """Response model for listing valuations."""
+    success: bool = Field(..., description="Whether the request was successful")
+    valuations: List[ValuationListItem] = Field(..., description="List of valuations")
+
+
+class ValuationResponse(BaseModel):
+    """Response model for a single valuation."""
+    id: int = Field(..., description="Valuation ID")
+    name: str = Field(..., description="Valuation name")
+    description: Optional[str] = Field(None, description="Valuation description")
+    indicators: List[str] = Field(..., description="List of selected indicator IDs")
+    zscore_method: str = Field(..., description="Z-score calculation method")
+    rolling_window: int = Field(..., description="Rolling window size")
+    average_window: Optional[int] = Field(None, description="Average window size")
+    show_average: bool = Field(..., description="Whether to show average z-score")
+    overbought_threshold: float = Field(..., description="Overbought threshold")
+    oversold_threshold: float = Field(..., description="Oversold threshold")
+    symbol: str = Field(..., description="Trading pair symbol")
+    start_date: Optional[str] = Field(None, description="Start date")
+    end_date: Optional[str] = Field(None, description="End date")
+    created_at: str = Field(..., description="Creation timestamp")
+    updated_at: str = Field(..., description="Last update timestamp")

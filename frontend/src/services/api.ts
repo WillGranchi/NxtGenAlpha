@@ -732,6 +732,8 @@ export class TradingAPI {
     symbol?: string;
     zscore_method?: 'rolling' | 'all_time';
     rolling_window?: number;
+    show_average?: boolean;
+    average_window?: number;
     start_date?: string;
     end_date?: string;
   }): Promise<{
@@ -764,6 +766,137 @@ export class TradingAPI {
     }>;
   }> {
     const response: AxiosResponse<any> = await api.get('/api/valuation/data', { params });
+    return response.data;
+  }
+
+  // Saved Valuation CRUD Methods
+
+  /**
+   * List all saved valuations for the current user.
+   */
+  static async listValuations(): Promise<{
+    success: boolean;
+    valuations: Array<{
+      id: number;
+      name: string;
+      description: string | null;
+      created_at: string;
+      updated_at: string;
+    }>;
+  }> {
+    const response: AxiosResponse<any> = await api.get('/api/valuation/saved/list');
+    return response.data;
+  }
+
+  /**
+   * Get a specific saved valuation by ID.
+   */
+  static async getValuation(valuationId: number): Promise<{
+    id: number;
+    name: string;
+    description: string | null;
+    indicators: string[];
+    zscore_method: 'rolling' | 'all_time';
+    rolling_window: number;
+    average_window: number | null;
+    show_average: boolean;
+    overbought_threshold: number;
+    oversold_threshold: number;
+    symbol: string;
+    start_date: string | null;
+    end_date: string | null;
+    created_at: string;
+    updated_at: string;
+  }> {
+    const response: AxiosResponse<any> = await api.get(`/api/valuation/saved/${valuationId}`);
+    return response.data;
+  }
+
+  /**
+   * Save a new valuation configuration.
+   */
+  static async saveValuation(request: {
+    name: string;
+    description?: string;
+    indicators: string[];
+    zscore_method: 'rolling' | 'all_time';
+    rolling_window: number;
+    average_window?: number | null;
+    show_average: boolean;
+    overbought_threshold: number;
+    oversold_threshold: number;
+    symbol: string;
+    start_date?: string | null;
+    end_date?: string | null;
+  }): Promise<{
+    id: number;
+    name: string;
+    description: string | null;
+    indicators: string[];
+    zscore_method: 'rolling' | 'all_time';
+    rolling_window: number;
+    average_window: number | null;
+    show_average: boolean;
+    overbought_threshold: number;
+    oversold_threshold: number;
+    symbol: string;
+    start_date: string | null;
+    end_date: string | null;
+    created_at: string;
+    updated_at: string;
+  }> {
+    const response: AxiosResponse<any> = await api.post('/api/valuation/saved', request);
+    return response.data;
+  }
+
+  /**
+   * Update an existing valuation configuration.
+   */
+  static async updateValuation(
+    valuationId: number,
+    request: {
+      name?: string;
+      description?: string;
+      indicators?: string[];
+      zscore_method?: 'rolling' | 'all_time';
+      rolling_window?: number;
+      average_window?: number | null;
+      show_average?: boolean;
+      overbought_threshold?: number;
+      oversold_threshold?: number;
+      symbol?: string;
+      start_date?: string | null;
+      end_date?: string | null;
+    }
+  ): Promise<{
+    id: number;
+    name: string;
+    description: string | null;
+    indicators: string[];
+    zscore_method: 'rolling' | 'all_time';
+    rolling_window: number;
+    average_window: number | null;
+    show_average: boolean;
+    overbought_threshold: number;
+    oversold_threshold: number;
+    symbol: string;
+    start_date: string | null;
+    end_date: string | null;
+    created_at: string;
+    updated_at: string;
+  }> {
+    const response: AxiosResponse<any> = await api.put(`/api/valuation/saved/${valuationId}`, request);
+    return response.data;
+  }
+
+  /**
+   * Delete a saved valuation.
+   */
+  static async deleteValuation(valuationId: number): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    const response: AxiosResponse<any> = await api.delete(`/api/valuation/saved/${valuationId}`);
     return response.data;
   }
 }

@@ -51,8 +51,8 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
 
   return (
     <div className={`space-y-2 ${className}`}>
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="flex-1">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="w-full">
           <label htmlFor="start-date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Start Date
           </label>
@@ -70,7 +70,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
           />
         </div>
         
-        <div className="flex-1">
+        <div className="w-full">
           <label htmlFor="end-date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             End Date
           </label>

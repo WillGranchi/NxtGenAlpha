@@ -2,11 +2,12 @@
 Valuation API routes for calculating z-scores of mean-reverting indicators.
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import Dict, Any, List, Optional
 import logging
 import pandas as pd
 from datetime import datetime
+from sqlalchemy.orm import Session
 
 from backend.core.data_loader import load_crypto_data
 from backend.core.indicators import (
@@ -19,14 +20,23 @@ from backend.core.fundamental_indicators import (
 from backend.core.valuation import (
     calculate_indicator_zscore,
     calculate_average_zscore,
-    get_latest_zscore
+    get_latest_zscore,
+    calculate_average_indicator_zscore
 )
+from backend.core.database import get_db
+from backend.core.auth import get_current_user
+from backend.api.models.db_models import Valuation, User
 from backend.api.models.valuation_models import (
     ValuationZScoreRequest,
     ValuationZScoreResponse,
     ValuationIndicatorsResponse,
     ValuationIndicator,
-    ValuationDataResponse
+    ValuationDataResponse,
+    SaveValuationRequest,
+    UpdateValuationRequest,
+    ValuationListResponse,
+    ValuationListItem,
+    ValuationResponse
 )
 
 router = APIRouter(prefix="/api/valuation", tags=["valuation"])
@@ -213,6 +223,14 @@ async def calculate_valuation_zscores(request: ValuationZScoreRequest) -> Valuat
                 detail="No valid indicators could be calculated"
             )
         
+        # Calculate average z-score if requested
+        average_zscore_series = None
+        if request.show_average and indicator_zscores:
+            average_zscore_series = calculate_average_indicator_zscore(
+                indicator_zscores,
+                average_window=request.average_window
+            )
+        
         # Build response data
         data_points = []
         dates = df.index
@@ -237,6 +255,17 @@ async def calculate_valuation_zscores(request: ValuationZScoreRequest) -> Valuat
                         zscore=zscore
                     )
             
+            # Add average z-score if requested
+            if request.show_average and average_zscore_series is not None:
+                if date in average_zscore_series.index:
+                    avg_zscore = average_zscore_series.loc[date]
+                    if not pd.isna(avg_zscore):
+                        from backend.api.models.valuation_models import IndicatorZScore
+                        indicators_dict['average'] = IndicatorZScore(
+                            value=float(avg_zscore),  # Average z-score value
+                            zscore=float(avg_zscore)
+                        )
+            
             if indicators_dict:  # Only add if we have at least one indicator
                 from backend.api.models.valuation_models import ValuationDataPoint
                 data_points.append(ValuationDataPoint(
@@ -247,6 +276,12 @@ async def calculate_valuation_zscores(request: ValuationZScoreRequest) -> Valuat
         
         # Calculate averages
         averages = calculate_average_zscore(indicator_zscores)
+        
+        # Add average z-score to averages dict if requested
+        if request.show_average and average_zscore_series is not None:
+            valid_avg = average_zscore_series.dropna()
+            if len(valid_avg) > 0:
+                averages['average'] = float(valid_avg.mean())
         
         return ValuationZScoreResponse(
             success=True,
@@ -350,4 +385,300 @@ async def get_valuation_data(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to get valuation data: {str(e)}"
+        )
+
+
+# Saved Valuation CRUD Routes
+
+@router.get("/saved/list", response_model=ValuationListResponse)
+async def list_saved_valuations(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> ValuationListResponse:
+    """
+    List all saved valuations for the current user.
+    """
+    try:
+        valuations = db.query(Valuation).filter(
+            Valuation.user_id == current_user.id
+        ).order_by(Valuation.updated_at.desc()).all()
+        
+        valuation_items = [
+            ValuationListItem(
+                id=valuation.id,
+                name=valuation.name,
+                description=valuation.description,
+                created_at=valuation.created_at.isoformat() if valuation.created_at else "",
+                updated_at=valuation.updated_at.isoformat() if valuation.updated_at else ""
+            )
+            for valuation in valuations
+        ]
+        
+        return ValuationListResponse(
+            success=True,
+            valuations=valuation_items
+        )
+    except Exception as e:
+        logger.error(f"Error listing saved valuations: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error listing saved valuations: {str(e)}"
+        )
+
+
+@router.get("/saved/{valuation_id}", response_model=ValuationResponse)
+async def get_saved_valuation(
+    valuation_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> ValuationResponse:
+    """
+    Get a specific saved valuation by ID.
+    """
+    try:
+        valuation = db.query(Valuation).filter(
+            Valuation.id == valuation_id,
+            Valuation.user_id == current_user.id
+        ).first()
+        
+        if not valuation:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Valuation with ID {valuation_id} not found"
+            )
+        
+        return ValuationResponse(
+            id=valuation.id,
+            name=valuation.name,
+            description=valuation.description,
+            indicators=valuation.indicators,
+            zscore_method=valuation.zscore_method,
+            rolling_window=valuation.rolling_window,
+            average_window=valuation.average_window,
+            show_average=valuation.show_average,
+            overbought_threshold=valuation.overbought_threshold,
+            oversold_threshold=valuation.oversold_threshold,
+            symbol=valuation.symbol,
+            start_date=valuation.start_date,
+            end_date=valuation.end_date,
+            created_at=valuation.created_at.isoformat() if valuation.created_at else "",
+            updated_at=valuation.updated_at.isoformat() if valuation.updated_at else ""
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting saved valuation {valuation_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting saved valuation: {str(e)}"
+        )
+
+
+@router.post("/saved", response_model=ValuationResponse, status_code=201)
+async def save_valuation(
+    request: SaveValuationRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> ValuationResponse:
+    """
+    Save a new valuation configuration.
+    """
+    try:
+        # Check if valuation with same name already exists for this user
+        existing = db.query(Valuation).filter(
+            Valuation.user_id == current_user.id,
+            Valuation.name == request.name
+        ).first()
+        
+        if existing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Valuation with name '{request.name}' already exists"
+            )
+        
+        valuation = Valuation(
+            user_id=current_user.id,
+            name=request.name,
+            description=request.description,
+            indicators=request.indicators,
+            zscore_method=request.zscore_method,
+            rolling_window=request.rolling_window,
+            average_window=request.average_window,
+            show_average=request.show_average,
+            overbought_threshold=request.overbought_threshold,
+            oversold_threshold=request.oversold_threshold,
+            symbol=request.symbol,
+            start_date=request.start_date,
+            end_date=request.end_date
+        )
+        
+        db.add(valuation)
+        db.commit()
+        db.refresh(valuation)
+        
+        logger.info(f"Valuation '{request.name}' saved for user {current_user.id}")
+        
+        return ValuationResponse(
+            id=valuation.id,
+            name=valuation.name,
+            description=valuation.description,
+            indicators=valuation.indicators,
+            zscore_method=valuation.zscore_method,
+            rolling_window=valuation.rolling_window,
+            average_window=valuation.average_window,
+            show_average=valuation.show_average,
+            overbought_threshold=valuation.overbought_threshold,
+            oversold_threshold=valuation.oversold_threshold,
+            symbol=valuation.symbol,
+            start_date=valuation.start_date,
+            end_date=valuation.end_date,
+            created_at=valuation.created_at.isoformat() if valuation.created_at else "",
+            updated_at=valuation.updated_at.isoformat() if valuation.updated_at else ""
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error saving valuation: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error saving valuation: {str(e)}"
+        )
+
+
+@router.put("/saved/{valuation_id}", response_model=ValuationResponse)
+async def update_valuation(
+    valuation_id: int,
+    request: UpdateValuationRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> ValuationResponse:
+    """
+    Update an existing valuation configuration.
+    """
+    try:
+        valuation = db.query(Valuation).filter(
+            Valuation.id == valuation_id,
+            Valuation.user_id == current_user.id
+        ).first()
+        
+        if not valuation:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Valuation with ID {valuation_id} not found"
+            )
+        
+        # Check if name is being changed and conflicts with another valuation
+        if request.name and request.name != valuation.name:
+            existing = db.query(Valuation).filter(
+                Valuation.user_id == current_user.id,
+                Valuation.name == request.name,
+                Valuation.id != valuation_id
+            ).first()
+            
+            if existing:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Valuation with name '{request.name}' already exists"
+                )
+        
+        # Update fields
+        if request.name is not None:
+            valuation.name = request.name
+        if request.description is not None:
+            valuation.description = request.description
+        if request.indicators is not None:
+            valuation.indicators = request.indicators
+        if request.zscore_method is not None:
+            valuation.zscore_method = request.zscore_method
+        if request.rolling_window is not None:
+            valuation.rolling_window = request.rolling_window
+        if request.average_window is not None:
+            valuation.average_window = request.average_window
+        if request.show_average is not None:
+            valuation.show_average = request.show_average
+        if request.overbought_threshold is not None:
+            valuation.overbought_threshold = request.overbought_threshold
+        if request.oversold_threshold is not None:
+            valuation.oversold_threshold = request.oversold_threshold
+        if request.symbol is not None:
+            valuation.symbol = request.symbol
+        if request.start_date is not None:
+            valuation.start_date = request.start_date
+        if request.end_date is not None:
+            valuation.end_date = request.end_date
+        
+        valuation.updated_at = datetime.utcnow()
+        
+        db.commit()
+        db.refresh(valuation)
+        
+        logger.info(f"Valuation {valuation_id} updated for user {current_user.id}")
+        
+        return ValuationResponse(
+            id=valuation.id,
+            name=valuation.name,
+            description=valuation.description,
+            indicators=valuation.indicators,
+            zscore_method=valuation.zscore_method,
+            rolling_window=valuation.rolling_window,
+            average_window=valuation.average_window,
+            show_average=valuation.show_average,
+            overbought_threshold=valuation.overbought_threshold,
+            oversold_threshold=valuation.oversold_threshold,
+            symbol=valuation.symbol,
+            start_date=valuation.start_date,
+            end_date=valuation.end_date,
+            created_at=valuation.created_at.isoformat() if valuation.created_at else "",
+            updated_at=valuation.updated_at.isoformat() if valuation.updated_at else ""
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating valuation {valuation_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error updating valuation: {str(e)}"
+        )
+
+
+@router.delete("/saved/{valuation_id}")
+async def delete_valuation(
+    valuation_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Delete a saved valuation.
+    """
+    try:
+        valuation = db.query(Valuation).filter(
+            Valuation.id == valuation_id,
+            Valuation.user_id == current_user.id
+        ).first()
+        
+        if not valuation:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Valuation with ID {valuation_id} not found"
+            )
+        
+        db.delete(valuation)
+        db.commit()
+        
+        logger.info(f"Valuation {valuation_id} deleted for user {current_user.id}")
+        
+        return {
+            "success": True,
+            "message": f"Valuation '{valuation.name}' deleted successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting valuation {valuation_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error deleting valuation: {str(e)}"
         )

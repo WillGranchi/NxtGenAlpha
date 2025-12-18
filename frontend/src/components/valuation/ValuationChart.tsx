@@ -11,6 +11,7 @@ interface ValuationChartProps {
   data: ValuationDataPoint[];
   availableIndicators: ValuationIndicator[];
   selectedIndicators: string[];
+  showAverage?: boolean;
   overboughtThreshold: number;
   oversoldThreshold: number;
   height?: number;
@@ -32,6 +33,7 @@ export const ValuationChart: React.FC<ValuationChartProps> = memo(({
   data,
   availableIndicators,
   selectedIndicators,
+  showAverage = false,
   overboughtThreshold,
   oversoldThreshold,
   height = 600,
@@ -100,6 +102,34 @@ export const ValuationChart: React.FC<ValuationChartProps> = memo(({
           '<extra></extra>',
       });
     });
+
+    // Average z-score line (if enabled)
+    if (showAverage) {
+      const averageZscores = data.map((d) => {
+        const avgData = d.indicators['average'];
+        return avgData ? avgData.zscore : null;
+      });
+
+      if (averageZscores.some((z) => z !== null)) {
+        plotData.push({
+          x: dates,
+          y: averageZscores,
+          type: 'scatter',
+          mode: 'lines',
+          name: 'Average Z-Score',
+          yaxis: 'y',
+          line: {
+            color: '#F59E0B', // Amber color for average
+            width: 3,
+            dash: 'dash',
+          },
+          hovertemplate: '<b>Average Z-Score</b><br>' +
+            'Date: %{x}<br>' +
+            'Z-Score: %{y:.2f}<br>' +
+            '<extra></extra>',
+        });
+      }
+    }
 
     // Reference lines: thresholds and zero
     // Zero line
@@ -249,7 +279,7 @@ export const ValuationChart: React.FC<ValuationChartProps> = memo(({
     }
 
     return { plotData, dates, prices };
-  }, [data, availableIndicators, selectedIndicators, overboughtThreshold, oversoldThreshold]);
+  }, [data, availableIndicators, selectedIndicators, showAverage, overboughtThreshold, oversoldThreshold]);
 
   if (!chartData || chartData.plotData.length === 0) {
     return (

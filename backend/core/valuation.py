@@ -162,3 +162,58 @@ def get_latest_zscore(zscores: pd.Series) -> float:
     if len(valid_values) > 0:
         return float(valid_values.iloc[-1])
     return 0.0
+
+
+def calculate_average_indicator_zscore(
+    indicator_zscores: Dict[str, pd.Series],
+    average_window: Optional[int] = None
+) -> pd.Series:
+    """
+    Calculate average z-score across multiple indicators.
+    
+    Args:
+        indicator_zscores: Dictionary mapping indicator IDs to their z-score Series
+        average_window: Optional window size for smoothing the average (if None, no smoothing)
+        
+    Returns:
+        Pandas Series with average z-scores
+    """
+    if not indicator_zscores:
+        return pd.Series(dtype=float)
+    
+    # Align all series to common index
+    aligned_series = []
+    common_index = None
+    
+    for indicator_id, zscore_series in indicator_zscores.items():
+        if len(zscore_series) > 0:
+            if common_index is None:
+                common_index = zscore_series.index
+            else:
+                common_index = common_index.intersection(zscore_series.index)
+    
+    if common_index is None or len(common_index) == 0:
+        return pd.Series(dtype=float)
+    
+    # Calculate average for each date
+    average_values = []
+    for date in common_index:
+        values = []
+        for zscore_series in indicator_zscores.values():
+            if date in zscore_series.index:
+                value = zscore_series.loc[date]
+                if not pd.isna(value):
+                    values.append(value)
+        
+        if values:
+            average_values.append(sum(values) / len(values))
+        else:
+            average_values.append(np.nan)
+    
+    average_series = pd.Series(average_values, index=common_index)
+    
+    # Apply smoothing window if specified
+    if average_window and average_window > 1:
+        average_series = average_series.rolling(window=average_window, min_periods=1).mean()
+    
+    return average_series

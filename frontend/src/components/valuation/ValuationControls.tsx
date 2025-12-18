@@ -18,6 +18,10 @@ interface ValuationControlsProps {
   onZscoreMethodChange: (method: 'rolling' | 'all_time') => void;
   rollingWindow: number;
   onRollingWindowChange: (window: number) => void;
+  showAverage: boolean;
+  onShowAverageChange: (show: boolean) => void;
+  averageWindow: number | null;
+  onAverageWindowChange: (window: number | null) => void;
   overboughtThreshold: number;
   onOverboughtThresholdChange: (threshold: number) => void;
   oversoldThreshold: number;
@@ -39,6 +43,10 @@ export const ValuationControls: React.FC<ValuationControlsProps> = ({
   onZscoreMethodChange,
   rollingWindow,
   onRollingWindowChange,
+  showAverage,
+  onShowAverageChange,
+  averageWindow,
+  onAverageWindowChange,
   overboughtThreshold,
   onOverboughtThresholdChange,
   oversoldThreshold,
@@ -207,8 +215,37 @@ export const ValuationControls: React.FC<ValuationControlsProps> = ({
         </div>
       )}
 
+      {/* Average Z-Score Option */}
+      <div>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={showAverage}
+            onChange={(e) => onShowAverageChange(e.target.checked)}
+            className="w-4 h-4 text-primary-500 focus:ring-primary-500 rounded border-border-default"
+          />
+          <span className="text-sm font-medium text-text-primary">Show Average Z-Score</span>
+        </label>
+        {showAverage && (
+          <div className="mt-2 ml-6">
+            <Input
+              type="number"
+              label="Average Window Size (Optional)"
+              value={averageWindow || ''}
+              onChange={(e) => {
+                const value = e.target.value;
+                onAverageWindowChange(value === '' ? null : parseInt(value) || null);
+              }}
+              min={1}
+              max={1000}
+              helperText="Window size for smoothing the average z-score (leave empty for no smoothing)"
+            />
+          </div>
+        )}
+      </div>
+
       {/* Thresholds */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <Input
             type="number"
@@ -250,7 +287,7 @@ export const ValuationControls: React.FC<ValuationControlsProps> = ({
         </div>
 
         {/* Indicator List */}
-        <div className="space-y-4 max-h-96 overflow-y-auto">
+        <div className="space-y-4 max-h-64 md:max-h-96 overflow-y-auto">
           {(['technical', 'fundamental'] as const).map((category) => {
             const indicators = filteredIndicators[category] || [];
             const isExpanded = expandedCategories[category];

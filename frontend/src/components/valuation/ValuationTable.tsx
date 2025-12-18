@@ -11,6 +11,7 @@ interface ValuationTableProps {
   averages: Record<string, number>;
   availableIndicators: ValuationIndicator[];
   selectedIndicators: string[];
+  showAverage?: boolean;
   overboughtThreshold: number;
   oversoldThreshold: number;
 }
@@ -20,6 +21,7 @@ export const ValuationTable: React.FC<ValuationTableProps> = ({
   averages,
   availableIndicators,
   selectedIndicators,
+  showAverage = false,
   overboughtThreshold,
   oversoldThreshold,
 }) => {
@@ -55,14 +57,17 @@ export const ValuationTable: React.FC<ValuationTableProps> = ({
     return '';
   };
 
-  // Calculate overall average
+  // Calculate overall average - use 'average' from data if available, otherwise calculate from selected indicators
   const overallAverage = useMemo(() => {
+    if (showAverage && latestData && latestData.indicators['average']) {
+      return latestData.indicators['average'].zscore;
+    }
     if (selectedIndicators.length === 0) return 0;
     const sum = selectedIndicators.reduce((acc, id) => {
       return acc + (averages[id] || 0);
     }, 0);
     return sum / selectedIndicators.length;
-  }, [averages, selectedIndicators]);
+  }, [averages, selectedIndicators, showAverage, latestData]);
 
   if (!latestData || selectedIndicators.length === 0) {
     return (
@@ -109,8 +114,8 @@ export const ValuationTable: React.FC<ValuationTableProps> = ({
         </p>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full">
+      <div className="overflow-x-auto -mx-6 px-6">
+        <table className="w-full min-w-[600px]">
           <thead>
             <tr className="border-b border-border-default">
               <th className="text-left py-3 px-4 text-sm font-semibold text-text-secondary">

@@ -3,19 +3,35 @@
  * Main page for viewing mean-reverting indicators with z-scores
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useValuation } from '../hooks/useValuation';
 import { ValuationControls } from '../components/valuation/ValuationControls';
 import { ValuationChart } from '../components/valuation/ValuationChart';
 import { ValuationTable } from '../components/valuation/ValuationTable';
+import { SaveValuationModal } from '../components/valuation/SaveValuationModal';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { useMobile } from '../hooks/useMobile';
+import { useAuth } from '../hooks/useAuth';
+import TradingAPI from '../services/api';
+import { Button } from '../components/ui/Button';
+import { Save, Loader2, ChevronDown } from 'lucide-react';
 
 const ValuationPage: React.FC = () => {
   const { isMobile } = useMobile();
+  const { isAuthenticated } = useAuth();
   const [viewMode, setViewMode] = useState<'chart' | 'table' | 'both'>('both');
   const [overboughtThreshold, setOverboughtThreshold] = useState<number>(1.0);
   const [oversoldThreshold, setOversoldThreshold] = useState<number>(-1.0);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showLoadDropdown, setShowLoadDropdown] = useState(false);
+  const [savedValuations, setSavedValuations] = useState<Array<{
+    id: number;
+    name: string;
+    description: string | null;
+    created_at: string;
+    updated_at: string;
+  }>>([]);
+  const [loadingValuations, setLoadingValuations] = useState(false);
 
   const {
     availableIndicators,
@@ -31,6 +47,10 @@ const ValuationPage: React.FC = () => {
     setZscoreMethod,
     rollingWindow,
     setRollingWindow,
+    showAverage,
+    setShowAverage,
+    averageWindow,
+    setAverageWindow,
     startDate,
     setStartDate,
     endDate,
@@ -39,16 +59,151 @@ const ValuationPage: React.FC = () => {
     setSymbol,
   } = useValuation();
 
+  // Load saved valuations
+  useEffect(() => {
+    if (isAuthenticated && showLoadDropdown) {
+      loadSavedValuations();
+    }
+  }, [isAuthenticated, showLoadDropdown]);
+
+  const loadSavedValuations = async () => {
+    try {
+      setLoadingValuations(true);
+      const response = await TradingAPI.listValuations();
+      setSavedValuations(response.valuations);
+    } catch (err: any) {
+      console.error('Failed to load valuations:', err);
+    } finally {
+      setLoadingValuations(false);
+    }
+  };
+
+  const handleSaveClick = () => {
+    if (!isAuthenticated) {
+      alert('Please log in to save valuations to your account.');
+      return;
+    }
+
+    if (selectedIndicators.length === 0) {
+      alert('Please select at least one indicator before saving.');
+      return;
+    }
+
+    setShowSaveModal(true);
+  };
+
+  const handleSaveValuation = async (name: string, description?: string) => {
+    try {
+      await TradingAPI.saveValuation({
+        name,
+        description,
+        indicators: selectedIndicators,
+        zscore_method: zscoreMethod,
+        rolling_window: rollingWindow,
+        average_window: averageWindow || undefined,
+        show_average: showAverage,
+        overbought_threshold: overboughtThreshold,
+        oversold_threshold: oversoldThreshold,
+        symbol,
+        start_date: startDate || undefined,
+        end_date: endDate || undefined,
+      });
+      setShowSaveModal(false);
+      alert(`Valuation "${name}" saved successfully!`);
+    } catch (error: any) {
+      throw error; // Let modal handle the error display
+    }
+  };
+
+  const handleLoadValuation = async (valuationId: number) => {
+    try {
+      const valuation = await TradingAPI.getValuation(valuationId);
+      
+      // Load valuation settings
+      setSelectedIndicators(valuation.indicators);
+      setZscoreMethod(valuation.zscore_method);
+      setRollingWindow(valuation.rolling_window);
+      setAverageWindow(valuation.average_window);
+      setShowAverage(valuation.show_average);
+      setOverboughtThreshold(valuation.overbought_threshold);
+      setOversoldThreshold(valuation.oversold_threshold);
+      setSymbol(valuation.symbol);
+      setStartDate(valuation.start_date || '');
+      setEndDate(valuation.end_date || '');
+      
+      setShowLoadDropdown(false);
+      alert(`Valuation "${valuation.name}" loaded successfully!`);
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to load valuation');
+    }
+  };
+
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-bg-primary p-4 md:p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Header */}
-          <div>
-            <h1 className="text-3xl font-bold text-text-primary mb-2">Valuation</h1>
-            <p className="text-text-secondary">
-              Analyze mean-reverting indicators with z-scores to identify overbought and oversold states
-            </p>
+          <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-text-primary mb-2">Valuation</h1>
+              <p className="text-sm sm:text-base text-text-secondary">
+                Analyze mean-reverting indicators with z-scores to identify overbought and oversold states
+              </p>
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <div className="relative">
+                <Button
+                  onClick={() => {
+                    setShowLoadDropdown(!showLoadDropdown);
+                    if (!showLoadDropdown && isAuthenticated) {
+                      loadSavedValuations();
+                    }
+                  }}
+                  variant="outline"
+                  size="sm"
+                >
+                  <ChevronDown className="w-4 h-4 mr-1" />
+                  Load
+                </Button>
+                {showLoadDropdown && isAuthenticated && (
+                  <div className="absolute right-0 mt-2 w-full sm:w-64 bg-bg-secondary border border-border-default rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+                    {loadingValuations ? (
+                      <div className="p-4 text-center text-text-muted">
+                        <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
+                        <p className="text-sm">Loading...</p>
+                      </div>
+                    ) : savedValuations.length === 0 ? (
+                      <div className="p-4 text-center text-text-muted text-sm">
+                        No saved valuations
+                      </div>
+                    ) : (
+                      savedValuations.map((valuation) => (
+                        <button
+                          key={valuation.id}
+                          onClick={() => handleLoadValuation(valuation.id)}
+                          className="w-full text-left p-3 hover:bg-bg-tertiary transition-colors border-b border-border-default last:border-b-0"
+                        >
+                          <div className="font-medium text-text-primary">{valuation.name}</div>
+                          {valuation.description && (
+                            <div className="text-sm text-text-secondary mt-1 line-clamp-1">
+                              {valuation.description}
+                            </div>
+                          )}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+              <Button
+                onClick={handleSaveClick}
+                variant="default"
+                size="sm"
+              >
+                <Save className="w-4 h-4 mr-1" />
+                Save
+              </Button>
+            </div>
           </div>
 
           {/* Error Messages */}
@@ -111,6 +266,10 @@ const ValuationPage: React.FC = () => {
                 onZscoreMethodChange={setZscoreMethod}
                 rollingWindow={rollingWindow}
                 onRollingWindowChange={setRollingWindow}
+                showAverage={showAverage}
+                onShowAverageChange={setShowAverage}
+                averageWindow={averageWindow}
+                onAverageWindowChange={setAverageWindow}
                 overboughtThreshold={overboughtThreshold}
                 onOverboughtThresholdChange={setOverboughtThreshold}
                 oversoldThreshold={oversoldThreshold}
@@ -143,6 +302,7 @@ const ValuationPage: React.FC = () => {
                         data={zscoreData}
                         availableIndicators={availableIndicators}
                         selectedIndicators={selectedIndicators}
+                        showAverage={showAverage}
                         overboughtThreshold={overboughtThreshold}
                         oversoldThreshold={oversoldThreshold}
                         height={isMobile ? 400 : 600}
@@ -167,6 +327,7 @@ const ValuationPage: React.FC = () => {
                         averages={averages}
                         availableIndicators={availableIndicators}
                         selectedIndicators={selectedIndicators}
+                        showAverage={showAverage}
                         overboughtThreshold={overboughtThreshold}
                         oversoldThreshold={oversoldThreshold}
                       />
@@ -178,6 +339,13 @@ const ValuationPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Save Valuation Modal */}
+      <SaveValuationModal
+        isOpen={showSaveModal}
+        onClose={() => setShowSaveModal(false)}
+        onSave={handleSaveValuation}
+      />
     </ErrorBoundary>
   );
 };

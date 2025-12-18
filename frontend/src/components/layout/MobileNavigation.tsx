@@ -46,7 +46,7 @@ export const MobileNavigation: React.FC = () => {
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/valuation', label: 'Valuation', icon: BarChart3 },
-    { path: '/library', label: 'Strategy Library', icon: Library },
+    { path: '/library', label: 'My Creations', icon: Library },
     { path: '/settings', label: 'Settings', icon: Settings },
   ];
 
@@ -67,10 +67,10 @@ export const MobileNavigation: React.FC = () => {
       <nav
         {...(isMobile ? swipeHandlers.swipeProps : {})}
         className={`
-          fixed lg:static
-          top-0 left-0 h-full
+          fixed lg:sticky lg:top-0
+          top-0 left-0 h-screen
           bg-bg-secondary border-r border-border-default
-          w-64 min-h-screen p-4 flex flex-col
+          w-64 p-4 flex flex-col
           z-50
           transition-transform duration-300 ease-in-out
           ${isMobile ? (isOpen ? 'translate-x-0' : '-translate-x-full') : 'translate-x-0'}

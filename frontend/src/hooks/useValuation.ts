@@ -45,6 +45,10 @@ export interface UseValuationReturn {
   setZscoreMethod: (method: 'rolling' | 'all_time') => void;
   rollingWindow: number;
   setRollingWindow: (window: number) => void;
+  showAverage: boolean;
+  setShowAverage: (show: boolean) => void;
+  averageWindow: number | null;
+  setAverageWindow: (window: number | null) => void;
   
   // Date range
   startDate: string;
@@ -80,6 +84,8 @@ export const useValuation = (): UseValuationReturn => {
   // Z-score calculation settings
   const [zscoreMethod, setZscoreMethod] = useState<'rolling' | 'all_time'>('rolling');
   const [rollingWindow, setRollingWindow] = useState<number>(200);
+  const [showAverage, setShowAverage] = useState<boolean>(false);
+  const [averageWindow, setAverageWindow] = useState<number | null>(null);
   
   // Date range
   const [startDate, setStartDate] = useState<string>('2018-01-01');
@@ -126,6 +132,8 @@ export const useValuation = (): UseValuationReturn => {
         symbol,
         zscore_method: zscoreMethod,
         rolling_window: rollingWindow,
+        show_average: showAverage,
+        average_window: averageWindow || undefined,
         start_date: startDate || undefined,
         end_date: endDate || undefined,
       });
@@ -145,7 +153,7 @@ export const useValuation = (): UseValuationReturn => {
     } finally {
       setZscoresLoading(false);
     }
-  }, [selectedIndicators, symbol, zscoreMethod, rollingWindow, startDate, endDate]);
+  }, [selectedIndicators, symbol, zscoreMethod, rollingWindow, showAverage, averageWindow, startDate, endDate]);
   
   // Refresh data (recalculate z-scores)
   const refreshData = useCallback(async () => {
@@ -162,7 +170,7 @@ export const useValuation = (): UseValuationReturn => {
     if (selectedIndicators.length > 0) {
       calculateZScores();
     }
-  }, [selectedIndicators, symbol, zscoreMethod, rollingWindow, startDate, endDate, calculateZScores]);
+  }, [selectedIndicators, symbol, zscoreMethod, rollingWindow, showAverage, averageWindow, startDate, endDate, calculateZScores]);
   
   return {
     // Available indicators
@@ -185,6 +193,10 @@ export const useValuation = (): UseValuationReturn => {
     setZscoreMethod,
     rollingWindow,
     setRollingWindow,
+    showAverage,
+    setShowAverage,
+    averageWindow,
+    setAverageWindow,
     
     // Date range
     startDate,
