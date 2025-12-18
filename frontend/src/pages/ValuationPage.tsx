@@ -304,6 +304,8 @@ const ValuationPage: React.FC = () => {
                 onEndDateChange={setEndDate}
                 timeframe={timeframe}
                 onTimeframeChange={setTimeframe}
+                bandIndicatorId={bandIndicatorId}
+                onBandIndicatorChange={setBandIndicatorId}
                 symbol={symbol}
                 onSymbolChange={setSymbol}
                 isLoading={indicatorsLoading || zscoresLoading}
