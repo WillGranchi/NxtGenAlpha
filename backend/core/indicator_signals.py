@@ -9,7 +9,8 @@ from datetime import datetime
 import logging
 
 from backend.core.backtest import BacktestEngine
-from backend.core.expression import create_signal_series, get_available_conditions, evaluate_all_conditions
+from backend.core.expression import create_signal_series
+from backend.core.indicator_registry import get_available_conditions, evaluate_all_conditions
 from backend.core.metrics import calculate_all_metrics
 
 logger = logging.getLogger(__name__)
@@ -60,7 +61,8 @@ def generate_indicator_signals(
     
     for indicator_config in indicators:
         indicator_id = indicator_config['id']
-        params = indicator_config.get('parameters', {})
+        # IndicatorConfig uses 'params', not 'parameters'
+        params = indicator_config.get('params', indicator_config.get('parameters', {}))
         
         try:
             indicator_values = calculate_indicator(df, indicator_id, **params)
