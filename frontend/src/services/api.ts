@@ -899,6 +899,62 @@ export class TradingAPI {
     const response: AxiosResponse<any> = await api.delete(`/api/valuation/saved/${valuationId}`);
     return response.data;
   }
+
+  // Indicator Signal Generation API
+
+  /**
+   * Generate signals for individual indicators.
+   */
+  static async generateIndicatorSignals(request: {
+    indicators: Array<{ id: string; parameters: Record<string, any> }>;
+    expressions: Record<string, string>;
+    symbol?: string;
+    strategy_type?: 'long_cash' | 'long_short';
+    initial_capital?: number;
+    start_date?: string;
+    end_date?: string;
+  }): Promise<{
+    success: boolean;
+    results: Record<string, BacktestResult>;
+    price_data: Array<{
+      Date: string;
+      Price: number;
+      Position: number;
+      [key: string]: any;
+    }>;
+  }> {
+    const response: AxiosResponse<any> = await api.post('/api/indicators/signals', request);
+    return response.data;
+  }
+
+  /**
+   * Generate combined signals using majority voting.
+   */
+  static async generateCombinedSignals(request: {
+    indicator_signals: Record<string, number[]>;
+    dates: string[];
+    prices: number[];
+    threshold: number;
+    strategy_type?: 'long_cash' | 'long_short';
+    initial_capital?: number;
+  }): Promise<{
+    success: boolean;
+    combined_result: BacktestResult;
+    combined_signals: number[];
+    agreement_stats: {
+      total_points: number;
+      agreement_by_point: Array<{
+        date: string;
+        long_count: number;
+        short_count: number;
+        total_count: number;
+        combined_signal: number;
+      }>;
+    };
+  }> {
+    const response: AxiosResponse<any> = await api.post('/api/indicators/combined', request);
+    return response.data;
+  }
 }
 
 export default TradingAPI;

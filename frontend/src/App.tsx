@@ -11,6 +11,7 @@ import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import DashboardPage from './pages/DashboardPage';
+import IndicatorsPage from './pages/IndicatorsPage';
 import StrategyLibraryPage from './pages/StrategyLibraryPage';
 import SettingsPage from './pages/SettingsPage';
 import ValuationPage from './pages/ValuationPage';
@@ -32,6 +33,16 @@ export const App: React.FC = () => {
               <ProtectedRoute>
                 <Layout>
                   <DashboardPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/indicators"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <IndicatorsPage />
                 </Layout>
               </ProtectedRoute>
             }
