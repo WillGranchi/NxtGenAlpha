@@ -3,7 +3,7 @@ Pydantic models for Indicator signal generation API endpoints.
 """
 
 from pydantic import BaseModel, Field
-from typing import List, Dict, Optional, Literal
+from typing import List, Dict, Optional, Literal, Any
 from backend.api.models.backtest_models import IndicatorConfig, BacktestResult
 
 
@@ -96,7 +96,7 @@ class CombinedSignalResponse(BaseModel):
         ..., 
         description="Combined signal series (0/1/-1)"
     )
-    agreement_stats: Dict[str, any] = Field(
+    agreement_stats: Dict[str, Any] = Field(
         ..., 
         description="Statistics about indicator agreement at each point"
     )
