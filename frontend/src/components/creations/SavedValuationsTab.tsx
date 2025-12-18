@@ -119,7 +119,7 @@ export const SavedValuationsTab: React.FC<SavedValuationsTabProps> = ({
         <p className="text-red-400 text-sm">{error}</p>
         <Button
           onClick={loadValuations}
-          variant="outline"
+          variant="secondary"
           size="sm"
           className="mt-2"
         >
@@ -178,7 +178,7 @@ export const SavedValuationsTab: React.FC<SavedValuationsTabProps> = ({
               {onLoadValuation && (
                 <Button
                   onClick={() => handleLoad(valuation.id)}
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   className="flex-1 min-w-[80px]"
                 >

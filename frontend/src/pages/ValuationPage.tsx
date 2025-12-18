@@ -159,7 +159,7 @@ const ValuationPage: React.FC = () => {
                       loadSavedValuations();
                     }
                   }}
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                 >
                   <ChevronDown className="w-4 h-4 mr-1" />
@@ -197,7 +197,7 @@ const ValuationPage: React.FC = () => {
               </div>
               <Button
                 onClick={handleSaveClick}
-                variant="default"
+                variant="primary"
                 size="sm"
               >
                 <Save className="w-4 h-4 mr-1" />

@@ -4,17 +4,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import TradingAPI from '../../services/api';
+import TradingAPI, { StrategyListItem } from '../../services/api';
 import { Edit, Trash2, Copy, Loader2 } from 'lucide-react';
 import { Button } from '../ui/Button';
-
-interface StrategyListItem {
-  id: number;
-  name: string;
-  description: string | null;
-  created_at: string;
-  updated_at: string;
-}
 
 interface SavedStrategiesTabProps {
   onLoadStrategy?: (strategyId: number) => void;
@@ -105,7 +97,7 @@ export const SavedStrategiesTab: React.FC<SavedStrategiesTabProps> = ({
         <p className="text-red-400 text-sm">{error}</p>
         <Button
           onClick={loadStrategies}
-          variant="outline"
+          variant="secondary"
           size="sm"
           className="mt-2"
         >
@@ -164,7 +156,7 @@ export const SavedStrategiesTab: React.FC<SavedStrategiesTabProps> = ({
               {onLoadStrategy && (
                 <Button
                   onClick={() => handleLoad(strategy.id)}
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   className="flex-1 min-w-[80px]"
                 >
