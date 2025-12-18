@@ -22,6 +22,7 @@ const ValuationPage: React.FC = () => {
   const [viewMode, setViewMode] = useState<'chart' | 'table' | 'both'>('both');
   const [overboughtThreshold, setOverboughtThreshold] = useState<number>(1.0);
   const [oversoldThreshold, setOversoldThreshold] = useState<number>(-1.0);
+  const [bandIndicatorId, setBandIndicatorId] = useState<string | 'average' | null>(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showLoadDropdown, setShowLoadDropdown] = useState(false);
   const [savedValuations, setSavedValuations] = useState<Array<{
@@ -60,6 +61,27 @@ const ValuationPage: React.FC = () => {
     symbol,
     setSymbol,
   } = useValuation();
+
+  // Set default band indicator when selected indicators change
+  useEffect(() => {
+    if (selectedIndicators.length > 0 && !bandIndicatorId) {
+      // Default to first selected indicator
+      setBandIndicatorId(selectedIndicators[0]);
+    } else if (selectedIndicators.length === 0) {
+      setBandIndicatorId(null);
+    } else if (bandIndicatorId && bandIndicatorId !== 'average' && !selectedIndicators.includes(bandIndicatorId)) {
+      // If current band indicator is no longer selected, switch to first available
+      setBandIndicatorId(selectedIndicators[0]);
+    }
+  }, [selectedIndicators, bandIndicatorId]);
+
+  // Update band indicator when average is enabled/disabled
+  useEffect(() => {
+    if (showAverage && bandIndicatorId === null && selectedIndicators.length > 0) {
+      // If average is enabled and no band indicator set, default to first indicator
+      setBandIndicatorId(selectedIndicators[0]);
+    }
+  }, [showAverage, selectedIndicators, bandIndicatorId]);
 
   // Load saved valuations
   useEffect(() => {
@@ -307,6 +329,7 @@ const ValuationPage: React.FC = () => {
                         availableIndicators={availableIndicators}
                         selectedIndicators={selectedIndicators}
                         showAverage={showAverage}
+                        bandIndicatorId={bandIndicatorId}
                         overboughtThreshold={overboughtThreshold}
                         oversoldThreshold={oversoldThreshold}
                         height={isMobile ? 400 : 600}

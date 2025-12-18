@@ -12,6 +12,7 @@ interface ValuationChartProps {
   availableIndicators: ValuationIndicator[];
   selectedIndicators: string[];
   showAverage?: boolean;
+  bandIndicatorId?: string | 'average' | null; // Which indicator to use for overbought/oversold bands
   overboughtThreshold: number;
   oversoldThreshold: number;
   height?: number;
@@ -34,6 +35,7 @@ export const ValuationChart: React.FC<ValuationChartProps> = memo(({
   availableIndicators,
   selectedIndicators,
   showAverage = false,
+  bandIndicatorId = null,
   overboughtThreshold,
   oversoldThreshold,
   height = 600,
@@ -183,13 +185,18 @@ export const ValuationChart: React.FC<ValuationChartProps> = memo(({
     });
 
     // Overbought/oversold bands
-    // Create shaded regions based on any selected indicator exceeding thresholds
-    // We'll use the first selected indicator's z-scores to determine regions
-    if (selectedIndicators.length > 0) {
-      const firstIndicatorId = selectedIndicators[0];
+    // Create shaded regions based on selected indicator or average exceeding thresholds
+    const indicatorForBands = bandIndicatorId || (selectedIndicators.length > 0 ? selectedIndicators[0] : null);
+    
+    if (indicatorForBands) {
       const zscores = data.map((d) => {
-        const indData = d.indicators[firstIndicatorId];
-        return indData ? indData.zscore : null;
+        if (indicatorForBands === 'average') {
+          const avgData = d.indicators['average'];
+          return avgData ? avgData.zscore : null;
+        } else {
+          const indData = d.indicators[indicatorForBands];
+          return indData ? indData.zscore : null;
+        }
       });
 
       // Find overbought regions (any point where z-score > threshold)
@@ -278,7 +285,7 @@ export const ValuationChart: React.FC<ValuationChartProps> = memo(({
     }
 
     return { plotData, dates, prices };
-  }, [data, availableIndicators, selectedIndicators, showAverage, overboughtThreshold, oversoldThreshold]);
+  }, [data, availableIndicators, selectedIndicators, showAverage, bandIndicatorId, overboughtThreshold, oversoldThreshold]);
 
   if (!chartData || chartData.plotData.length === 0) {
     return (

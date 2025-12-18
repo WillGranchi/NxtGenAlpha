@@ -32,6 +32,8 @@ interface ValuationControlsProps {
   onEndDateChange: (date: string) => void;
   timeframe: '1h' | '4h' | '6h' | '12h' | '1d' | '1w' | 'custom' | null;
   onTimeframeChange: (timeframe: '1h' | '4h' | '6h' | '12h' | '1d' | '1w' | 'custom' | null) => void;
+  bandIndicatorId: string | 'average' | null;
+  onBandIndicatorChange: (indicatorId: string | 'average' | null) => void;
   symbol: string;
   onSymbolChange: (symbol: string) => void;
   isLoading?: boolean;
@@ -59,6 +61,8 @@ export const ValuationControls: React.FC<ValuationControlsProps> = ({
   onEndDateChange,
   timeframe,
   onTimeframeChange,
+  bandIndicatorId,
+  onBandIndicatorChange,
   symbol,
   onSymbolChange,
   isLoading = false,
@@ -313,6 +317,36 @@ export const ValuationControls: React.FC<ValuationControlsProps> = ({
           </div>
         )}
       </div>
+
+      {/* Band Indicator Selector */}
+      {selectedIndicators.length > 0 && (
+        <div>
+          <label className="block text-sm font-medium text-text-secondary mb-2">
+            Overbought/Oversold Bands Indicator
+          </label>
+          <select
+            value={bandIndicatorId || ''}
+            onChange={(e) => onBandIndicatorChange(e.target.value === '' ? null : (e.target.value as string | 'average'))}
+            disabled={isLoading}
+            className="w-full px-3 py-2 bg-bg-tertiary border border-border-default rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {selectedIndicators.map((indicatorId) => {
+              const indicator = availableIndicators.find((ind) => ind.id === indicatorId);
+              return (
+                <option key={indicatorId} value={indicatorId}>
+                  {indicator ? indicator.name : indicatorId}
+                </option>
+              );
+            })}
+            {showAverage && (
+              <option value="average">Average Z-Score</option>
+            )}
+          </select>
+          <p className="text-xs text-text-muted mt-1">
+            Select which indicator to use for overbought/oversold band shading
+          </p>
+        </div>
+      )}
 
       {/* Thresholds */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
