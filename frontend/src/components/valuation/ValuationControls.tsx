@@ -30,8 +30,8 @@ interface ValuationControlsProps {
   onStartDateChange: (date: string) => void;
   endDate: string;
   onEndDateChange: (date: string) => void;
-  timeframe: '12h' | '1h' | '4h' | '1w' | 'custom' | null;
-  onTimeframeChange: (timeframe: '12h' | '1h' | '4h' | '1w' | 'custom' | null) => void;
+  timeframe: '1h' | '4h' | '6h' | '12h' | '1d' | '1w' | 'custom' | null;
+  onTimeframeChange: (timeframe: '1h' | '4h' | '6h' | '12h' | '1d' | '1w' | 'custom' | null) => void;
   symbol: string;
   onSymbolChange: (symbol: string) => void;
   isLoading?: boolean;
@@ -166,26 +166,52 @@ export const ValuationControls: React.FC<ValuationControlsProps> = ({
           Timeframe
         </label>
         <div className="flex flex-wrap gap-2 mb-3">
-          {(['1h', '4h', '12h', '1w', 'custom'] as const).map((tf) => (
-            <button
-              key={tf}
-              type="button"
-              onClick={() => onTimeframeChange(tf === 'custom' ? null : tf)}
-              disabled={isLoading}
-              className={`
-                px-3 py-1.5 text-sm font-medium rounded-lg transition-all
-                ${
-                  (timeframe === tf) || (tf === 'custom' && timeframe === null)
-                    ? 'bg-primary-500 text-white shadow-md'
-                    : 'bg-bg-tertiary text-text-secondary hover:bg-bg-elevated hover:text-text-primary border border-border-default'
-                }
-                disabled:opacity-50 disabled:cursor-not-allowed
-              `}
-            >
-              {tf === 'custom' ? 'Custom' : tf.toUpperCase()}
-            </button>
-          ))}
+          {([
+            { id: '1h', label: '1H', supported: false },
+            { id: '4h', label: '4H', supported: false },
+            { id: '6h', label: '6H', supported: false },
+            { id: '12h', label: '12H', supported: false },
+            { id: '1d', label: '1D', supported: true },
+            { id: '1w', label: '1W', supported: true },
+            { id: 'custom', label: 'Custom', supported: true },
+          ] as const).map(({ id, label, supported }) => {
+            const isActive = (timeframe === id) || (id === 'custom' && timeframe === null);
+            const isDisabled = isLoading || !supported;
+            
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => {
+                  if (supported) {
+                    onTimeframeChange(id === 'custom' ? null : id);
+                  }
+                }}
+                disabled={isDisabled}
+                title={!supported ? 'Coming soon - hourly data not yet available' : undefined}
+                className={`
+                  px-3 py-1.5 text-sm font-medium rounded-lg transition-all relative
+                  ${
+                    isActive && supported
+                      ? 'bg-primary-500 text-white shadow-md'
+                      : supported
+                      ? 'bg-bg-tertiary text-text-secondary hover:bg-bg-elevated hover:text-text-primary border border-border-default'
+                      : 'bg-bg-tertiary/50 text-text-muted border border-border-default/50 cursor-not-allowed opacity-60'
+                  }
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                `}
+              >
+                {label}
+                {!supported && (
+                  <span className="absolute -top-1 -right-1 text-[8px] text-primary-400">*</span>
+                )}
+              </button>
+            );
+          })}
         </div>
+        <p className="text-xs text-text-muted mt-1">
+          <span className="text-primary-400">*</span> Hourly timeframes coming soon
+        </p>
       </div>
 
       {/* Date Range */}

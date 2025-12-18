@@ -55,8 +55,8 @@ export interface UseValuationReturn {
   setStartDate: (date: string) => void;
   endDate: string;
   setEndDate: (date: string) => void;
-  timeframe: '12h' | '1h' | '4h' | '1w' | 'custom' | null;
-  setTimeframe: (timeframe: '12h' | '1h' | '4h' | '1w' | 'custom' | null) => void;
+  timeframe: '1h' | '4h' | '6h' | '12h' | '1d' | '1w' | 'custom' | null;
+  setTimeframe: (timeframe: '1h' | '4h' | '6h' | '12h' | '1d' | '1w' | 'custom' | null) => void;
   
   // Symbol
   symbol: string;
@@ -92,7 +92,7 @@ export const useValuation = (): UseValuationReturn => {
   // Date range
   const [startDate, setStartDate] = useState<string>('2018-01-01');
   const [endDate, setEndDate] = useState<string>('');
-  const [timeframe, setTimeframe] = useState<'12h' | '1h' | '4h' | '1w' | 'custom' | null>(null);
+  const [timeframe, setTimeframe] = useState<'1h' | '4h' | '6h' | '12h' | '1d' | '1w' | 'custom' | null>(null);
   
   // Symbol
   const [symbol, setSymbol] = useState<string>('BTCUSDT');
@@ -164,24 +164,27 @@ export const useValuation = (): UseValuationReturn => {
   }, [calculateZScores]);
   
   // Calculate date range from timeframe
+  // Note: Hourly timeframes (1h, 4h, 6h, 12h) are not yet supported as data is daily
+  // They will be disabled in the UI with "coming soon" message
   useEffect(() => {
     if (timeframe && timeframe !== 'custom') {
       const now = new Date();
       let start: Date;
       
       switch (timeframe) {
-        case '1h':
-          start = new Date(now.getTime() - 60 * 60 * 1000); // 1 hour ago
-          break;
-        case '4h':
-          start = new Date(now.getTime() - 4 * 60 * 60 * 1000); // 4 hours ago
-          break;
-        case '12h':
-          start = new Date(now.getTime() - 12 * 60 * 60 * 1000); // 12 hours ago
+        case '1d':
+          start = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 1 day ago
           break;
         case '1w':
           start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
           break;
+        // Hourly timeframes not yet supported - data is daily
+        case '1h':
+        case '4h':
+        case '6h':
+        case '12h':
+          // Don't update dates for unsupported timeframes
+          return;
         default:
           return;
       }
