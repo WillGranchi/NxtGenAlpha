@@ -91,8 +91,10 @@ export const CombinedSignalsTab: React.FC<CombinedSignalsTabProps> = ({
   }, [priceData, indicatorIds]);
 
   // Generate combined buy/sell signals
-  const combinedOverlaySignals = useMemo(() => {
-    if (!chartData || chartData.length === 0) return {};
+  const combinedOverlaySignals = useMemo((): Record<string, { buy: { x: string[]; y: number[] }; sell: { x: string[]; y: number[] } }> => {
+    if (!chartData || chartData.length === 0) {
+      return {};
+    }
 
     const buySignals: { x: string[]; y: number[] } = { x: [], y: [] };
     const sellSignals: { x: string[]; y: number[] } = { x: [], y: [] };
@@ -151,7 +153,7 @@ export const CombinedSignalsTab: React.FC<CombinedSignalsTabProps> = ({
           data={chartData}
           title="Combined Trading Signals (Majority Voting)"
           height={500}
-          overlaySignals={combinedOverlaySignals ? { ...overlaySignals, ...combinedOverlaySignals } : overlaySignals}
+          overlaySignals={{ ...overlaySignals, ...combinedOverlaySignals }}
           showOverlayLegend={true}
         />
       </div>
