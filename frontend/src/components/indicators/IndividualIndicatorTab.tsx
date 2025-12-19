@@ -37,6 +37,9 @@ export const IndividualIndicatorTab: React.FC<IndividualIndicatorTabProps> = ({
       Date: point.Date,
       Price: point.Price,
       Position: point[`${indicatorId}_Position`] ?? point.Position ?? 0,
+      Portfolio_Value: point.Price, // Use price as placeholder
+      Capital: 0, // Not used by PriceChart
+      Shares: 0, // Not used by PriceChart
     }));
   }, [priceData, indicatorId]);
 

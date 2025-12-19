@@ -55,6 +55,9 @@ export const CombinedSignalsTab: React.FC<CombinedSignalsTabProps> = ({
       Date: point.Date,
       Price: point.Price,
       Position: index < combinedSignals.length ? combinedSignals[index] : 0,
+      Portfolio_Value: point.Price, // Use price as placeholder
+      Capital: 0, // Not used by PriceChart
+      Shares: 0, // Not used by PriceChart
     }));
   }, [priceData, combinedSignals]);
 
@@ -148,7 +151,7 @@ export const CombinedSignalsTab: React.FC<CombinedSignalsTabProps> = ({
           data={chartData}
           title="Combined Trading Signals (Majority Voting)"
           height={500}
-          overlaySignals={{ ...overlaySignals, ...combinedOverlaySignals }}
+          overlaySignals={combinedOverlaySignals ? { ...overlaySignals, ...combinedOverlaySignals } : overlaySignals}
           showOverlayLegend={true}
         />
       </div>
