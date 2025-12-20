@@ -432,6 +432,14 @@ const IndicatorsPage: React.FC = () => {
                             show_on_chart: false,
                           }))}
                           availableIndicators={availableIndicators}
+                          indicatorParameters={indicator.parameters}
+                          onParametersChange={(indId, params) => {
+                            setSelectedIndicators((prev) =>
+                              prev.map((ind) =>
+                                ind.id === indId ? { ...ind, parameters: params } : ind
+                              )
+                            );
+                          }}
                           isLoading={isLoading}
                         />
                       );

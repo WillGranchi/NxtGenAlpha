@@ -245,40 +245,45 @@ export const StrategyDescription: React.FC<StrategyDescriptionProps> = ({
 
   // Generate description based on expression type
   const description = useMemo(() => {
-    if (useSeparateExpressions) {
-      const parts: string[] = [];
+    try {
+      if (useSeparateExpressions) {
+        const parts: string[] = [];
 
-      if (longExpression.trim()) {
-        const longDesc = expressionToNaturalLanguage(longExpression);
-        if (longDesc) {
-          parts.push(`Goes LONG when ${longDesc.toLowerCase()}`);
-        }
-      }
-
-      if (strategyType === 'long_cash') {
-        if (cashExpression.trim()) {
-          const cashDesc = expressionToNaturalLanguage(cashExpression);
-          if (cashDesc) {
-            parts.push(`Goes to CASH when ${cashDesc.toLowerCase()}`);
-          }
-        } else if (longExpression.trim()) {
-          parts.push('Goes to CASH when LONG conditions are false');
-        }
-      } else if (strategyType === 'long_short') {
-        if (shortExpression.trim()) {
-          const shortDesc = expressionToNaturalLanguage(shortExpression);
-          if (shortDesc) {
-            parts.push(`Goes SHORT when ${shortDesc.toLowerCase()}`);
+        if (longExpression.trim()) {
+          const longDesc = expressionToNaturalLanguage(longExpression);
+          if (longDesc && typeof longDesc === 'string') {
+            parts.push(`Goes LONG when ${longDesc.toLowerCase()}`);
           }
         }
-      }
 
-      return parts.length > 0 ? parts.join('. ') + '.' : 'No strategy conditions defined.';
-    } else {
-      if (expression.trim()) {
-        const desc = expressionToNaturalLanguage(expression);
-        return desc ? `Strategy goes long when ${desc.toLowerCase()}` : 'No strategy conditions defined.';
+        if (strategyType === 'long_cash') {
+          if (cashExpression.trim()) {
+            const cashDesc = expressionToNaturalLanguage(cashExpression);
+            if (cashDesc && typeof cashDesc === 'string') {
+              parts.push(`Goes to CASH when ${cashDesc.toLowerCase()}`);
+            }
+          } else if (longExpression.trim()) {
+            parts.push('Goes to CASH when LONG conditions are false');
+          }
+        } else if (strategyType === 'long_short') {
+          if (shortExpression.trim()) {
+            const shortDesc = expressionToNaturalLanguage(shortExpression);
+            if (shortDesc && typeof shortDesc === 'string') {
+              parts.push(`Goes SHORT when ${shortDesc.toLowerCase()}`);
+            }
+          }
+        }
+
+        return parts.length > 0 ? parts.join('. ') + '.' : 'No strategy conditions defined.';
+      } else {
+        if (expression.trim()) {
+          const desc = expressionToNaturalLanguage(expression);
+          return (desc && typeof desc === 'string') ? `Strategy goes long when ${desc.toLowerCase()}` : 'No strategy conditions defined.';
+        }
+        return 'No strategy conditions defined.';
       }
+    } catch (error) {
+      console.error('Error generating strategy description:', error);
       return 'No strategy conditions defined.';
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
