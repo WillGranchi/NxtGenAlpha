@@ -58,6 +58,7 @@ const IndicatorsPage: React.FC = () => {
   // UI state
   const [threshold, setThreshold] = useState<number>(0.5); // 50% default
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingIndicators, setLoadingIndicators] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [settingsExpanded, setSettingsExpanded] = useState<boolean>(false);
   
@@ -109,7 +110,7 @@ const IndicatorsPage: React.FC = () => {
       
       setExpressions(newExpressions);
     }
-  }, [selectedIndicators, availableIndicators]);
+  }, [selectedIndicators, availableIndicators, availableConditions]);
   
   // Update available conditions when indicators change
   // Conditions are derived from indicator metadata
@@ -236,7 +237,112 @@ const IndicatorsPage: React.FC = () => {
     threshold,
   ]);
   
-  // Update combined signals when threshold changes
+  // Auto-generate signals when indicators are selected or expressions change
+  useEffect(() => {
+    // Only auto-generate if we have at least one indicator with an expression
+    const hasValidIndicators = selectedIndicators.length > 0 && 
+      selectedIndicators.every((ind) => expressions[ind.id] && expressions[ind.id].trim());
+    
+    if (!hasValidIndicators) {
+      // Clear results if no valid indicators
+      if (selectedIndicators.length === 0) {
+        setPriceData([]);
+        setIndividualResults({});
+        setCombinedResult(null);
+        setCombinedSignals([]);
+        setAgreementStats(null);
+      }
+      return;
+    }
+
+    // Debounce the auto-generation
+    const timeoutId = setTimeout(() => {
+      const autoGenerate = async () => {
+        setIsLoading(true);
+        setLoadingIndicators(new Set(selectedIndicators.map(ind => ind.id)));
+        setError(null);
+        
+        try {
+          // Generate individual indicator signals
+          const signalResponse = await TradingAPI.generateIndicatorSignals({
+            indicators: selectedIndicators.map((ind) => ({
+              id: ind.id,
+              parameters: ind.parameters,
+            })),
+            expressions,
+            symbol,
+            strategy_type: strategyType,
+            initial_capital: initialCapital,
+            start_date: startDate || undefined,
+            end_date: endDate || undefined,
+          });
+          
+          if (!signalResponse.success) {
+            throw new Error('Failed to generate signals');
+          }
+          
+          setPriceData(signalResponse.price_data);
+          setIndividualResults(signalResponse.results);
+          
+          // Generate combined signals
+          if (Object.keys(signalResponse.results).length > 0) {
+            const indicatorSignals: Record<string, number[]> = {};
+            const dates: string[] = [];
+            const prices: number[] = [];
+            
+            signalResponse.price_data.forEach((point) => {
+              dates.push(point.Date);
+              prices.push(point.Price);
+              
+              selectedIndicators.forEach((indicator) => {
+                if (!indicatorSignals[indicator.id]) {
+                  indicatorSignals[indicator.id] = [];
+                }
+                const signalValue = point[`${indicator.id}_Position`] ?? 0;
+                indicatorSignals[indicator.id].push(signalValue);
+              });
+            });
+            
+            const combinedResponse = await TradingAPI.generateCombinedSignals({
+              indicator_signals: indicatorSignals,
+              dates,
+              prices,
+              threshold,
+              strategy_type: strategyType,
+              initial_capital: initialCapital,
+            });
+            
+            if (combinedResponse.success) {
+              setCombinedResult(combinedResponse.combined_result);
+              setCombinedSignals(combinedResponse.combined_signals);
+              setAgreementStats(combinedResponse.agreement_stats);
+            }
+          }
+        } catch (err: any) {
+          // Silently handle errors for auto-generation (don't show error to user)
+          console.error('Error auto-generating signals:', err);
+        } finally {
+          setIsLoading(false);
+          setLoadingIndicators(new Set());
+        }
+      };
+      
+      autoGenerate();
+    }, 500); // 500ms debounce
+    
+    return () => clearTimeout(timeoutId);
+  }, [
+    selectedIndicators,
+    expressions,
+    symbol,
+    strategyType,
+    initialCapital,
+    startDate,
+    endDate,
+    threshold,
+  ]);
+
+  // Update combined signals when threshold changes (if we already have results)
   useEffect(() => {
     if (priceData.length > 0 && Object.keys(individualResults).length > 0) {
       const regenerateCombined = async () => {
@@ -279,7 +385,7 @@ const IndicatorsPage: React.FC = () => {
       
       regenerateCombined();
     }
-  }, [threshold, strategyType, initialCapital]);
+  }, [threshold]);
   
   // Get indicator names
   const indicatorNames = useMemo(() => {
@@ -398,35 +504,22 @@ const IndicatorsPage: React.FC = () => {
                     </div>
                   </div>
                   
-                  {/* Initial Capital & Generate Button */}
-                  <div className="flex flex-col gap-2">
-                    <div>
-                      <Input
-                        type="number"
-                        label="Initial Capital"
-                        value={initialCapital}
-                        onChange={(e) => setInitialCapital(parseFloat(e.target.value) || 10000)}
-                        min={1000}
-                        step={1000}
-                      />
-                    </div>
-                    <Button
-                      onClick={handleGenerateSignals}
-                      disabled={isLoading || selectedIndicators.length === 0}
-                      className="w-full mt-auto"
-                    >
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Generating...
-                        </>
-                      ) : (
-                        <>
-                          <Play className="w-4 h-4 mr-2" />
-                          Generate Signals
-                        </>
-                      )}
-                    </Button>
+                  {/* Initial Capital */}
+                  <div>
+                    <Input
+                      type="number"
+                      label="Initial Capital"
+                      value={initialCapital}
+                      onChange={(e) => setInitialCapital(parseFloat(e.target.value) || 10000)}
+                      min={1000}
+                      step={1000}
+                    />
+                    {isLoading && (
+                      <div className="mt-2 text-xs text-text-muted flex items-center gap-2">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Generating signals...
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -449,7 +542,7 @@ const IndicatorsPage: React.FC = () => {
               availableConditions={availableConditions}
               priceData={priceData}
               individualResults={individualResults}
-              isLoading={isLoading}
+              isLoading={isLoading || loadingIndicators.size > 0}
             />
           )}
 
