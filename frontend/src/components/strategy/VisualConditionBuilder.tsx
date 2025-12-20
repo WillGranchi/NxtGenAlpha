@@ -133,22 +133,27 @@ export const VisualConditionBuilder: React.FC<VisualConditionBuilderProps> = ({
 
   // Generate expression string from condition rows
   const generateExpressionFromRows = (rows: ConditionRow[]): string => {
-    if (rows.length === 0) return '';
-    
-    const parts: string[] = [];
-    
-    rows.forEach((row, index) => {
-      if (!row.conditionName) return;
+    try {
+      if (!rows || rows.length === 0) return '';
       
-      // Add operator before this condition (except first)
-      if (row.operator && index > 0) {
-        parts.push(row.operator);
-      }
+      const parts: string[] = [];
       
-      parts.push(row.conditionName);
-    });
-    
-    return parts.join(' ');
+      rows.forEach((row, index) => {
+        if (!row || !row.conditionName || typeof row.conditionName !== 'string') return;
+        
+        // Add operator before this condition (except first)
+        if (row.operator && index > 0) {
+          parts.push(String(row.operator));
+        }
+        
+        parts.push(String(row.conditionName));
+      });
+      
+      return parts.join(' ');
+    } catch (error) {
+      console.error('Error generating expression from rows:', error);
+      return '';
+    }
   };
 
 
@@ -220,12 +225,28 @@ export const VisualConditionBuilder: React.FC<VisualConditionBuilderProps> = ({
     <div className={`card p-4 ${className}`}>
       {/* Natural Language Description */}
       <div className="mb-4">
-        <StrategyDescription
-          expression={generateExpressionFromRows(conditionRows)}
-          selectedIndicators={selectedIndicators}
-          availableIndicators={availableIndicators}
-          availableConditions={availableConditions}
-        />
+        {(() => {
+          try {
+            const expr = generateExpressionFromRows(conditionRows);
+            // Ensure expression is a string
+            const expressionStr = typeof expr === 'string' ? expr : String(expr || '');
+            return (
+              <StrategyDescription
+                expression={expressionStr}
+                selectedIndicators={selectedIndicators}
+                availableIndicators={availableIndicators}
+                availableConditions={availableConditions}
+              />
+            );
+          } catch (error) {
+            console.error('Error rendering StrategyDescription:', error);
+            return (
+              <div className="p-4 bg-bg-tertiary border border-border-default rounded-lg">
+                <p className="text-sm text-text-muted italic">Unable to generate strategy description.</p>
+              </div>
+            );
+          }
+        })()}
       </div>
 
       {/* Condition Rows */}

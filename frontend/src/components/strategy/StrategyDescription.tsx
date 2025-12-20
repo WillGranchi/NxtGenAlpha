@@ -52,13 +52,22 @@ export const StrategyDescription: React.FC<StrategyDescriptionProps> = ({
 
   // Convert condition name to natural language with actual parameter values
   const conditionToNaturalLanguage = (conditionName: string): string => {
-    const indicator = findIndicatorForCondition(conditionName);
-    if (!indicator || !availableIndicators?.[indicator.id]) {
-      return conditionName;
-    }
+    try {
+      if (!conditionName || typeof conditionName !== 'string') {
+        return 'Invalid condition';
+      }
 
-    const metadata = availableIndicators[indicator.id];
-    const params = indicator.params;
+      const indicator = findIndicatorForCondition(conditionName);
+      if (!indicator || !availableIndicators?.[indicator.id]) {
+        return conditionName;
+      }
+
+      const metadata = availableIndicators[indicator.id];
+      if (!metadata) {
+        return conditionName;
+      }
+
+      const params = indicator.params || {};
 
     // RSI conditions
     if (conditionName.startsWith('rsi_')) {
@@ -185,15 +194,31 @@ export const StrategyDescription: React.FC<StrategyDescriptionProps> = ({
 
     // Fallback to metadata description if available
     if (metadata.conditions && conditionName in metadata.conditions) {
-      let desc = metadata.conditions[conditionName];
-      // Try to replace parameter placeholders with actual values
-      Object.entries(params).forEach(([key, value]) => {
-        desc = desc.replace(new RegExp(`\\b${key}\\b`, 'gi'), String(value));
-      });
-      return desc;
+      const conditionDesc = metadata.conditions[conditionName];
+      // Ensure it's a string
+      if (typeof conditionDesc === 'string') {
+        let desc = conditionDesc;
+        // Try to replace parameter placeholders with actual values
+        Object.entries(params).forEach(([key, value]) => {
+          desc = desc.replace(new RegExp(`\\b${key}\\b`, 'gi'), String(value));
+        });
+        return desc;
+      } else if (typeof conditionDesc === 'object' && conditionDesc !== null) {
+        // If it's an object, try to extract a message or convert to string
+        const errorObj = conditionDesc as any;
+        if (errorObj.msg || errorObj.message || errorObj.description) {
+          return String(errorObj.msg || errorObj.message || errorObj.description);
+        }
+        // Fallback: return condition name if object doesn't have expected fields
+        return conditionName;
+      }
     }
 
-    return conditionName;
+      return conditionName;
+    } catch (error) {
+      console.error('Error converting condition to natural language:', error);
+      return conditionName || 'Unknown condition';
+    }
   };
 
   // Parse expression to natural language

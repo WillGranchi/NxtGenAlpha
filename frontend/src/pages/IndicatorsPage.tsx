@@ -211,7 +211,16 @@ const IndicatorsPage: React.FC = () => {
         }
       }
     } catch (err: any) {
-      setError(err.response?.data?.detail || err.message || 'Failed to generate signals');
+      // Ensure error message is always a string
+      let errorMessage = 'Failed to generate signals';
+      if (err?.response?.data?.detail) {
+        errorMessage = typeof err.response.data.detail === 'string' 
+          ? err.response.data.detail 
+          : JSON.stringify(err.response.data.detail);
+      } else if (err?.message) {
+        errorMessage = typeof err.message === 'string' ? err.message : String(err.message);
+      }
+      setError(errorMessage);
       console.error('Error generating signals:', err);
     } finally {
       setIsLoading(false);
@@ -296,7 +305,9 @@ const IndicatorsPage: React.FC = () => {
           {/* Error Message */}
           {error && (
             <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-4">
-              <p className="text-red-400 text-sm">{error}</p>
+              <p className="text-red-400 text-sm">
+                {typeof error === 'string' ? error : JSON.stringify(error)}
+              </p>
             </div>
           )}
           
