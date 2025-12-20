@@ -6,7 +6,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { IndicatorSelector } from '../components/indicators/IndicatorSelector';
 import { SignalBuilder } from '../components/indicators/SignalBuilder';
-import { IndicatorTabs } from '../components/indicators/IndicatorTabs';
+import { OverallStrategySummation } from '../components/indicators/OverallStrategySummation';
+import { IndividualPerformanceAccordion } from '../components/indicators/IndividualPerformanceAccordion';
 import { DateRangePicker } from '../components/DateRangePicker';
 import { TokenSelector } from '../components/TokenSelector';
 import { Button } from '../components/ui/Button';
@@ -14,7 +15,7 @@ import { Input } from '../components/ui/Input';
 import TradingAPI from '../services/api';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { useMobile } from '../hooks/useMobile';
-import { Play, Loader2 } from 'lucide-react';
+import { Play, Loader2, ChevronDown, ChevronUp, Settings } from 'lucide-react';
 import type { IndicatorMetadata, BacktestResult } from '../services/api';
 
 const IndicatorsPage: React.FC = () => {
@@ -55,10 +56,15 @@ const IndicatorsPage: React.FC = () => {
   } | null>(null);
   
   // UI state
-  const [activeTab, setActiveTab] = useState<string>('combined');
   const [threshold, setThreshold] = useState<number>(0.5); // 50% default
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [settingsExpanded, setSettingsExpanded] = useState<boolean>(false);
+  
+  // Auto-expand settings on desktop, collapse on mobile
+  useEffect(() => {
+    setSettingsExpanded(!isMobile);
+  }, [isMobile]);
   
   // Load available indicators
   useEffect(() => {
@@ -168,11 +174,6 @@ const IndicatorsPage: React.FC = () => {
       setPriceData(signalResponse.price_data);
       setIndividualResults(signalResponse.results);
       
-      // Set active tab to first indicator if results exist
-      if (selectedIndicators.length > 0) {
-        setActiveTab(selectedIndicators[0].id);
-      }
-      
       // Generate combined signals
       if (Object.keys(signalResponse.results).length > 0) {
         // Extract signal series from price data
@@ -207,7 +208,6 @@ const IndicatorsPage: React.FC = () => {
           setCombinedResult(combinedResponse.combined_result);
           setCombinedSignals(combinedResponse.combined_signals);
           setAgreementStats(combinedResponse.agreement_stats);
-          setActiveTab('combined');
         }
       }
     } catch (err: any) {
@@ -310,15 +310,27 @@ const IndicatorsPage: React.FC = () => {
               </p>
             </div>
           )}
-          
-          <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-4'}`}>
-            {/* Controls Sidebar */}
-            <div className={isMobile ? '' : 'lg:col-span-1'}>
-              <div className="space-y-6">
-                {/* Settings */}
-                <div className="bg-bg-secondary border border-border-default rounded-lg p-4 space-y-4">
-                  <h3 className="text-lg font-semibold text-text-primary">Settings</h3>
-                  
+
+          {/* Settings Bar (Collapsible) */}
+          <div className="bg-bg-secondary border border-border-default rounded-lg overflow-hidden">
+            <button
+              onClick={() => setSettingsExpanded(!settingsExpanded)}
+              className="w-full px-6 py-4 flex items-center justify-between hover:bg-bg-tertiary transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <Settings className="w-5 h-5 text-text-muted" />
+                <h3 className="text-lg font-semibold text-text-primary">Settings</h3>
+              </div>
+              {settingsExpanded ? (
+                <ChevronUp className="w-5 h-5 text-text-muted" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-text-muted" />
+              )}
+            </button>
+            
+            {settingsExpanded && (
+              <div className="border-t border-border-default p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                   {/* Symbol */}
                   <div>
                     <label className="block text-sm font-medium text-text-secondary mb-2">
@@ -328,7 +340,7 @@ const IndicatorsPage: React.FC = () => {
                   </div>
                   
                   {/* Date Range */}
-                  <div>
+                  <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-text-secondary mb-2">
                       Date Range
                     </label>
@@ -345,7 +357,7 @@ const IndicatorsPage: React.FC = () => {
                     <label className="block text-sm font-medium text-text-secondary mb-2">
                       Strategy Type
                     </label>
-                    <div className="flex gap-4">
+                    <div className="flex flex-col gap-2">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="radio"
@@ -355,7 +367,7 @@ const IndicatorsPage: React.FC = () => {
                           onChange={() => setStrategyType('long_cash')}
                           className="w-4 h-4 text-primary-500 focus:ring-primary-500"
                         />
-                        <span className="text-text-primary">Long/Cash</span>
+                        <span className="text-sm text-text-primary">Long/Cash</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -366,129 +378,142 @@ const IndicatorsPage: React.FC = () => {
                           onChange={() => setStrategyType('long_short')}
                           className="w-4 h-4 text-primary-500 focus:ring-primary-500"
                         />
-                        <span className="text-text-primary">Long/Short</span>
+                        <span className="text-sm text-text-primary">Long/Short</span>
                       </label>
                     </div>
                   </div>
                   
-                  {/* Initial Capital */}
-                  <div>
-                    <Input
-                      type="number"
-                      label="Initial Capital"
-                      value={initialCapital}
-                      onChange={(e) => setInitialCapital(parseFloat(e.target.value) || 10000)}
-                      min={1000}
-                      step={1000}
-                    />
+                  {/* Initial Capital & Generate Button */}
+                  <div className="flex flex-col gap-2">
+                    <div>
+                      <Input
+                        type="number"
+                        label="Initial Capital"
+                        value={initialCapital}
+                        onChange={(e) => setInitialCapital(parseFloat(e.target.value) || 10000)}
+                        min={1000}
+                        step={1000}
+                      />
+                    </div>
+                    <Button
+                      onClick={handleGenerateSignals}
+                      disabled={isLoading || selectedIndicators.length === 0}
+                      className="w-full mt-auto"
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-4 h-4 mr-2" />
+                          Generate Signals
+                        </>
+                      )}
+                    </Button>
                   </div>
-                  
-                  {/* Generate Button */}
-                  <Button
-                    onClick={handleGenerateSignals}
-                    disabled={isLoading || selectedIndicators.length === 0}
-                    className="w-full"
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Play className="w-4 h-4 mr-2" />
-                        Generate Signals
-                      </>
-                    )}
-                  </Button>
                 </div>
-                
-                {/* Indicator Selector */}
-                {availableIndicators && (
-                  <IndicatorSelector
-                    availableIndicators={availableIndicators}
-                    selectedIndicators={selectedIndicators}
-                    onIndicatorsChange={setSelectedIndicators}
-                    isLoading={isLoading}
-                  />
-                )}
-                
-                {/* Signal Builders */}
-                {selectedIndicators.length > 0 && (
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-text-primary">Signal Expressions</h3>
-                    <p className="text-sm text-text-secondary mb-4">
-                      Configure when each indicator should generate buy/sell signals using the visual builder below.
-                    </p>
-                    {selectedIndicators.map((indicator) => {
-                      const metadata = availableIndicators?.[indicator.id];
-                      if (!metadata) return null;
-                      
-                      return (
-                        <SignalBuilder
-                          key={indicator.id}
-                          indicatorId={indicator.id}
-                          indicatorMetadata={metadata}
-                          expression={expressions[indicator.id] || ''}
-                          onExpressionChange={(expr) => {
-                            setExpressions((prev) => ({
-                              ...prev,
-                              [indicator.id]: expr,
-                            }));
-                          }}
-                          availableConditions={availableConditions}
-                          selectedIndicators={selectedIndicators.map(ind => ({
-                            id: ind.id,
-                            params: ind.parameters,
-                            show_on_chart: false,
-                          }))}
-                          availableIndicators={availableIndicators}
-                          indicatorParameters={indicator.parameters}
-                          onParametersChange={(indId, params) => {
-                            setSelectedIndicators((prev) =>
-                              prev.map((ind) =>
-                                ind.id === indId ? { ...ind, parameters: params } : ind
-                              )
-                            );
-                          }}
-                          isLoading={isLoading}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
+              </div>
+            )}
+          </div>
+
+          {/* Overall Strategy Summation */}
+          {combinedResult && priceData.length > 0 && (
+            <OverallStrategySummation
+              indicatorIds={selectedIndicators.map(ind => ind.id)}
+              indicatorNames={indicatorNames}
+              priceData={priceData}
+              combinedResult={combinedResult}
+              combinedSignals={combinedSignals}
+              agreementStats={agreementStats}
+              threshold={threshold}
+              onThresholdChange={setThreshold}
+              isLoading={isLoading}
+            />
+          )}
+
+          {/* Indicator Selector (Full Width) */}
+          {availableIndicators && (
+            <IndicatorSelector
+              availableIndicators={availableIndicators}
+              selectedIndicators={selectedIndicators}
+              onIndicatorsChange={setSelectedIndicators}
+              isLoading={isLoading}
+            />
+          )}
+
+          {/* Signal Expressions (Full Width) */}
+          {selectedIndicators.length > 0 && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-xl font-semibold text-text-primary mb-2">Signal Expressions</h3>
+                <p className="text-sm text-text-secondary">
+                  Configure when each indicator should generate buy/sell signals using the visual builder below.
+                </p>
+              </div>
+              <div className="space-y-4">
+                {selectedIndicators.map((indicator) => {
+                  const metadata = availableIndicators?.[indicator.id];
+                  if (!metadata) return null;
+                  
+                  return (
+                    <SignalBuilder
+                      key={indicator.id}
+                      indicatorId={indicator.id}
+                      indicatorMetadata={metadata}
+                      expression={expressions[indicator.id] || ''}
+                      onExpressionChange={(expr) => {
+                        setExpressions((prev) => ({
+                          ...prev,
+                          [indicator.id]: expr,
+                        }));
+                      }}
+                      availableConditions={availableConditions}
+                      selectedIndicators={selectedIndicators.map(ind => ({
+                        id: ind.id,
+                        params: ind.parameters,
+                        show_on_chart: false,
+                      }))}
+                      availableIndicators={availableIndicators}
+                      indicatorParameters={indicator.parameters}
+                      onParametersChange={(indId, params) => {
+                        setSelectedIndicators((prev) =>
+                          prev.map((ind) =>
+                            ind.id === indId ? { ...ind, parameters: params } : ind
+                          )
+                        );
+                      }}
+                      isLoading={isLoading}
+                    />
+                  );
+                })}
               </div>
             </div>
-            
-            {/* Main Content Area */}
-            <div className={isMobile ? '' : 'lg:col-span-3'}>
-              {priceData.length > 0 && Object.keys(individualResults).length > 0 ? (
-                <IndicatorTabs
-                  selectedIndicators={selectedIndicators}
-                  indicatorNames={indicatorNames}
-                  activeTab={activeTab}
-                  onTabChange={setActiveTab}
-                  priceData={priceData}
-                  individualResults={individualResults}
-                  combinedResult={combinedResult}
-                  combinedSignals={combinedSignals}
-                  agreementStats={agreementStats}
-                  threshold={threshold}
-                  onThresholdChange={setThreshold}
-                  isLoading={isLoading}
-                />
-              ) : (
-                <div className="bg-bg-secondary border border-border-default rounded-lg p-12">
-                  <div className="text-center text-text-muted">
-                    <p className="mb-4">Select indicators and generate signals to view results</p>
-                    <p className="text-sm">
-                      Choose indicators from the sidebar, configure their signal expressions, and click "Generate Signals"
-                    </p>
-                  </div>
-                </div>
-              )}
+          )}
+
+          {/* Individual Performance Accordion */}
+          {priceData.length > 0 && Object.keys(individualResults).length > 0 && (
+            <IndividualPerformanceAccordion
+              selectedIndicators={selectedIndicators}
+              indicatorNames={indicatorNames}
+              priceData={priceData}
+              individualResults={individualResults}
+              isLoading={isLoading}
+            />
+          )}
+
+          {/* Empty State */}
+          {priceData.length === 0 && Object.keys(individualResults).length === 0 && (
+            <div className="bg-bg-secondary border border-border-default rounded-lg p-12">
+              <div className="text-center text-text-muted">
+                <p className="mb-4">Select indicators and generate signals to view results</p>
+                <p className="text-sm">
+                  Choose indicators above, configure their signal expressions, and click "Generate Signals"
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </ErrorBoundary>

@@ -98,7 +98,7 @@ export const IndicatorSelector: React.FC<IndicatorSelectorProps> = ({
   return (
     <div className="bg-bg-secondary border border-border-default rounded-lg p-4 md:p-6 space-y-4">
       <div>
-        <h3 className="text-lg font-semibold text-text-primary mb-2">Select Indicators</h3>
+        <h3 className="text-xl font-semibold text-text-primary mb-2">Select Indicators</h3>
         <p className="text-sm text-text-secondary">
           Choose indicators to analyze and generate signals
         </p>

@@ -56,16 +56,16 @@ export const SignalBuilder: React.FC<SignalBuilderProps> = ({
   };
 
   return (
-    <div className="bg-bg-tertiary border border-border-default rounded-lg p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <h4 className="text-sm font-semibold text-text-primary">
+    <div className="bg-bg-tertiary border border-border-default rounded-lg p-4 md:p-6 space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex-1 min-w-0">
+          <h4 className="text-lg font-semibold text-text-primary">
             {indicatorMetadata.name} Signal Expression
           </h4>
-          <p className="text-xs text-text-muted mt-1">
+          <p className="text-sm text-text-muted mt-1">
             {indicatorMetadata.description}
           </p>
-          <p className="text-xs text-text-secondary mt-2">
+          <p className="text-sm text-text-secondary mt-2">
             Generate signal when the following conditions are met:
           </p>
         </div>
