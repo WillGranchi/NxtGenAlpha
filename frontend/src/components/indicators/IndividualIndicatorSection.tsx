@@ -48,6 +48,15 @@ export const IndividualIndicatorSection: React.FC<IndividualIndicatorSectionProp
 }) => {
   const [activeTab, setActiveTab] = useState<'signal' | 'parameters'>('signal');
   const [isPerformanceExpanded, setIsPerformanceExpanded] = useState(false);
+  const [hasExpandedOnce, setHasExpandedOnce] = useState(false);
+
+  // Auto-expand performance accordion when results become available (only once)
+  React.useEffect(() => {
+    if (result && !hasExpandedOnce) {
+      setIsPerformanceExpanded(true);
+      setHasExpandedOnce(true);
+    }
+  }, [result, hasExpandedOnce]);
 
   // Prepare chart data with signals
   const chartData = useMemo(() => {
@@ -210,10 +219,17 @@ export const IndividualIndicatorSection: React.FC<IndividualIndicatorSectionProp
 
         {isPerformanceExpanded && (
           <div className="p-4 md:p-6 space-y-6 border-t border-border-default">
-            {result ? (
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center text-text-muted">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mb-4"></div>
+                  <p>Generating signals and running backtest...</p>
+                </div>
+              </div>
+            ) : result ? (
               <>
                 {/* Price Chart with Signals */}
-                {chartData.length > 0 && (
+                {chartData.length > 0 ? (
                   <div>
                     <h4 className="text-base font-semibold text-text-primary mb-4">
                       Price Chart with Signals
@@ -226,10 +242,14 @@ export const IndividualIndicatorSection: React.FC<IndividualIndicatorSectionProp
                       showOverlayLegend={true}
                     />
                   </div>
+                ) : (
+                  <div className="text-center py-8 text-text-muted">
+                    <p>No price data available yet.</p>
+                  </div>
                 )}
 
                 {/* Equity Curve */}
-                {result.equity_curve && result.equity_curve.length > 0 && (
+                {result.equity_curve && result.equity_curve.length > 0 ? (
                   <div>
                     <h4 className="text-base font-semibold text-text-primary mb-4">Equity Curve</h4>
                     <EquityChart
@@ -238,13 +258,19 @@ export const IndividualIndicatorSection: React.FC<IndividualIndicatorSectionProp
                       height={400}
                     />
                   </div>
+                ) : (
+                  <div className="text-center py-8 text-text-muted">
+                    <p>Equity curve data not available.</p>
+                  </div>
                 )}
 
                 {/* Performance Metrics */}
-                <div>
-                  <h4 className="text-base font-semibold text-text-primary mb-4">Performance Metrics</h4>
-                  <EnhancedMetrics metrics={result.metrics} />
-                </div>
+                {result.metrics && (
+                  <div>
+                    <h4 className="text-base font-semibold text-text-primary mb-4">Performance Metrics</h4>
+                    <EnhancedMetrics metrics={result.metrics} />
+                  </div>
+                )}
               </>
             ) : (
               <div className="text-center py-8 text-text-muted">
