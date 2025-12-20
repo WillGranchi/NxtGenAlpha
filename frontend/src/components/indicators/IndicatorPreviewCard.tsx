@@ -139,7 +139,6 @@ export const IndicatorPreviewCard: React.FC<IndicatorPreviewCardProps> = ({
           availableConditions={availableConditions}
           selectedIndicators={selectedIndicators}
           availableIndicators={availableIndicators}
-          isLoading={isLoading}
         />
       </div>
 
