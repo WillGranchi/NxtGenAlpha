@@ -311,6 +311,21 @@ const IndicatorsPage: React.FC = () => {
             </div>
           )}
 
+          {/* Overall Strategy Summation - At the Very Top */}
+          {selectedIndicators.length > 0 && (
+            <OverallStrategySummation
+              indicatorIds={selectedIndicators.map(ind => ind.id)}
+              indicatorNames={indicatorNames}
+              priceData={priceData}
+              combinedResult={combinedResult}
+              combinedSignals={combinedSignals}
+              agreementStats={agreementStats}
+              threshold={threshold}
+              onThresholdChange={setThreshold}
+              isLoading={isLoading}
+            />
+          )}
+
           {/* Settings Bar (Collapsible) */}
           <div className="bg-bg-secondary border border-border-default rounded-lg overflow-hidden">
             <button
@@ -418,27 +433,22 @@ const IndicatorsPage: React.FC = () => {
             )}
           </div>
 
-          {/* Overall Strategy Summation */}
-          {combinedResult && priceData.length > 0 && (
-            <OverallStrategySummation
-              indicatorIds={selectedIndicators.map(ind => ind.id)}
-              indicatorNames={indicatorNames}
-              priceData={priceData}
-              combinedResult={combinedResult}
-              combinedSignals={combinedSignals}
-              agreementStats={agreementStats}
-              threshold={threshold}
-              onThresholdChange={setThreshold}
-              isLoading={isLoading}
-            />
-          )}
-
           {/* Indicator Selector (Full Width) */}
           {availableIndicators && (
             <IndicatorSelector
               availableIndicators={availableIndicators}
               selectedIndicators={selectedIndicators}
               onIndicatorsChange={setSelectedIndicators}
+              expressions={expressions}
+              onExpressionChange={(indicatorId, expression) => {
+                setExpressions((prev) => ({
+                  ...prev,
+                  [indicatorId]: expression,
+                }));
+              }}
+              availableConditions={availableConditions}
+              priceData={priceData}
+              individualResults={individualResults}
               isLoading={isLoading}
             />
           )}

@@ -5,12 +5,23 @@
 
 import React, { useState, useMemo } from 'react';
 import { Search, ChevronDown, ChevronUp, X } from 'lucide-react';
-import type { IndicatorMetadata } from '../../services/api';
+import { IndicatorPreviewCard } from './IndicatorPreviewCard';
+import type { IndicatorMetadata, IndicatorConfig, BacktestResult } from '../../services/api';
 
 interface IndicatorSelectorProps {
   availableIndicators: Record<string, IndicatorMetadata>;
   selectedIndicators: Array<{ id: string; parameters: Record<string, any> }>;
   onIndicatorsChange: (indicators: Array<{ id: string; parameters: Record<string, any> }>) => void;
+  expressions: Record<string, string>;
+  onExpressionChange: (indicatorId: string, expression: string) => void;
+  availableConditions: Record<string, string>;
+  priceData?: Array<{
+    Date: string;
+    Price: number;
+    Position: number;
+    [key: string]: any;
+  }>;
+  individualResults?: Record<string, BacktestResult>;
   isLoading?: boolean;
 }
 
@@ -18,6 +29,11 @@ export const IndicatorSelector: React.FC<IndicatorSelectorProps> = ({
   availableIndicators,
   selectedIndicators,
   onIndicatorsChange,
+  expressions,
+  onExpressionChange,
+  availableConditions,
+  priceData = [],
+  individualResults = {},
   isLoading = false,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -110,7 +126,7 @@ export const IndicatorSelector: React.FC<IndicatorSelectorProps> = ({
           <label className="block text-sm font-medium text-text-secondary mb-2">
             Selected ({selectedIndicators.length})
           </label>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 mb-4">
             {selectedIndicators.map((indicator) => {
               const metadata = availableIndicators[indicator.id];
               return (
@@ -129,6 +145,42 @@ export const IndicatorSelector: React.FC<IndicatorSelectorProps> = ({
                     <X className="w-4 h-4" />
                   </button>
                 </div>
+              );
+            })}
+          </div>
+
+          {/* Preview Cards for Selected Indicators */}
+          <div className="space-y-4">
+            {selectedIndicators.map((indicator) => {
+              const metadata = availableIndicators[indicator.id];
+              if (!metadata) return null;
+
+              return (
+                <IndicatorPreviewCard
+                  key={indicator.id}
+                  indicatorId={indicator.id}
+                  indicatorMetadata={metadata}
+                  expression={expressions[indicator.id] || ''}
+                  onExpressionChange={(expr) => onExpressionChange(indicator.id, expr)}
+                  availableConditions={availableConditions}
+                  selectedIndicators={selectedIndicators.map(ind => ({
+                    id: ind.id,
+                    params: ind.parameters,
+                    show_on_chart: false,
+                  }))}
+                  availableIndicators={availableIndicators}
+                  indicatorParameters={indicator.parameters}
+                  onParametersChange={(indId, params) => {
+                    onIndicatorsChange(
+                      selectedIndicators.map((ind) =>
+                        ind.id === indId ? { ...ind, parameters: params } : ind
+                      )
+                    );
+                  }}
+                  priceData={priceData}
+                  result={individualResults[indicator.id]}
+                  isLoading={isLoading}
+                />
               );
             })}
           </div>

@@ -137,7 +137,10 @@ export const OverallStrategySummation: React.FC<OverallStrategySummationProps> =
     };
   }, [currentAgreement]);
 
-  if (!combinedResult || !currentAgreement) {
+  // Show even without results if indicators are selected (show placeholder)
+  const hasResults = combinedResult && currentAgreement;
+  
+  if (!hasResults && indicatorIds.length === 0) {
     return null;
   }
 
@@ -176,7 +179,7 @@ export const OverallStrategySummation: React.FC<OverallStrategySummationProps> =
         )}
       </div>
 
-      {/* Majority Voting Controls */}
+      {/* Majority Voting Controls - Always Visible */}
       <MajorityVotingControls
         threshold={threshold}
         onThresholdChange={onThresholdChange}
@@ -185,31 +188,42 @@ export const OverallStrategySummation: React.FC<OverallStrategySummationProps> =
       />
 
       {/* Combined Price Chart */}
-      <div>
-        <PriceChart
-          data={chartData}
-          title="Overall Strategy - Combined Trading Signals"
-          height={600}
-          overlaySignals={{ ...overlaySignals, ...combinedOverlaySignals }}
-          showOverlayLegend={true}
-        />
-      </div>
+      {hasResults && (
+        <>
+          <div>
+            <PriceChart
+              data={chartData}
+              title="Overall Strategy - Combined Trading Signals"
+              height={600}
+              overlaySignals={{ ...overlaySignals, ...combinedOverlaySignals }}
+              showOverlayLegend={true}
+            />
+          </div>
 
-      {/* Combined Metrics */}
-      <div>
-        <h3 className="text-lg font-semibold text-text-primary mb-4">Combined Performance Metrics</h3>
-        <EnhancedMetrics metrics={combinedResult.metrics} />
-      </div>
+          {/* Combined Metrics */}
+          <div>
+            <h3 className="text-lg font-semibold text-text-primary mb-4">Combined Performance Metrics</h3>
+            <EnhancedMetrics metrics={combinedResult.metrics} />
+          </div>
 
-      {/* Combined Equity Curve */}
-      {combinedResult.equity_curve && combinedResult.equity_curve.length > 0 && (
-        <div>
-          <h3 className="text-lg font-semibold text-text-primary mb-4">Combined Equity Curve</h3>
-          <EquityChart
-            data={combinedResult.equity_curve}
-            title="Overall Strategy Equity Curve"
-            height={400}
-          />
+          {/* Combined Equity Curve */}
+          {combinedResult.equity_curve && combinedResult.equity_curve.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold text-text-primary mb-4">Combined Equity Curve</h3>
+              <EquityChart
+                data={combinedResult.equity_curve}
+                title="Overall Strategy Equity Curve"
+                height={400}
+              />
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Placeholder when no results */}
+      {!hasResults && indicatorIds.length > 0 && (
+        <div className="text-center py-8 text-text-muted">
+          <p>Select indicators and generate signals to see overall strategy results</p>
         </div>
       )}
     </div>
