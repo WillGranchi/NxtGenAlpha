@@ -406,6 +406,9 @@ const IndicatorsPage: React.FC = () => {
                 {selectedIndicators.length > 0 && (
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold text-text-primary">Signal Expressions</h3>
+                    <p className="text-sm text-text-secondary mb-4">
+                      Configure when each indicator should generate buy/sell signals using the visual builder below.
+                    </p>
                     {selectedIndicators.map((indicator) => {
                       const metadata = availableIndicators?.[indicator.id];
                       if (!metadata) return null;
@@ -423,6 +426,12 @@ const IndicatorsPage: React.FC = () => {
                             }));
                           }}
                           availableConditions={availableConditions}
+                          selectedIndicators={selectedIndicators.map(ind => ({
+                            id: ind.id,
+                            params: ind.parameters,
+                            show_on_chart: false,
+                          }))}
+                          availableIndicators={availableIndicators}
                           isLoading={isLoading}
                         />
                       );

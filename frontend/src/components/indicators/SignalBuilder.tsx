@@ -1,10 +1,10 @@
 /**
  * Signal Builder Component
- * Build custom signal expressions per indicator
+ * Build custom signal expressions per indicator using visual condition builder
  */
 
-import React, { useState, useEffect } from 'react';
-import { ExpressionBuilder } from '../strategy/ExpressionBuilder';
+import React from 'react';
+import { VisualConditionBuilder } from '../strategy/VisualConditionBuilder';
 import type { IndicatorMetadata, IndicatorConfig } from '../../services/api';
 
 interface SignalBuilderProps {
@@ -13,6 +13,8 @@ interface SignalBuilderProps {
   expression: string;
   onExpressionChange: (expression: string) => void;
   availableConditions: Record<string, string>;
+  selectedIndicators: IndicatorConfig[];
+  availableIndicators: Record<string, IndicatorMetadata> | null;
   isLoading?: boolean;
 }
 
@@ -22,19 +24,10 @@ export const SignalBuilder: React.FC<SignalBuilderProps> = ({
   expression,
   onExpressionChange,
   availableConditions,
+  selectedIndicators,
+  availableIndicators,
   isLoading = false,
 }) => {
-  const [localExpression, setLocalExpression] = useState(expression);
-
-  useEffect(() => {
-    setLocalExpression(expression);
-  }, [expression]);
-
-  const handleExpressionChange = (newExpression: string) => {
-    setLocalExpression(newExpression);
-    onExpressionChange(newExpression);
-  };
-
   // Get default condition for this indicator
   const getDefaultCondition = () => {
     const indicatorConditions = Object.keys(availableConditions).filter((cond) =>
@@ -46,7 +39,7 @@ export const SignalBuilder: React.FC<SignalBuilderProps> = ({
   const handleUseDefault = () => {
     const defaultCondition = getDefaultCondition();
     if (defaultCondition) {
-      handleExpressionChange(defaultCondition);
+      onExpressionChange(defaultCondition);
     }
   };
 
@@ -60,22 +53,25 @@ export const SignalBuilder: React.FC<SignalBuilderProps> = ({
           <p className="text-xs text-text-muted mt-1">
             {indicatorMetadata.description}
           </p>
+          <p className="text-xs text-text-secondary mt-2">
+            Generate signal when the following conditions are met:
+          </p>
         </div>
         <button
           onClick={handleUseDefault}
           disabled={isLoading || !getDefaultCondition()}
-          className="text-xs text-primary-400 hover:text-primary-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="text-xs text-primary-400 hover:text-primary-300 disabled:opacity-50 disabled:cursor-not-allowed px-2 py-1 rounded hover:bg-primary-500/10 transition-colors"
         >
           Use Default
         </button>
       </div>
 
-      <ExpressionBuilder
-        selectedIndicators={[{ id: indicatorId, params: {}, show_on_chart: false }] as IndicatorConfig[]}
-        expression={localExpression}
-        onExpressionChange={handleExpressionChange}
-        availableConditions={Object.keys(availableConditions)}
-        onValidate={() => {}}
+      <VisualConditionBuilder
+        expression={expression}
+        onExpressionChange={onExpressionChange}
+        availableConditions={availableConditions}
+        selectedIndicators={selectedIndicators}
+        availableIndicators={availableIndicators}
       />
     </div>
   );
