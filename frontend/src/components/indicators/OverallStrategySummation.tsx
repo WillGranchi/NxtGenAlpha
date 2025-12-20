@@ -20,6 +20,14 @@ interface OverallStrategySummationProps {
     Position: number;
     [key: string]: any;
   }>;
+  basePriceData: Array<{
+    Date: string;
+    Price: number;
+    Position: number;
+    Portfolio_Value: number;
+    Capital: number;
+    Shares: number;
+  }>;
   combinedResult: BacktestResult | null;
   combinedSignals: number[];
   agreementStats: {
@@ -41,6 +49,7 @@ export const OverallStrategySummation: React.FC<OverallStrategySummationProps> =
   indicatorIds,
   indicatorNames,
   priceData,
+  basePriceData,
   combinedResult,
   combinedSignals,
   agreementStats,
@@ -48,19 +57,24 @@ export const OverallStrategySummation: React.FC<OverallStrategySummationProps> =
   onThresholdChange,
   isLoading = false,
 }) => {
-  // Prepare chart data with combined signals
+  // Prepare chart data - use combined signals if available, otherwise use base price data
   const chartData = useMemo(() => {
-    if (!priceData || priceData.length === 0 || combinedSignals.length === 0) return [];
-
-    return priceData.map((point, index) => ({
-      Date: point.Date,
-      Price: point.Price,
-      Position: index < combinedSignals.length ? combinedSignals[index] : 0,
-      Portfolio_Value: point.Price,
-      Capital: 0,
-      Shares: 0,
-    }));
-  }, [priceData, combinedSignals]);
+    const hasCombinedSignals = priceData.length > 0 && combinedSignals.length > 0;
+    
+    if (hasCombinedSignals) {
+      return priceData.map((point, index) => ({
+        Date: point.Date,
+        Price: point.Price,
+        Position: index < combinedSignals.length ? combinedSignals[index] : 0,
+        Portfolio_Value: point.Price,
+        Capital: 0,
+        Shares: 0,
+      }));
+    }
+    
+    // Use base price data when no indicators selected
+    return basePriceData || [];
+  }, [priceData, combinedSignals, basePriceData]);
 
   // Generate overlay signals for all indicators
   const overlaySignals = useMemo(() => {
@@ -137,12 +151,9 @@ export const OverallStrategySummation: React.FC<OverallStrategySummationProps> =
     };
   }, [currentAgreement]);
 
-  // Show even without results if indicators are selected (show placeholder)
+  // Determine if we have combined results
   const hasResults = combinedResult && currentAgreement;
-  
-  if (!hasResults && indicatorIds.length === 0) {
-    return null;
-  }
+  const hasPriceData = chartData.length > 0;
 
   return (
     <div className="bg-bg-secondary border-2 border-primary-500/30 rounded-lg p-6 space-y-6">
@@ -151,7 +162,9 @@ export const OverallStrategySummation: React.FC<OverallStrategySummationProps> =
         <div>
           <h2 className="text-2xl font-bold text-text-primary mb-2">Overall Strategy</h2>
           <p className="text-sm text-text-secondary">
-            Combined signals from all indicators using majority voting
+            {hasResults 
+              ? 'Combined signals from all indicators using majority voting'
+              : 'BTC Price Chart - Select indicators to see combined signals'}
           </p>
         </div>
         {currentSignalState && (
@@ -187,43 +200,44 @@ export const OverallStrategySummation: React.FC<OverallStrategySummationProps> =
         isLoading={isLoading}
       />
 
-      {/* Combined Price Chart */}
-      {hasResults && (
-        <>
-          <div>
-            <PriceChart
-              data={chartData}
-              title="Overall Strategy - Combined Trading Signals"
-              height={600}
-              overlaySignals={{ ...overlaySignals, ...combinedOverlaySignals }}
-              showOverlayLegend={true}
-            />
-          </div>
-
-          {/* Combined Metrics */}
-          <div>
-            <h3 className="text-lg font-semibold text-text-primary mb-4">Combined Performance Metrics</h3>
-            <EnhancedMetrics metrics={combinedResult.metrics} />
-          </div>
-
-          {/* Combined Equity Curve */}
-          {combinedResult.equity_curve && combinedResult.equity_curve.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold text-text-primary mb-4">Combined Equity Curve</h3>
-              <EquityChart
-                data={combinedResult.equity_curve}
-                title="Overall Strategy Equity Curve"
-                height={400}
-              />
-            </div>
-          )}
-        </>
+      {/* Price Chart - Always Visible */}
+      {hasPriceData && (
+        <div>
+          <PriceChart
+            data={chartData}
+            title={hasResults ? "Overall Strategy - Combined Trading Signals" : "BTC Price Chart"}
+            height={600}
+            overlaySignals={hasResults ? { ...overlaySignals, ...combinedOverlaySignals } : {}}
+            showOverlayLegend={hasResults}
+          />
+        </div>
       )}
 
-      {/* Placeholder when no results */}
-      {!hasResults && indicatorIds.length > 0 && (
-        <div className="text-center py-8 text-text-muted">
-          <p>Select indicators and generate signals to see overall strategy results</p>
+      {/* Equity Curve - Always Visible */}
+      <div>
+        <h3 className="text-lg font-semibold text-text-primary mb-4">
+          {hasResults ? 'Combined Equity Curve' : 'Equity Curve'}
+        </h3>
+        {hasResults && combinedResult.equity_curve && combinedResult.equity_curve.length > 0 ? (
+          <EquityChart
+            data={combinedResult.equity_curve}
+            title="Overall Strategy Equity Curve"
+            height={400}
+          />
+        ) : (
+          <div className="bg-bg-tertiary border border-border-default rounded-lg p-12">
+            <div className="text-center text-text-muted">
+              <p>Equity curve will appear here once indicators are selected and signals are generated</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Combined Metrics - Only when results exist */}
+      {hasResults && (
+        <div>
+          <h3 className="text-lg font-semibold text-text-primary mb-4">Combined Performance Metrics</h3>
+          <EnhancedMetrics metrics={combinedResult.metrics} />
         </div>
       )}
     </div>

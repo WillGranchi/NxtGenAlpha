@@ -5,17 +5,15 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { IndicatorSelector } from '../components/indicators/IndicatorSelector';
-import { SignalBuilder } from '../components/indicators/SignalBuilder';
 import { OverallStrategySummation } from '../components/indicators/OverallStrategySummation';
-import { IndividualPerformanceAccordion } from '../components/indicators/IndividualPerformanceAccordion';
+import { IndividualIndicatorSection } from '../components/indicators/IndividualIndicatorSection';
 import { DateRangePicker } from '../components/DateRangePicker';
 import { TokenSelector } from '../components/TokenSelector';
-import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import TradingAPI from '../services/api';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { useMobile } from '../hooks/useMobile';
-import { Play, Loader2, ChevronDown, ChevronUp, Settings } from 'lucide-react';
+import { Loader2, ChevronDown, ChevronUp, Settings } from 'lucide-react';
 import type { IndicatorMetadata, BacktestResult } from '../services/api';
 
 const IndicatorsPage: React.FC = () => {
@@ -33,6 +31,16 @@ const IndicatorsPage: React.FC = () => {
   const [endDate, setEndDate] = useState<string>('');
   const [strategyType, setStrategyType] = useState<'long_cash' | 'long_short'>('long_cash');
   const [initialCapital, setInitialCapital] = useState<number>(10000);
+  
+  // Base price data (for default chart display)
+  const [basePriceData, setBasePriceData] = useState<Array<{
+    Date: string;
+    Price: number;
+    Position: number;
+    Portfolio_Value: number;
+    Capital: number;
+    Shares: number;
+  }>>([]);
   
   // Results
   const [priceData, setPriceData] = useState<Array<{
@@ -66,6 +74,36 @@ const IndicatorsPage: React.FC = () => {
   useEffect(() => {
     setSettingsExpanded(!isMobile);
   }, [isMobile]);
+  
+  // Load base price data for default chart display
+  useEffect(() => {
+    const loadBasePriceData = async () => {
+      try {
+        const response = await TradingAPI.getValuationData({
+          symbol,
+          indicators: [], // No indicators, just price
+          start_date: startDate || undefined,
+          end_date: endDate || undefined,
+        });
+        
+        if (response.success && response.data) {
+          const formattedData = response.data.map((d) => ({
+            Date: d.date,
+            Price: d.price,
+            Position: 0, // No signals
+            Portfolio_Value: d.price,
+            Capital: 0,
+            Shares: 0,
+          }));
+          setBasePriceData(formattedData);
+        }
+      } catch (err) {
+        console.error('Failed to load base price data:', err);
+      }
+    };
+    
+    loadBasePriceData();
+  }, [symbol, startDate, endDate]);
   
   // Load available indicators
   useEffect(() => {
@@ -417,21 +455,6 @@ const IndicatorsPage: React.FC = () => {
             </div>
           )}
 
-          {/* Overall Strategy Summation - At the Very Top */}
-          {selectedIndicators.length > 0 && (
-            <OverallStrategySummation
-              indicatorIds={selectedIndicators.map(ind => ind.id)}
-              indicatorNames={indicatorNames}
-              priceData={priceData}
-              combinedResult={combinedResult}
-              combinedSignals={combinedSignals}
-              agreementStats={agreementStats}
-              threshold={threshold}
-              onThresholdChange={setThreshold}
-              isLoading={isLoading}
-            />
-          )}
-
           {/* Settings Bar (Collapsible) */}
           <div className="bg-bg-secondary border border-border-default rounded-lg overflow-hidden">
             <button
@@ -526,84 +549,71 @@ const IndicatorsPage: React.FC = () => {
             )}
           </div>
 
+          {/* Overall Strategy Summation - Always Visible */}
+          <OverallStrategySummation
+            indicatorIds={selectedIndicators.map(ind => ind.id)}
+            indicatorNames={indicatorNames}
+            priceData={priceData}
+            basePriceData={basePriceData}
+            combinedResult={combinedResult}
+            combinedSignals={combinedSignals}
+            agreementStats={agreementStats}
+            threshold={threshold}
+            onThresholdChange={setThreshold}
+            isLoading={isLoading}
+          />
+
           {/* Indicator Selector (Full Width) */}
           {availableIndicators && (
             <IndicatorSelector
               availableIndicators={availableIndicators}
               selectedIndicators={selectedIndicators}
               onIndicatorsChange={setSelectedIndicators}
-              expressions={expressions}
-              onExpressionChange={(indicatorId, expression) => {
-                setExpressions((prev) => ({
-                  ...prev,
-                  [indicatorId]: expression,
-                }));
-              }}
-              availableConditions={availableConditions}
-              priceData={priceData}
-              individualResults={individualResults}
               isLoading={isLoading || loadingIndicators.size > 0}
             />
           )}
 
-          {/* Signal Expressions (Full Width) */}
+          {/* Individual Indicator Sections */}
           {selectedIndicators.length > 0 && (
             <div className="space-y-4">
-              <div>
-                <h3 className="text-xl font-semibold text-text-primary mb-2">Signal Expressions</h3>
-                <p className="text-sm text-text-secondary">
-                  Configure when each indicator should generate buy/sell signals using the visual builder below.
-                </p>
-              </div>
-              <div className="space-y-4">
-                {selectedIndicators.map((indicator) => {
-                  const metadata = availableIndicators?.[indicator.id];
-                  if (!metadata) return null;
-                  
-                  return (
-                    <SignalBuilder
-                      key={indicator.id}
-                      indicatorId={indicator.id}
-                      indicatorMetadata={metadata}
-                      expression={expressions[indicator.id] || ''}
-                      onExpressionChange={(expr) => {
-                        setExpressions((prev) => ({
-                          ...prev,
-                          [indicator.id]: expr,
-                        }));
-                      }}
-                      availableConditions={availableConditions}
-                      selectedIndicators={selectedIndicators.map(ind => ({
-                        id: ind.id,
-                        params: ind.parameters,
-                        show_on_chart: false,
-                      }))}
-                      availableIndicators={availableIndicators}
-                      indicatorParameters={indicator.parameters}
-                      onParametersChange={(indId, params) => {
-                        setSelectedIndicators((prev) =>
-                          prev.map((ind) =>
-                            ind.id === indId ? { ...ind, parameters: params } : ind
-                          )
-                        );
-                      }}
-                      isLoading={isLoading}
-                    />
-                  );
-                })}
-              </div>
+              {selectedIndicators.map((indicator) => {
+                const metadata = availableIndicators?.[indicator.id];
+                if (!metadata) return null;
+                
+                return (
+                  <IndividualIndicatorSection
+                    key={indicator.id}
+                    indicatorId={indicator.id}
+                    indicatorMetadata={metadata}
+                    expression={expressions[indicator.id] || ''}
+                    onExpressionChange={(expr) => {
+                      setExpressions((prev) => ({
+                        ...prev,
+                        [indicator.id]: expr,
+                      }));
+                    }}
+                    indicatorParameters={indicator.parameters}
+                    onParametersChange={(params) => {
+                      setSelectedIndicators((prev) =>
+                        prev.map((ind) =>
+                          ind.id === indicator.id ? { ...ind, parameters: params } : ind
+                        )
+                      );
+                    }}
+                    availableConditions={availableConditions}
+                    selectedIndicators={selectedIndicators.map(ind => ({
+                      id: ind.id,
+                      params: ind.parameters,
+                      show_on_chart: false,
+                    }))}
+                    availableIndicators={availableIndicators}
+                    priceData={priceData}
+                    result={individualResults[indicator.id]}
+                    isLoading={isLoading || loadingIndicators.has(indicator.id)}
+                  />
+                );
+              })}
             </div>
-          )}
-
-          {/* Individual Performance Accordion */}
-          {priceData.length > 0 && Object.keys(individualResults).length > 0 && (
-            <IndividualPerformanceAccordion
-              selectedIndicators={selectedIndicators}
-              indicatorNames={indicatorNames}
-              priceData={priceData}
-              individualResults={individualResults}
-              isLoading={isLoading}
-            />
           )}
 
           {/* Empty State */}

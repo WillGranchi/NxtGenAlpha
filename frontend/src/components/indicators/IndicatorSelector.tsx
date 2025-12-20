@@ -4,24 +4,13 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { Search, ChevronDown, ChevronUp, X } from 'lucide-react';
-import { IndicatorPreviewCard } from './IndicatorPreviewCard';
-import type { IndicatorMetadata, IndicatorConfig, BacktestResult } from '../../services/api';
+import { Search, ChevronDown, ChevronUp, X, Check } from 'lucide-react';
+import type { IndicatorMetadata } from '../../services/api';
 
 interface IndicatorSelectorProps {
   availableIndicators: Record<string, IndicatorMetadata>;
   selectedIndicators: Array<{ id: string; parameters: Record<string, any> }>;
   onIndicatorsChange: (indicators: Array<{ id: string; parameters: Record<string, any> }>) => void;
-  expressions: Record<string, string>;
-  onExpressionChange: (indicatorId: string, expression: string) => void;
-  availableConditions: Record<string, string>;
-  priceData?: Array<{
-    Date: string;
-    Price: number;
-    Position: number;
-    [key: string]: any;
-  }>;
-  individualResults?: Record<string, BacktestResult>;
   isLoading?: boolean;
 }
 
@@ -29,11 +18,6 @@ export const IndicatorSelector: React.FC<IndicatorSelectorProps> = ({
   availableIndicators,
   selectedIndicators,
   onIndicatorsChange,
-  expressions,
-  onExpressionChange,
-  availableConditions,
-  priceData = [],
-  individualResults = {},
   isLoading = false,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -126,7 +110,7 @@ export const IndicatorSelector: React.FC<IndicatorSelectorProps> = ({
           <label className="block text-sm font-medium text-text-secondary mb-2">
             Selected ({selectedIndicators.length})
           </label>
-          <div className="flex flex-wrap gap-2 mb-4">
+          <div className="flex flex-wrap gap-2">
             {selectedIndicators.map((indicator) => {
               const metadata = availableIndicators[indicator.id];
               return (
@@ -148,42 +132,6 @@ export const IndicatorSelector: React.FC<IndicatorSelectorProps> = ({
               );
             })}
           </div>
-
-          {/* Preview Cards for Selected Indicators */}
-          <div className="space-y-4">
-            {selectedIndicators.map((indicator) => {
-              const metadata = availableIndicators[indicator.id];
-              if (!metadata) return null;
-
-              return (
-                <IndicatorPreviewCard
-                  key={indicator.id}
-                  indicatorId={indicator.id}
-                  indicatorMetadata={metadata}
-                  expression={expressions[indicator.id] || ''}
-                  onExpressionChange={(expr) => onExpressionChange(indicator.id, expr)}
-                  availableConditions={availableConditions}
-                  selectedIndicators={selectedIndicators.map(ind => ({
-                    id: ind.id,
-                    params: ind.parameters,
-                    show_on_chart: false,
-                  }))}
-                  availableIndicators={availableIndicators}
-                  indicatorParameters={indicator.parameters}
-                  onParametersChange={(indId, params) => {
-                    onIndicatorsChange(
-                      selectedIndicators.map((ind) =>
-                        ind.id === indId ? { ...ind, parameters: params } : ind
-                      )
-                    );
-                  }}
-                  priceData={priceData}
-                  result={individualResults[indicator.id]}
-                  isLoading={isLoading}
-                />
-              );
-            })}
-          </div>
         </div>
       )}
 
@@ -199,8 +147,8 @@ export const IndicatorSelector: React.FC<IndicatorSelectorProps> = ({
         />
       </div>
 
-      {/* Indicator List */}
-      <div className="space-y-2 max-h-96 overflow-y-auto">
+      {/* Compact Card Grid */}
+      <div className="space-y-4">
         {Object.entries(filteredIndicators).map(([category, indicators]) => {
           if (indicators.length === 0) return null;
 
@@ -210,17 +158,15 @@ export const IndicatorSelector: React.FC<IndicatorSelectorProps> = ({
           ).length;
 
           return (
-            <div key={category} className="border border-border-default rounded-lg overflow-hidden">
+            <div key={category}>
               {/* Category Header */}
               <button
                 onClick={() => toggleCategory(category)}
-                className="w-full px-4 py-3 bg-bg-tertiary hover:bg-bg-elevated transition-colors flex items-center justify-between"
+                className="w-full px-4 py-2 bg-bg-tertiary hover:bg-bg-elevated transition-colors flex items-center justify-between rounded-lg mb-2"
               >
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-semibold text-text-primary capitalize">
-                    {category} ({categorySelected}/{indicators.length})
-                  </span>
-                </div>
+                <span className="text-sm font-semibold text-text-primary capitalize">
+                  {category} ({categorySelected}/{indicators.length})
+                </span>
                 {isExpanded ? (
                   <ChevronUp className="w-4 h-4 text-text-muted" />
                 ) : (
@@ -228,36 +174,36 @@ export const IndicatorSelector: React.FC<IndicatorSelectorProps> = ({
                 )}
               </button>
 
-              {/* Indicator Checkboxes */}
+              {/* Indicator Cards Grid */}
               {isExpanded && (
-                <div className="p-2 space-y-1">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {indicators.map(({ id, metadata }) => {
                     const isSelected = selectedIndicators.some((ind) => ind.id === id);
                     return (
-                      <label
+                      <button
                         key={id}
-                        className={`flex items-start gap-3 p-2 rounded cursor-pointer transition-colors ${
+                        onClick={() => toggleIndicator(id)}
+                        disabled={isLoading}
+                        className={`relative p-3 rounded-lg border-2 transition-all text-left ${
                           isSelected
-                            ? 'bg-primary-500/10 hover:bg-primary-500/20'
-                            : 'hover:bg-bg-elevated'
+                            ? 'border-primary-500 bg-primary-500/10'
+                            : 'border-border-default bg-bg-tertiary hover:border-primary-500/50 hover:bg-bg-elevated'
                         }`}
                       >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleIndicator(id)}
-                          disabled={isLoading}
-                          className="mt-1 w-4 h-4 text-primary-500 focus:ring-primary-500 rounded border-border-default"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-text-primary">
+                        {isSelected && (
+                          <div className="absolute top-2 right-2 w-5 h-5 bg-primary-500 rounded-full flex items-center justify-center">
+                            <Check className="w-3 h-3 text-white" />
+                          </div>
+                        )}
+                        <div className="pr-6">
+                          <div className="text-sm font-semibold text-text-primary mb-1">
                             {metadata.name}
                           </div>
-                          <div className="text-xs text-text-muted line-clamp-1">
+                          <div className="text-xs text-text-muted line-clamp-2">
                             {metadata.description}
                           </div>
                         </div>
-                      </label>
+                      </button>
                     );
                   })}
                 </div>
