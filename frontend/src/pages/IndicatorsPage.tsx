@@ -7,14 +7,16 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { IndicatorSelector } from '../components/indicators/IndicatorSelector';
 import { OverallStrategySummation } from '../components/indicators/OverallStrategySummation';
 import { IndividualIndicatorSection } from '../components/indicators/IndividualIndicatorSection';
+import { VisualConditionBuilder } from '../components/strategy/VisualConditionBuilder';
 import { DateRangePicker } from '../components/DateRangePicker';
 import { TokenSelector } from '../components/TokenSelector';
 import { Input } from '../components/ui/Input';
+import { Button } from '../components/ui/Button';
 import TradingAPI from '../services/api';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { useMobile } from '../hooks/useMobile';
-import { Loader2, ChevronDown, ChevronUp, Settings } from 'lucide-react';
-import type { IndicatorMetadata, BacktestResult } from '../services/api';
+import { Loader2, ChevronDown, ChevronUp, Settings, Play } from 'lucide-react';
+import type { IndicatorMetadata, BacktestResult, IndicatorConfig } from '../services/api';
 
 const IndicatorsPage: React.FC = () => {
   const { isMobile } = useMobile();
@@ -184,11 +186,12 @@ const IndicatorsPage: React.FC = () => {
     );
     
     if (missingExpressions.length > 0) {
-      setError(`Please provide expressions for: ${missingExpressions.map((ind) => ind.id).join(', ')}`);
+      setError(`Please provide expressions for: ${missingExpressions.map((ind) => availableIndicators?.[ind.id]?.name || ind.id).join(', ')}`);
       return;
     }
     
     setIsLoading(true);
+    setLoadingIndicators(new Set(selectedIndicators.map(ind => ind.id)));
     setError(null);
     
     try {
@@ -263,6 +266,7 @@ const IndicatorsPage: React.FC = () => {
       console.error('Error generating signals:', err);
     } finally {
       setIsLoading(false);
+      setLoadingIndicators(new Set());
     }
   }, [
     selectedIndicators,
@@ -273,112 +277,9 @@ const IndicatorsPage: React.FC = () => {
     startDate,
     endDate,
     threshold,
+    availableIndicators,
   ]);
   
-  // Auto-generate signals when indicators are selected or expressions change
-  useEffect(() => {
-    // Only auto-generate if we have at least one indicator with an expression
-    const hasValidIndicators = selectedIndicators.length > 0 && 
-      selectedIndicators.every((ind) => expressions[ind.id] && expressions[ind.id].trim());
-    
-    if (!hasValidIndicators) {
-      // Clear results if no valid indicators
-      if (selectedIndicators.length === 0) {
-        setPriceData([]);
-        setIndividualResults({});
-        setCombinedResult(null);
-        setCombinedSignals([]);
-        setAgreementStats(null);
-      }
-      return;
-    }
-
-    // Debounce the auto-generation
-    const timeoutId = setTimeout(() => {
-      const autoGenerate = async () => {
-        setIsLoading(true);
-        setLoadingIndicators(new Set(selectedIndicators.map(ind => ind.id)));
-        setError(null);
-        
-        try {
-          // Generate individual indicator signals
-          const signalResponse = await TradingAPI.generateIndicatorSignals({
-            indicators: selectedIndicators.map((ind) => ({
-              id: ind.id,
-              parameters: ind.parameters,
-            })),
-            expressions,
-            symbol,
-            strategy_type: strategyType,
-            initial_capital: initialCapital,
-            start_date: startDate || undefined,
-            end_date: endDate || undefined,
-          });
-          
-          if (!signalResponse.success) {
-            throw new Error('Failed to generate signals');
-          }
-          
-          setPriceData(signalResponse.price_data);
-          setIndividualResults(signalResponse.results);
-          
-          // Generate combined signals
-          if (Object.keys(signalResponse.results).length > 0) {
-            const indicatorSignals: Record<string, number[]> = {};
-            const dates: string[] = [];
-            const prices: number[] = [];
-            
-            signalResponse.price_data.forEach((point) => {
-              dates.push(point.Date);
-              prices.push(point.Price);
-              
-              selectedIndicators.forEach((indicator) => {
-                if (!indicatorSignals[indicator.id]) {
-                  indicatorSignals[indicator.id] = [];
-                }
-                const signalValue = point[`${indicator.id}_Position`] ?? 0;
-                indicatorSignals[indicator.id].push(signalValue);
-              });
-            });
-            
-            const combinedResponse = await TradingAPI.generateCombinedSignals({
-              indicator_signals: indicatorSignals,
-              dates,
-              prices,
-              threshold,
-              strategy_type: strategyType,
-              initial_capital: initialCapital,
-            });
-            
-            if (combinedResponse.success) {
-              setCombinedResult(combinedResponse.combined_result);
-              setCombinedSignals(combinedResponse.combined_signals);
-              setAgreementStats(combinedResponse.agreement_stats);
-            }
-          }
-        } catch (err: any) {
-          // Silently handle errors for auto-generation (don't show error to user)
-          console.error('Error auto-generating signals:', err);
-        } finally {
-          setIsLoading(false);
-          setLoadingIndicators(new Set());
-        }
-      };
-      
-      autoGenerate();
-    }, 500); // 500ms debounce
-    
-    return () => clearTimeout(timeoutId);
-  }, [
-    selectedIndicators,
-    expressions,
-    symbol,
-    strategyType,
-    initialCapital,
-    startDate,
-    endDate,
-    threshold,
-  ]);
 
   // Update combined signals when threshold changes (if we already have results)
   useEffect(() => {
@@ -573,7 +474,73 @@ const IndicatorsPage: React.FC = () => {
             />
           )}
 
-          {/* Individual Indicator Sections */}
+          {/* Signal Expressions Section */}
+          {selectedIndicators.length > 0 && (
+            <div className="bg-bg-secondary border border-border-default rounded-lg p-4 md:p-6 space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                  <h3 className="text-xl font-semibold text-text-primary mb-2">Signal Expressions</h3>
+                  <p className="text-sm text-text-secondary">
+                    Configure signal expressions for each selected indicator. These expressions will be used to combine indicators.
+                  </p>
+                </div>
+                <Button
+                  onClick={handleGenerateSignals}
+                  disabled={isLoading || selectedIndicators.length === 0}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4 mr-2" />
+                      Generate Signals
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              <div className="space-y-4">
+                {selectedIndicators.map((indicator) => {
+                  const metadata = availableIndicators?.[indicator.id];
+                  if (!metadata) return null;
+                  
+                  return (
+                    <div key={indicator.id} className="bg-bg-tertiary border border-border-default rounded-lg p-4">
+                      <div className="mb-3">
+                        <h4 className="text-base font-semibold text-text-primary">
+                          {metadata.name}
+                        </h4>
+                        <p className="text-xs text-text-muted mt-1">
+                          {metadata.description}
+                        </p>
+                      </div>
+                      <VisualConditionBuilder
+                        expression={expressions[indicator.id] || ''}
+                        onExpressionChange={(expr) => {
+                          setExpressions((prev) => ({
+                            ...prev,
+                            [indicator.id]: expr,
+                          }));
+                        }}
+                        availableConditions={availableConditions}
+                        selectedIndicators={selectedIndicators.map(ind => ({
+                          id: ind.id,
+                          params: ind.parameters,
+                          show_on_chart: false,
+                        }))}
+                        availableIndicators={availableIndicators}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Individual Indicator Sections (Parameters and Performance) */}
           {selectedIndicators.length > 0 && (
             <div className="space-y-4">
               {selectedIndicators.map((indicator) => {
@@ -585,13 +552,6 @@ const IndicatorsPage: React.FC = () => {
                     key={indicator.id}
                     indicatorId={indicator.id}
                     indicatorMetadata={metadata}
-                    expression={expressions[indicator.id] || ''}
-                    onExpressionChange={(expr) => {
-                      setExpressions((prev) => ({
-                        ...prev,
-                        [indicator.id]: expr,
-                      }));
-                    }}
                     indicatorParameters={indicator.parameters}
                     onParametersChange={(params) => {
                       setSelectedIndicators((prev) =>
@@ -600,13 +560,6 @@ const IndicatorsPage: React.FC = () => {
                         )
                       );
                     }}
-                    availableConditions={availableConditions}
-                    selectedIndicators={selectedIndicators.map(ind => ({
-                      id: ind.id,
-                      params: ind.parameters,
-                      show_on_chart: false,
-                    }))}
-                    availableIndicators={availableIndicators}
                     priceData={priceData}
                     result={individualResults[indicator.id]}
                     isLoading={isLoading || loadingIndicators.has(indicator.id)}

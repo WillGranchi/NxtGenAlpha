@@ -4,24 +4,18 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { VisualConditionBuilder } from '../strategy/VisualConditionBuilder';
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { ParameterEditor } from './ParameterEditor';
 import { PriceChart } from '../charts/PriceChart';
 import { EquityChart } from '../charts/EquityChart';
 import EnhancedMetrics from '../results/EnhancedMetrics';
-import type { IndicatorMetadata, IndicatorConfig, BacktestResult } from '../../services/api';
+import type { IndicatorMetadata, BacktestResult } from '../../services/api';
 
 interface IndividualIndicatorSectionProps {
   indicatorId: string;
   indicatorMetadata: IndicatorMetadata;
-  expression: string;
-  onExpressionChange: (expression: string) => void;
   indicatorParameters: Record<string, any>;
   onParametersChange: (params: Record<string, any>) => void;
-  availableConditions: Record<string, string>;
-  selectedIndicators: IndicatorConfig[];
-  availableIndicators: Record<string, IndicatorMetadata> | null;
   priceData: Array<{
     Date: string;
     Price: number;
@@ -35,28 +29,13 @@ interface IndividualIndicatorSectionProps {
 export const IndividualIndicatorSection: React.FC<IndividualIndicatorSectionProps> = ({
   indicatorId,
   indicatorMetadata,
-  expression,
-  onExpressionChange,
   indicatorParameters,
   onParametersChange,
-  availableConditions,
-  selectedIndicators,
-  availableIndicators,
   priceData,
   result,
   isLoading = false,
 }) => {
-  const [activeTab, setActiveTab] = useState<'signal' | 'parameters'>('signal');
-  const [isPerformanceExpanded, setIsPerformanceExpanded] = useState(false);
-  const [hasExpandedOnce, setHasExpandedOnce] = useState(false);
-
-  // Auto-expand performance accordion when results become available (only once)
-  React.useEffect(() => {
-    if (result && !hasExpandedOnce) {
-      setIsPerformanceExpanded(true);
-      setHasExpandedOnce(true);
-    }
-  }, [result, hasExpandedOnce]);
+  const [activeTab, setActiveTab] = useState<'parameters' | 'performance'>('parameters');
 
   // Prepare chart data with signals
   const chartData = useMemo(() => {
@@ -147,16 +126,6 @@ export const IndividualIndicatorSection: React.FC<IndividualIndicatorSectionProp
       <div className="border-b border-border-default">
         <div className="flex">
           <button
-            onClick={() => setActiveTab('signal')}
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'signal'
-                ? 'text-primary-500 border-b-2 border-primary-500 bg-primary-500/5'
-                : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
-            }`}
-          >
-            Signal Logic
-          </button>
-          <button
             onClick={() => setActiveTab('parameters')}
             className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
               activeTab === 'parameters'
@@ -166,28 +135,21 @@ export const IndividualIndicatorSection: React.FC<IndividualIndicatorSectionProp
           >
             Parameters
           </button>
+          <button
+            onClick={() => setActiveTab('performance')}
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'performance'
+                ? 'text-primary-500 border-b-2 border-primary-500 bg-primary-500/5'
+                : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
+            }`}
+          >
+            Performance
+          </button>
         </div>
       </div>
 
       {/* Tab Content */}
       <div className="p-4 md:p-6">
-        {activeTab === 'signal' && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
-                Signal Expression
-              </label>
-              <VisualConditionBuilder
-                expression={expression}
-                onExpressionChange={onExpressionChange}
-                availableConditions={availableConditions}
-                selectedIndicators={selectedIndicators}
-                availableIndicators={availableIndicators}
-              />
-            </div>
-          </div>
-        )}
-
         {activeTab === 'parameters' && (
           <ParameterEditor
             indicatorMetadata={indicatorMetadata}
@@ -196,29 +158,9 @@ export const IndividualIndicatorSection: React.FC<IndividualIndicatorSectionProp
             isLoading={isLoading}
           />
         )}
-      </div>
 
-      {/* Performance Accordion */}
-      <div className="border-t border-border-default">
-        <button
-          onClick={() => setIsPerformanceExpanded(!isPerformanceExpanded)}
-          className="w-full px-4 md:px-6 py-4 flex items-center justify-between hover:bg-bg-tertiary transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            {isPerformanceExpanded ? (
-              <ChevronDown className="w-5 h-5 text-text-muted" />
-            ) : (
-              <ChevronUp className="w-5 h-5 text-text-muted" />
-            )}
-            <span className="text-base font-semibold text-text-primary">Performance</span>
-            {!isPerformanceExpanded && result && (
-              <span className="text-sm text-text-secondary ml-2">{getKeyMetric()}</span>
-            )}
-          </div>
-        </button>
-
-        {isPerformanceExpanded && (
-          <div className="p-4 md:p-6 space-y-6 border-t border-border-default">
+        {activeTab === 'performance' && (
+          <div className="space-y-6">
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="text-center text-text-muted">
@@ -274,12 +216,13 @@ export const IndividualIndicatorSection: React.FC<IndividualIndicatorSectionProp
               </>
             ) : (
               <div className="text-center py-8 text-text-muted">
-                <p>No results available. Generate signals to see performance metrics.</p>
+                <p>No results available. Configure signal expressions above and click "Generate Signals" to see performance metrics.</p>
               </div>
             )}
           </div>
         )}
       </div>
+
     </div>
   );
 };
