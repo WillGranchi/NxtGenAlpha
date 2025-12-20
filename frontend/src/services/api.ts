@@ -923,8 +923,32 @@ export class TradingAPI {
       [key: string]: any;
     }>;
   }> {
-    const response: AxiosResponse<any> = await api.post('/api/indicators/signals', request);
-    return response.data;
+    try {
+      const response: AxiosResponse<any> = await api.post('/api/indicators/signals', request);
+      return response.data;
+    } catch (error: any) {
+      // Handle Pydantic validation errors
+      if (error?.response?.data?.detail) {
+        const detail = error.response.data.detail;
+        if (Array.isArray(detail)) {
+          // Pydantic validation errors are arrays
+          const errorMessages = detail.map((err: any) => {
+            if (typeof err === 'string') return err;
+            if (err?.msg) return err.msg;
+            if (err?.loc && err?.msg) {
+              return `${err.loc.join('.')}: ${err.msg}`;
+            }
+            return JSON.stringify(err);
+          }).join('; ');
+          throw new Error(errorMessages);
+        } else if (typeof detail === 'string') {
+          throw new Error(detail);
+        } else {
+          throw new Error(JSON.stringify(detail));
+        }
+      }
+      throw error;
+    }
   }
 
   /**
@@ -952,8 +976,32 @@ export class TradingAPI {
       }>;
     };
   }> {
-    const response: AxiosResponse<any> = await api.post('/api/indicators/combined', request);
-    return response.data;
+    try {
+      const response: AxiosResponse<any> = await api.post('/api/indicators/combined', request);
+      return response.data;
+    } catch (error: any) {
+      // Handle Pydantic validation errors
+      if (error?.response?.data?.detail) {
+        const detail = error.response.data.detail;
+        if (Array.isArray(detail)) {
+          // Pydantic validation errors are arrays
+          const errorMessages = detail.map((err: any) => {
+            if (typeof err === 'string') return err;
+            if (err?.msg) return err.msg;
+            if (err?.loc && err?.msg) {
+              return `${err.loc.join('.')}: ${err.msg}`;
+            }
+            return JSON.stringify(err);
+          }).join('; ');
+          throw new Error(errorMessages);
+        } else if (typeof detail === 'string') {
+          throw new Error(detail);
+        } else {
+          throw new Error(JSON.stringify(detail));
+        }
+      }
+      throw error;
+    }
   }
 }
 
