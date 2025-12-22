@@ -152,7 +152,7 @@ export const OverallStrategySummation: React.FC<OverallStrategySummationProps> =
   }, [currentAgreement]);
 
   // Determine if we have combined results
-  const hasResults = combinedResult && currentAgreement;
+  const hasResults = !!(combinedResult && currentAgreement);
   const hasPriceData = chartData.length > 0;
 
   return (

@@ -192,6 +192,7 @@ const IndicatorsPage: React.FC = () => {
         indicators: selectedIndicators.map((ind) => ({
           id: ind.id,
           params: ind.parameters,
+          show_on_chart: false,
         })),
         expression: expression.trim(),
         strategy_type: strategyType,
