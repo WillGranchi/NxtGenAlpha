@@ -245,7 +245,11 @@ const IndicatorTile: React.FC<IndicatorTileProps> = ({
           
           <div className="text-center">
             <div className={`text-lg font-bold ${getValueColor(result.metrics?.max_drawdown_pct, false)}`}>
-              {formatValue(result.metrics?.max_drawdown_pct, 1, '%')}
+              {result.metrics?.max_drawdown_pct !== undefined
+                ? `${Math.abs(result.metrics.max_drawdown_pct).toFixed(1)}%`
+                : result.metrics?.max_drawdown !== undefined
+                ? `${Math.abs(result.metrics.max_drawdown * 100).toFixed(1)}%`
+                : 'N/A'}
             </div>
             <div className="text-xs text-gray-600">Max DD</div>
           </div>

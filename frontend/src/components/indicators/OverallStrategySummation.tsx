@@ -30,6 +30,7 @@ interface OverallStrategySummationProps {
   }>;
   combinedResult: BacktestResult | null;
   combinedSignals: number[];
+  individualResults: Record<string, BacktestResult>;
   agreementStats: {
     total_points: number;
     agreement_by_point: Array<{
@@ -52,11 +53,13 @@ export const OverallStrategySummation: React.FC<OverallStrategySummationProps> =
   basePriceData,
   combinedResult,
   combinedSignals,
+  individualResults,
   agreementStats,
   threshold,
   onThresholdChange,
   isLoading = false,
 }) => {
+  const [showIndividualIndicators, setShowIndividualIndicators] = React.useState<boolean>(false);
   // Prepare chart data - use combined signals if available, otherwise use base price data
   const chartData = useMemo(() => {
     const hasCombinedSignals = priceData.length > 0 && combinedSignals.length > 0;
@@ -215,14 +218,36 @@ export const OverallStrategySummation: React.FC<OverallStrategySummationProps> =
 
       {/* Equity Curve - Always Visible */}
       <div>
-        <h3 className="text-lg font-semibold text-text-primary mb-4">
-          {hasResults ? 'Combined Equity Curve' : 'Equity Curve'}
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-text-primary">
+            {hasResults ? 'Combined Equity Curve' : 'Equity Curve'}
+          </h3>
+          {hasResults && Object.keys(individualResults).length > 0 && (
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showIndividualIndicators}
+                onChange={(e) => setShowIndividualIndicators(e.target.checked)}
+                className="w-4 h-4 text-primary-500 rounded focus:ring-primary-500"
+              />
+              <span className="text-sm text-text-secondary">Show Individual Indicators</span>
+            </label>
+          )}
+        </div>
         {hasResults && combinedResult.equity_curve && combinedResult.equity_curve.length > 0 ? (
           <EquityChart
             data={combinedResult.equity_curve}
             title="Overall Strategy Equity Curve"
             height={400}
+            individualEquityData={showIndividualIndicators ? Object.fromEntries(
+              Object.entries(individualResults)
+                .filter(([id]) => indicatorIds.includes(id))
+                .map(([id, result]) => [
+                  indicatorNames[id] || id,
+                  result.equity_curve || []
+                ])
+            ) : {}}
+            showIndividualLegend={showIndividualIndicators}
           />
         ) : (
           <div className="bg-bg-tertiary border border-border-default rounded-lg p-12">

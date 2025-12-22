@@ -47,7 +47,9 @@ const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
     },
     {
       label: 'Max Drawdown',
-      value: formatValue(metrics.max_drawdown_pct, 2, '%'),
+      value: metrics.max_drawdown_pct !== undefined
+        ? `${Math.abs(metrics.max_drawdown_pct).toFixed(2)}%`
+        : 'N/A',
       color: getValueColor(metrics.max_drawdown_pct, false),
       icon: '📉',
     },

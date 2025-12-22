@@ -23,7 +23,16 @@ export const MobileMetrics: React.FC<MobileMetricsProps> = ({
     { label: 'Total Return', value: metrics.total_return, format: (v: number) => `${(v * 100).toFixed(2)}%`, icon: TrendingUp },
     { label: 'Final Value', value: metrics.final_portfolio_value, format: (v: number) => `$${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: DollarSign },
     { label: 'Sharpe Ratio', value: metrics.sharpe_ratio, format: (v: number) => v.toFixed(2), icon: BarChart3 },
-    { label: 'Max Drawdown', value: metrics.max_drawdown, format: (v: number) => `${(v * 100).toFixed(2)}%`, icon: TrendingDown },
+    { 
+      label: 'Max Drawdown', 
+      value: metrics.max_drawdown_pct !== undefined 
+        ? Math.abs(metrics.max_drawdown_pct) / 100  // Convert percentage to decimal
+        : metrics.max_drawdown !== undefined 
+        ? Math.abs(metrics.max_drawdown)  // Already decimal, ensure positive
+        : 0,
+      format: (v: number) => `${(v * 100).toFixed(2)}%`, 
+      icon: TrendingDown 
+    },
   ];
 
   // Additional metrics

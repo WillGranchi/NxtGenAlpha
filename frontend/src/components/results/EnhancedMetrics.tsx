@@ -40,6 +40,11 @@ export const EnhancedMetrics: React.FC<EnhancedMetricsProps> = ({
 
       switch (format) {
         case 'percentage':
+          // Handle both decimal (0-1) and percentage formats
+          // If value is already > 1 or < -1, it's likely already a percentage
+          if (Math.abs(value) > 1) {
+            return `${value.toFixed(2)}%`;
+          }
           return `${(value * 100).toFixed(2)}%`;
         case 'currency':
           return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -75,7 +80,10 @@ export const EnhancedMetrics: React.FC<EnhancedMetricsProps> = ({
     {
       key: 'total_return',
       label: 'Total Return',
-      value: metrics.total_return,
+      // Prefer net_profit_pct if available (already percentage), otherwise use total_return (decimal)
+      value: metrics.net_profit_pct !== undefined
+        ? metrics.net_profit_pct / 100  // Convert percentage to decimal
+        : metrics.total_return,  // Already decimal
       format: 'percentage',
       icon: <TrendingUp className="w-5 h-5" />,
       color: 'positive',
@@ -116,7 +124,11 @@ export const EnhancedMetrics: React.FC<EnhancedMetricsProps> = ({
     {
       key: 'max_drawdown',
       label: 'Max Drawdown',
-      value: metrics.max_drawdown,
+      // Prefer max_drawdown_pct if available (already as positive percentage)
+      // Otherwise use max_drawdown (negative decimal)
+      value: metrics.max_drawdown_pct !== undefined 
+        ? -metrics.max_drawdown_pct / 100  // Convert positive percentage to negative decimal
+        : metrics.max_drawdown,  // Already a negative decimal
       format: 'percentage',
       icon: <TrendingDown className="w-5 h-5" />,
       color: 'negative',
@@ -137,7 +149,10 @@ export const EnhancedMetrics: React.FC<EnhancedMetricsProps> = ({
     {
       key: 'win_rate',
       label: 'Win Rate',
-      value: metrics.win_rate,
+      // win_rate might be percentage (0-100) or decimal (0-1)
+      value: metrics.win_rate !== undefined && metrics.win_rate > 1
+        ? metrics.win_rate / 100  // Convert percentage to decimal
+        : metrics.win_rate,  // Already decimal
       format: 'percentage',
       icon: <BarChart3 className="w-5 h-5" />,
       color: 'positive',

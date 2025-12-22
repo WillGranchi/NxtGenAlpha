@@ -434,7 +434,8 @@ def calculate_all_metrics(backtest_results: Dict) -> Dict:
         'annualized_return': round(cagr * 100, 2),
         
         # Risk metrics
-        'max_drawdown_pct': round(max_drawdown * 100, 2),
+        # max_drawdown is already a decimal (negative), convert to percentage for display
+        'max_drawdown_pct': round(abs(max_drawdown) * 100, 2),  # Store as positive percentage
         'volatility': round(volatility * 100, 2),
         'var_5_percent': round(var_5 * 100, 2),
         'cvar_5_percent': round(cvar_5 * 100, 2),
@@ -452,8 +453,8 @@ def calculate_all_metrics(backtest_results: Dict) -> Dict:
         'win_rate': round(win_rate * 100, 2),
         'profit_factor': round(profit_factor, 3) if profit_factor != float('inf') else '∞',
         
-        # Drawdown details
-        'max_drawdown': round(max_dd * 100, 2),
+        # Drawdown details - store as decimal (negative) for consistency
+        'max_drawdown': round(max_dd, 4),  # Keep as decimal (negative)
         'max_drawdown_duration_days': dd_duration
     }
     

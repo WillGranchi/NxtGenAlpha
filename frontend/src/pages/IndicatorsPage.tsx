@@ -397,6 +397,7 @@ const IndicatorsPage: React.FC = () => {
             basePriceData={basePriceData}
             combinedResult={combinedResult}
             combinedSignals={combinedSignals}
+            individualResults={individualResults}
             agreementStats={agreementStats}
             threshold={threshold}
             onThresholdChange={setThreshold}

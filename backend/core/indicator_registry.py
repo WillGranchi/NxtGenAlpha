@@ -15,6 +15,14 @@ from .indicators import (
     sma, ema, rsi, bollinger_bands, macd, stochastic, williams_r, atr, cci, momentum,
     adx, parabolic_sar, ichimoku_cloud, obv, volume_sma, keltner_channels
 )
+from .pinescript_indicators import (
+    rsi_trail_signal, lwst_signal, ssd_signal, vtsp_signal, dema_dmi_signal,
+    ewma_signal, ema_zscore_signal, dst_signal, msd_signal, dema_efi_signal,
+    hsp_signal, dema_afr_signal, rsi_sd_signal, inverted_sd_dema_rsi_signal,
+    kvo_signal, stc_signal, eri_signal, cmo_signal, fisher_transform_signal,
+    bb_percent_signal, tsi_signal, disparity_index_signal,
+    chande_momentum_oscillator_signal, rapr_1_signal, rapr_2_signal
+)
 
 
 class IndicatorMetadata:
@@ -560,6 +568,533 @@ def evaluate_keltner_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dic
     }
 
 
+# PineScript Indicator Compute Functions
+
+def compute_rsitrail_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute RSI Trail indicator."""
+    f_rsi_lower = params.get('f_rsi_lower', 30)
+    f_rsi_upper = params.get('f_rsi_upper', 70)
+    signal = rsi_trail_signal(df, f_rsi_lower, f_rsi_upper)
+    df['RSITrail_Signal'] = signal
+    return df
+
+
+def evaluate_rsitrail_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate RSI Trail conditions."""
+    if 'RSITrail_Signal' not in df.columns:
+        df = compute_rsitrail_indicator(df, params)
+    return {
+        'rsitrail_long': df['RSITrail_Signal'] == 1,
+        'rsitrail_short': df['RSITrail_Signal'] == -1,
+        'rsitrail_bullish': df['RSITrail_Signal'] > 0
+    }
+
+
+def compute_lwst_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute Liquidity Weighted Supertrend indicator."""
+    supertrend_type = params.get('supertrend_type', 'Aggressive')
+    factor2 = params.get('factor2', 2.0)
+    pd2 = params.get('pd2', 10)
+    fast = params.get('fast', 10)
+    slow = params.get('slow', 11)
+    signal = lwst_signal(df, supertrend_type, factor2, pd2, fast, slow)
+    df['LWST_Signal'] = signal
+    return df
+
+
+def evaluate_lwst_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate LWST conditions."""
+    if 'LWST_Signal' not in df.columns:
+        df = compute_lwst_indicator(df, params)
+    return {
+        'lwst_long': df['LWST_Signal'] == 1,
+        'lwst_short': df['LWST_Signal'] == -1,
+        'lwst_bullish': df['LWST_Signal'] > 0
+    }
+
+
+def compute_ssd_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute SMA Standard Deviation indicator."""
+    len_dema = params.get('len_dema', 21)
+    src_dema = params.get('src_dema', 0.0)
+    src_demal = params.get('src_demal', 0.0)
+    len_period = params.get('len', 50)
+    len_sd = params.get('len_sd', 20)
+    len_dema_sd = params.get('len_dema_sd', 21)
+    src_dema_sd = params.get('src_dema_sd', 0.0)
+    signal = ssd_signal(df, len_dema, src_dema, src_demal, len_period, len_sd, len_dema_sd, src_dema_sd)
+    df['SSD_Signal'] = signal
+    return df
+
+
+def evaluate_ssd_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate SSD conditions."""
+    if 'SSD_Signal' not in df.columns:
+        df = compute_ssd_indicator(df, params)
+    return {
+        'ssd_long': df['SSD_Signal'] == 1,
+        'ssd_short': df['SSD_Signal'] == -1,
+        'ssd_bullish': df['SSD_Signal'] > 0
+    }
+
+
+def compute_vtsp_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute Volume Trend Swing Points indicator."""
+    x = params.get('x', 5)
+    y = params.get('y', 5)
+    signal = vtsp_signal(df, x, y)
+    df['VTSP_Signal'] = signal
+    return df
+
+
+def evaluate_vtsp_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate VTSP conditions."""
+    if 'VTSP_Signal' not in df.columns:
+        df = compute_vtsp_indicator(df, params)
+    return {
+        'vtsp_long': df['VTSP_Signal'] == 1,
+        'vtsp_short': df['VTSP_Signal'] == -1,
+        'vtsp_bullish': df['VTSP_Signal'] > 0
+    }
+
+
+def compute_demadmi_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute DEMA DMI indicator."""
+    len_dema = params.get('len_dema', 14)
+    adx_smoothing_len = params.get('adx_smoothing_len', 14)
+    di_len = params.get('di_len', 14)
+    signal = dema_dmi_signal(df, len_dema, adx_smoothing_len, di_len)
+    df['DemaDMI_Signal'] = signal
+    return df
+
+
+def evaluate_demadmi_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate DemaDMI conditions."""
+    if 'DemaDMI_Signal' not in df.columns:
+        df = compute_demadmi_indicator(df, params)
+    return {
+        'demadmi_long': df['DemaDMI_Signal'] == 1,
+        'demadmi_short': df['DemaDMI_Signal'] == -1,
+        'demadmi_bullish': df['DemaDMI_Signal'] > 0
+    }
+
+
+def compute_ewma_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute EWMA indicator."""
+    len_period = params.get('len', 14)
+    src = params.get('src', 0.0)
+    signal = ewma_signal(df, len_period, src)
+    df['EWMA_Signal'] = signal
+    return df
+
+
+def evaluate_ewma_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate EWMA conditions."""
+    if 'EWMA_Signal' not in df.columns:
+        df = compute_ewma_indicator(df, params)
+    return {
+        'ewma_long': df['EWMA_Signal'] == 1,
+        'ewma_short': df['EWMA_Signal'] == -1,
+        'ewma_bullish': df['EWMA_Signal'] > 0
+    }
+
+
+def compute_emazscore_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute EMA Z-score indicator."""
+    len_period = params.get('len', 14)
+    src = params.get('src', 0.0)
+    lookback = params.get('lookback', 20)
+    threshold_l = params.get('threshold_l', 1.0)
+    threshold_s = params.get('threshold_s', -1.0)
+    signal = ema_zscore_signal(df, len_period, src, lookback, threshold_l, threshold_s)
+    df['EmaZScore_Signal'] = signal
+    return df
+
+
+def evaluate_emazscore_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate EmaZScore conditions."""
+    if 'EmaZScore_Signal' not in df.columns:
+        df = compute_emazscore_indicator(df, params)
+    return {
+        'emazscore_long': df['EmaZScore_Signal'] == 1,
+        'emazscore_short': df['EmaZScore_Signal'] == -1,
+        'emazscore_bullish': df['EmaZScore_Signal'] > 0
+    }
+
+
+def compute_dst_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute DEMA Supertrend indicator."""
+    subject = params.get('subject', 10)
+    mul = params.get('mul', 2.0)
+    demalen = params.get('demalen', 21)
+    src = params.get('src', 0.0)
+    signal = dst_signal(df, subject, mul, demalen, src)
+    df['DST_Signal'] = signal
+    return df
+
+
+def evaluate_dst_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate DST conditions."""
+    if 'DST_Signal' not in df.columns:
+        df = compute_dst_indicator(df, params)
+    return {
+        'dst_long': df['DST_Signal'] == 1,
+        'dst_short': df['DST_Signal'] == -1,
+        'dst_bullish': df['DST_Signal'] > 0
+    }
+
+
+def compute_msd_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute Median Standard Deviation indicator."""
+    len_dema = params.get('len_dema', 21)
+    median_len = params.get('median_len', 50)
+    atr_len = params.get('atr_len', 14)
+    atr_mul = params.get('atr_mul', 2.0)
+    len_sd = params.get('len_sd', 20)
+    signal = msd_signal(df, len_dema, median_len, atr_len, atr_mul, len_sd)
+    df['MSD_Signal'] = signal
+    return df
+
+
+def evaluate_msd_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate MSD conditions."""
+    if 'MSD_Signal' not in df.columns:
+        df = compute_msd_indicator(df, params)
+    return {
+        'msd_long': df['MSD_Signal'] == 1,
+        'msd_short': df['MSD_Signal'] == -1,
+        'msd_bullish': df['MSD_Signal'] > 0
+    }
+
+
+def compute_demaefi_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute DEMA EFI Volume indicator."""
+    dema_len = params.get('dema_len', 14)
+    dema_src = params.get('dema_src', 0.0)
+    length = params.get('length', 13)
+    signal = dema_efi_signal(df, dema_len, dema_src, length)
+    df['DemaEFI_Signal'] = signal
+    return df
+
+
+def evaluate_demaefi_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate DemaEFI conditions."""
+    if 'DemaEFI_Signal' not in df.columns:
+        df = compute_demaefi_indicator(df, params)
+    return {
+        'demaefi_long': df['DemaEFI_Signal'] == 1,
+        'demaefi_short': df['DemaEFI_Signal'] == -1,
+        'demaefi_bullish': df['DemaEFI_Signal'] > 0
+    }
+
+
+def compute_hsp_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute HMA Swing Points indicator."""
+    x = params.get('x', 5)
+    len_period = params.get('len', 14)
+    signal = hsp_signal(df, x, len_period)
+    df['HSP_Signal'] = signal
+    return df
+
+
+def evaluate_hsp_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate HSP conditions."""
+    if 'HSP_Signal' not in df.columns:
+        df = compute_hsp_indicator(df, params)
+    return {
+        'hsp_long': df['HSP_Signal'] == 1,
+        'hsp_short': df['HSP_Signal'] == -1,
+        'hsp_bullish': df['HSP_Signal'] > 0
+    }
+
+
+def compute_demaafr_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute DEMA Adaptive Filter Range indicator."""
+    len_period = params.get('len', 14)
+    src = params.get('src', 0.0)
+    p = params.get('p', 14)
+    atr_factor = params.get('atr_factor', 2.0)
+    signal = dema_afr_signal(df, len_period, src, p, atr_factor)
+    df['DemaAFR_Signal'] = signal
+    return df
+
+
+def evaluate_demaafr_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate DemaAFR conditions."""
+    if 'DemaAFR_Signal' not in df.columns:
+        df = compute_demaafr_indicator(df, params)
+    return {
+        'demaafr_long': df['DemaAFR_Signal'] == 1,
+        'demaafr_short': df['DemaAFR_Signal'] == -1,
+        'demaafr_bullish': df['DemaAFR_Signal'] > 0
+    }
+
+
+def compute_rsisd_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute RSI Standard Deviation indicator."""
+    len_period = params.get('len', 14)
+    src = params.get('src', 0.0)
+    sdlen = params.get('sdlen', 20)
+    signal = rsi_sd_signal(df, len_period, src, sdlen)
+    df['RSIsd_Signal'] = signal
+    return df
+
+
+def evaluate_rsisd_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate RSIsd conditions."""
+    if 'RSIsd_Signal' not in df.columns:
+        df = compute_rsisd_indicator(df, params)
+    return {
+        'rsisd_long': df['RSIsd_Signal'] == 1,
+        'rsisd_short': df['RSIsd_Signal'] == -1,
+        'rsisd_bullish': df['RSIsd_Signal'] > 0
+    }
+
+
+def compute_inverted_sd_dema_rsi_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute Inverted Standard Deviation DEMA RSI indicator."""
+    sublen = params.get('sublen', 21)
+    sublen_2 = params.get('sublen_2', 20)
+    len_period = params.get('len', 14)
+    threshold_l = params.get('threshold_l', 50)
+    threshold_s = params.get('threshold_s', 50)
+    signal = inverted_sd_dema_rsi_signal(df, sublen, sublen_2, len_period, threshold_l, threshold_s)
+    df['Inverted_SD_Dema_RSI_Signal'] = signal
+    return df
+
+
+def evaluate_inverted_sd_dema_rsi_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate Inverted_SD_Dema_RSI conditions."""
+    if 'Inverted_SD_Dema_RSI_Signal' not in df.columns:
+        df = compute_inverted_sd_dema_rsi_indicator(df, params)
+    return {
+        'inverted_sd_dema_rsi_long': df['Inverted_SD_Dema_RSI_Signal'] == 1,
+        'inverted_sd_dema_rsi_short': df['Inverted_SD_Dema_RSI_Signal'] == -1,
+        'inverted_sd_dema_rsi_bullish': df['Inverted_SD_Dema_RSI_Signal'] > 0
+    }
+
+
+# New Indicator Compute Functions
+
+def compute_kvo_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute Klinger Volume Oscillator indicator."""
+    fast_len = params.get('fast_len', 34)
+    slow_len = params.get('slow_len', 55)
+    signal = kvo_signal(df, fast_len, slow_len)
+    df['KVO_Signal'] = signal
+    return df
+
+
+def evaluate_kvo_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate KVO conditions."""
+    if 'KVO_Signal' not in df.columns:
+        df = compute_kvo_indicator(df, params)
+    return {
+        'kvo_long': df['KVO_Signal'] == 1,
+        'kvo_short': df['KVO_Signal'] == -1,
+        'kvo_bullish': df['KVO_Signal'] > 0
+    }
+
+
+def compute_stc_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute Schaff Trend Cycle indicator."""
+    length = params.get('length', 10)
+    fast_length = params.get('fast_length', 23)
+    slow_length = params.get('slow_length', 50)
+    signal = stc_signal(df, length, fast_length, slow_length)
+    df['STC_Signal'] = signal
+    return df
+
+
+def evaluate_stc_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate STC conditions."""
+    if 'STC_Signal' not in df.columns:
+        df = compute_stc_indicator(df, params)
+    return {
+        'stc_long': df['STC_Signal'] == 1,
+        'stc_short': df['STC_Signal'] == -1,
+        'stc_bullish': df['STC_Signal'] > 0
+    }
+
+
+def compute_eri_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute Elder Ray Index indicator."""
+    length = params.get('length', 13)
+    signal = eri_signal(df, length)
+    df['ERI_Signal'] = signal
+    return df
+
+
+def evaluate_eri_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate ERI conditions."""
+    if 'ERI_Signal' not in df.columns:
+        df = compute_eri_indicator(df, params)
+    return {
+        'eri_long': df['ERI_Signal'] == 1,
+        'eri_short': df['ERI_Signal'] == -1,
+        'eri_bullish': df['ERI_Signal'] > 0
+    }
+
+
+def compute_cmo_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute Chande Momentum Oscillator indicator."""
+    length = params.get('length', 14)
+    signal = cmo_signal(df, length)
+    df['CMO_Signal'] = signal
+    return df
+
+
+def evaluate_cmo_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate CMO conditions."""
+    if 'CMO_Signal' not in df.columns:
+        df = compute_cmo_indicator(df, params)
+    return {
+        'cmo_long': df['CMO_Signal'] == 1,
+        'cmo_short': df['CMO_Signal'] == -1,
+        'cmo_bullish': df['CMO_Signal'] > 0
+    }
+
+
+def compute_fisher_transform_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute Fisher Transform indicator."""
+    length = params.get('length', 10)
+    signal = fisher_transform_signal(df, length)
+    df['FisherTransform_Signal'] = signal
+    return df
+
+
+def evaluate_fisher_transform_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate Fisher Transform conditions."""
+    if 'FisherTransform_Signal' not in df.columns:
+        df = compute_fisher_transform_indicator(df, params)
+    return {
+        'fisher_transform_long': df['FisherTransform_Signal'] == 1,
+        'fisher_transform_short': df['FisherTransform_Signal'] == -1,
+        'fisher_transform_bullish': df['FisherTransform_Signal'] > 0
+    }
+
+
+def compute_bb_percent_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute Bollinger Band Percent indicator."""
+    bb_len = params.get('bb_len', 20)
+    bb_mul = params.get('bb_mul', 2.0)
+    bb_zlen = params.get('bb_zlen', 20)
+    signal = bb_percent_signal(df, bb_len, bb_mul, bb_zlen)
+    df['BBPercent_Signal'] = signal
+    return df
+
+
+def evaluate_bb_percent_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate BB Percent conditions."""
+    if 'BBPercent_Signal' not in df.columns:
+        df = compute_bb_percent_indicator(df, params)
+    return {
+        'bb_percent_long': df['BBPercent_Signal'] == 1,
+        'bb_percent_short': df['BBPercent_Signal'] == -1,
+        'bb_percent_bullish': df['BBPercent_Signal'] > 0
+    }
+
+
+def compute_tsi_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute True Strength Index indicator."""
+    tsi_long = params.get('tsi_long', 25)
+    tsi_short = params.get('tsi_short', 13)
+    tsi_zlen = params.get('tsi_zlen', 20)
+    signal = tsi_signal(df, tsi_long, tsi_short, tsi_zlen)
+    df['TSI_Signal'] = signal
+    return df
+
+
+def evaluate_tsi_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate TSI conditions."""
+    if 'TSI_Signal' not in df.columns:
+        df = compute_tsi_indicator(df, params)
+    return {
+        'tsi_long': df['TSI_Signal'] == 1,
+        'tsi_short': df['TSI_Signal'] == -1,
+        'tsi_bullish': df['TSI_Signal'] > 0
+    }
+
+
+def compute_disparity_index_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute Disparity Index indicator."""
+    lookback = params.get('lookback', 14)
+    smoothing = params.get('smoothing', 'EMA')
+    signal = disparity_index_signal(df, lookback, smoothing)
+    df['DisparityIndex_Signal'] = signal
+    return df
+
+
+def evaluate_disparity_index_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate Disparity Index conditions."""
+    if 'DisparityIndex_Signal' not in df.columns:
+        df = compute_disparity_index_indicator(df, params)
+    return {
+        'disparity_index_long': df['DisparityIndex_Signal'] == 1,
+        'disparity_index_short': df['DisparityIndex_Signal'] == -1,
+        'disparity_index_bullish': df['DisparityIndex_Signal'] > 0
+    }
+
+
+def compute_chande_momentum_oscillator_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute Chande Momentum Oscillator indicator (alternative)."""
+    lookback = params.get('lookback', 14)
+    signal = chande_momentum_oscillator_signal(df, lookback)
+    df['ChandeMO_Signal'] = signal
+    return df
+
+
+def evaluate_chande_momentum_oscillator_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate Chande Momentum Oscillator conditions."""
+    if 'ChandeMO_Signal' not in df.columns:
+        df = compute_chande_momentum_oscillator_indicator(df, params)
+    return {
+        'chande_mo_long': df['ChandeMO_Signal'] == 1,
+        'chande_mo_short': df['ChandeMO_Signal'] == -1,
+        'chande_mo_bullish': df['ChandeMO_Signal'] > 0
+    }
+
+
+def compute_rapr_1_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute RAPR 1 indicator."""
+    metric_lookback = params.get('metric_lookback', 20)
+    valuation_lookback = params.get('valuation_lookback', 0)
+    signal = rapr_1_signal(df, metric_lookback, valuation_lookback)
+    df['RAPR1_Signal'] = signal
+    return df
+
+
+def evaluate_rapr_1_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate RAPR 1 conditions."""
+    if 'RAPR1_Signal' not in df.columns:
+        df = compute_rapr_1_indicator(df, params)
+    return {
+        'rapr_1_long': df['RAPR1_Signal'] == 1,
+        'rapr_1_short': df['RAPR1_Signal'] == -1,
+        'rapr_1_bullish': df['RAPR1_Signal'] > 0
+    }
+
+
+def compute_rapr_2_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """Compute RAPR 2 indicator."""
+    metric_lookback = params.get('metric_lookback', 20)
+    valuation_lookback = params.get('valuation_lookback', 0)
+    signal = rapr_2_signal(df, metric_lookback, valuation_lookback)
+    df['RAPR2_Signal'] = signal
+    return df
+
+
+def evaluate_rapr_2_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
+    """Evaluate RAPR 2 conditions."""
+    if 'RAPR2_Signal' not in df.columns:
+        df = compute_rapr_2_indicator(df, params)
+    return {
+        'rapr_2_long': df['RAPR2_Signal'] == 1,
+        'rapr_2_short': df['RAPR2_Signal'] == -1,
+        'rapr_2_bullish': df['RAPR2_Signal'] > 0
+    }
+
+
 # Registry of available indicators
 INDICATOR_REGISTRY: Dict[str, IndicatorMetadata] = {
     'RSI': IndicatorMetadata(
@@ -893,7 +1428,456 @@ INDICATOR_REGISTRY: Dict[str, IndicatorMetadata] = {
         compute_fn=compute_keltner_indicator,
         evaluate_conditions_fn=evaluate_keltner_conditions,
         category='Volatility'
-    )
+    ),
+    
+    # PineScript Converted Indicators
+    'RSITrail': IndicatorMetadata(
+        name='RSI Trail',
+        description='RSI-based trail indicator with upper/lower bounds',
+        parameters={
+            'f_rsi_lower': {'type': 'int', 'default': 30, 'min': 10, 'max': 50, 'description': 'Lower RSI threshold'},
+            'f_rsi_upper': {'type': 'int', 'default': 70, 'min': 50, 'max': 90, 'description': 'Upper RSI threshold'}
+        },
+        conditions={
+            'rsitrail_long': 'RSI Trail long signal',
+            'rsitrail_short': 'RSI Trail short signal',
+            'rsitrail_bullish': 'RSI Trail bullish condition'
+        },
+        compute_fn=compute_rsitrail_indicator,
+        evaluate_conditions_fn=evaluate_rsitrail_conditions,
+        category='Momentum'
+    ),
+    
+    'LWST': IndicatorMetadata(
+        name='Liquidity Weighted Supertrend',
+        description='Supertrend indicator weighted by liquidity',
+        parameters={
+            'supertrend_type': {'type': 'str', 'default': 'Aggressive', 'description': 'Supertrend type'},
+            'factor2': {'type': 'float', 'default': 2.0, 'min': 0.5, 'max': 5.0, 'description': 'Supertrend factor'},
+            'pd2': {'type': 'int', 'default': 10, 'min': 5, 'max': 30, 'description': 'ATR period'},
+            'fast': {'type': 'int', 'default': 10, 'min': 5, 'max': 30, 'description': 'Fast EMA period'},
+            'slow': {'type': 'int', 'default': 11, 'min': 5, 'max': 50, 'description': 'Slow EMA period'}
+        },
+        conditions={
+            'lwst_long': 'LWST long signal',
+            'lwst_short': 'LWST short signal',
+            'lwst_bullish': 'LWST bullish condition'
+        },
+        compute_fn=compute_lwst_indicator,
+        evaluate_conditions_fn=evaluate_lwst_conditions,
+        category='Trend'
+    ),
+    
+    'SSD': IndicatorMetadata(
+        name='SMA Standard Deviation',
+        description='SMA-based standard deviation indicator',
+        parameters={
+            'len_dema': {'type': 'int', 'default': 21, 'min': 5, 'max': 50, 'description': 'DEMA length'},
+            'src_dema': {'type': 'float', 'default': 0.0, 'description': 'Source for DEMA'},
+            'src_demal': {'type': 'float', 'default': 0.0, 'description': 'Source for DEMA low'},
+            'len': {'type': 'int', 'default': 50, 'min': 10, 'max': 100, 'description': 'SMA length'},
+            'len_sd': {'type': 'int', 'default': 20, 'min': 5, 'max': 50, 'description': 'Standard deviation length'},
+            'len_dema_sd': {'type': 'int', 'default': 21, 'min': 5, 'max': 50, 'description': 'DEMA SD length'},
+            'src_dema_sd': {'type': 'float', 'default': 0.0, 'description': 'Source for DEMA SD'}
+        },
+        conditions={
+            'ssd_long': 'SSD long signal',
+            'ssd_short': 'SSD short signal',
+            'ssd_bullish': 'SSD bullish condition'
+        },
+        compute_fn=compute_ssd_indicator,
+        evaluate_conditions_fn=evaluate_ssd_conditions,
+        category='Trend'
+    ),
+    
+    'VTSP': IndicatorMetadata(
+        name='Volume Trend Swing Points',
+        description='Volume-based trend swing point detection',
+        parameters={
+            'x': {'type': 'int', 'default': 5, 'min': 3, 'max': 20, 'description': 'Period for highest'},
+            'y': {'type': 'int', 'default': 5, 'min': 3, 'max': 20, 'description': 'Period for lowest'}
+        },
+        conditions={
+            'vtsp_long': 'VTSP long signal',
+            'vtsp_short': 'VTSP short signal',
+            'vtsp_bullish': 'VTSP bullish condition'
+        },
+        compute_fn=compute_vtsp_indicator,
+        evaluate_conditions_fn=evaluate_vtsp_conditions,
+        category='Volume'
+    ),
+    
+    'DemaDMI': IndicatorMetadata(
+        name='DEMA DMI',
+        description='DEMA-based Directional Movement Index',
+        parameters={
+            'len_dema': {'type': 'int', 'default': 14, 'min': 5, 'max': 50, 'description': 'DEMA length'},
+            'adx_smoothing_len': {'type': 'int', 'default': 14, 'min': 5, 'max': 30, 'description': 'ADX smoothing length'},
+            'di_len': {'type': 'int', 'default': 14, 'min': 5, 'max': 30, 'description': 'DI length'}
+        },
+        conditions={
+            'demadmi_long': 'DemaDMI long signal',
+            'demadmi_short': 'DemaDMI short signal',
+            'demadmi_bullish': 'DemaDMI bullish condition'
+        },
+        compute_fn=compute_demadmi_indicator,
+        evaluate_conditions_fn=evaluate_demadmi_conditions,
+        category='Trend'
+    ),
+    
+    'EWMA': IndicatorMetadata(
+        name='Exponential Weighted Moving Average',
+        description='EWMA signal indicator',
+        parameters={
+            'len': {'type': 'int', 'default': 14, 'min': 5, 'max': 50, 'description': 'Length period'},
+            'src': {'type': 'float', 'default': 0.0, 'description': 'Source'}
+        },
+        conditions={
+            'ewma_long': 'EWMA long signal',
+            'ewma_short': 'EWMA short signal',
+            'ewma_bullish': 'EWMA bullish condition'
+        },
+        compute_fn=compute_ewma_indicator,
+        evaluate_conditions_fn=evaluate_ewma_conditions,
+        category='Trend'
+    ),
+    
+    'EmaZScore': IndicatorMetadata(
+        name='EMA Z-Score',
+        description='EMA-based Z-score indicator',
+        parameters={
+            'len': {'type': 'int', 'default': 14, 'min': 5, 'max': 50, 'description': 'EMA length'},
+            'src': {'type': 'float', 'default': 0.0, 'description': 'Source'},
+            'lookback': {'type': 'int', 'default': 20, 'min': 10, 'max': 50, 'description': 'Lookback period'},
+            'threshold_l': {'type': 'float', 'default': 1.0, 'min': 0.0, 'max': 3.0, 'description': 'Long threshold'},
+            'threshold_s': {'type': 'float', 'default': -1.0, 'min': -3.0, 'max': 0.0, 'description': 'Short threshold'}
+        },
+        conditions={
+            'emazscore_long': 'EmaZScore long signal',
+            'emazscore_short': 'EmaZScore short signal',
+            'emazscore_bullish': 'EmaZScore bullish condition'
+        },
+        compute_fn=compute_emazscore_indicator,
+        evaluate_conditions_fn=evaluate_emazscore_conditions,
+        category='Momentum'
+    ),
+    
+    'DST': IndicatorMetadata(
+        name='DEMA Supertrend',
+        description='DEMA-based Supertrend indicator',
+        parameters={
+            'subject': {'type': 'int', 'default': 10, 'min': 5, 'max': 30, 'description': 'ATR period'},
+            'mul': {'type': 'float', 'default': 2.0, 'min': 0.5, 'max': 5.0, 'description': 'Multiplier'},
+            'demalen': {'type': 'int', 'default': 21, 'min': 5, 'max': 50, 'description': 'DEMA length'},
+            'src': {'type': 'float', 'default': 0.0, 'description': 'Source'}
+        },
+        conditions={
+            'dst_long': 'DST long signal',
+            'dst_short': 'DST short signal',
+            'dst_bullish': 'DST bullish condition'
+        },
+        compute_fn=compute_dst_indicator,
+        evaluate_conditions_fn=evaluate_dst_conditions,
+        category='Trend'
+    ),
+    
+    'MSD': IndicatorMetadata(
+        name='Median Standard Deviation',
+        description='Median-based standard deviation indicator',
+        parameters={
+            'len_dema': {'type': 'int', 'default': 21, 'min': 5, 'max': 50, 'description': 'DEMA length'},
+            'median_len': {'type': 'int', 'default': 50, 'min': 20, 'max': 100, 'description': 'Median length'},
+            'atr_len': {'type': 'int', 'default': 14, 'min': 5, 'max': 30, 'description': 'ATR length'},
+            'atr_mul': {'type': 'float', 'default': 2.0, 'min': 0.5, 'max': 5.0, 'description': 'ATR multiplier'},
+            'len_sd': {'type': 'int', 'default': 20, 'min': 5, 'max': 50, 'description': 'Standard deviation length'}
+        },
+        conditions={
+            'msd_long': 'MSD long signal',
+            'msd_short': 'MSD short signal',
+            'msd_bullish': 'MSD bullish condition'
+        },
+        compute_fn=compute_msd_indicator,
+        evaluate_conditions_fn=evaluate_msd_conditions,
+        category='Volatility'
+    ),
+    
+    'DemaEFI': IndicatorMetadata(
+        name='DEMA EFI Volume',
+        description='DEMA-based Ease of Movement indicator',
+        parameters={
+            'dema_len': {'type': 'int', 'default': 14, 'min': 5, 'max': 50, 'description': 'DEMA length'},
+            'dema_src': {'type': 'float', 'default': 0.0, 'description': 'Source for DEMA'},
+            'length': {'type': 'int', 'default': 13, 'min': 5, 'max': 30, 'description': 'EFI length'}
+        },
+        conditions={
+            'demaefi_long': 'DemaEFI long signal',
+            'demaefi_short': 'DemaEFI short signal',
+            'demaefi_bullish': 'DemaEFI bullish condition'
+        },
+        compute_fn=compute_demaefi_indicator,
+        evaluate_conditions_fn=evaluate_demaefi_conditions,
+        category='Volume'
+    ),
+    
+    'HSP': IndicatorMetadata(
+        name='HMA Swing Points',
+        description='Hull Moving Average swing point detection',
+        parameters={
+            'x': {'type': 'int', 'default': 5, 'min': 3, 'max': 20, 'description': 'Period for highest/lowest'},
+            'len': {'type': 'int', 'default': 14, 'min': 5, 'max': 50, 'description': 'HMA length'}
+        },
+        conditions={
+            'hsp_long': 'HSP long signal',
+            'hsp_short': 'HSP short signal',
+            'hsp_bullish': 'HSP bullish condition'
+        },
+        compute_fn=compute_hsp_indicator,
+        evaluate_conditions_fn=evaluate_hsp_conditions,
+        category='Trend'
+    ),
+    
+    'DemaAFR': IndicatorMetadata(
+        name='DEMA Adaptive Filter Range',
+        description='DEMA-based adaptive filter range indicator',
+        parameters={
+            'len': {'type': 'int', 'default': 14, 'min': 5, 'max': 50, 'description': 'DEMA length'},
+            'src': {'type': 'float', 'default': 0.0, 'description': 'Source'},
+            'p': {'type': 'int', 'default': 14, 'min': 5, 'max': 30, 'description': 'ATR period'},
+            'atr_factor': {'type': 'float', 'default': 2.0, 'min': 0.5, 'max': 5.0, 'description': 'ATR factor'}
+        },
+        conditions={
+            'demaafr_long': 'DemaAFR long signal',
+            'demaafr_short': 'DemaAFR short signal',
+            'demaafr_bullish': 'DemaAFR bullish condition'
+        },
+        compute_fn=compute_demaafr_indicator,
+        evaluate_conditions_fn=evaluate_demaafr_conditions,
+        category='Trend'
+    ),
+    
+    'RSIsd': IndicatorMetadata(
+        name='RSI Standard Deviation',
+        description='RSI-based standard deviation indicator',
+        parameters={
+            'len': {'type': 'int', 'default': 14, 'min': 5, 'max': 50, 'description': 'RSI length'},
+            'src': {'type': 'float', 'default': 0.0, 'description': 'Source'},
+            'sdlen': {'type': 'int', 'default': 20, 'min': 5, 'max': 50, 'description': 'Standard deviation length'}
+        },
+        conditions={
+            'rsisd_long': 'RSIsd long signal',
+            'rsisd_short': 'RSIsd short signal',
+            'rsisd_bullish': 'RSIsd bullish condition'
+        },
+        compute_fn=compute_rsisd_indicator,
+        evaluate_conditions_fn=evaluate_rsisd_conditions,
+        category='Momentum'
+    ),
+    
+    'Inverted_SD_Dema_RSI': IndicatorMetadata(
+        name='Inverted Standard Deviation DEMA RSI',
+        description='Inverted SD-based DEMA RSI indicator',
+        parameters={
+            'sublen': {'type': 'int', 'default': 21, 'min': 5, 'max': 50, 'description': 'DEMA length'},
+            'sublen_2': {'type': 'int', 'default': 20, 'min': 5, 'max': 50, 'description': 'Standard deviation length'},
+            'len': {'type': 'int', 'default': 14, 'min': 5, 'max': 50, 'description': 'RSI length'},
+            'threshold_l': {'type': 'int', 'default': 50, 'min': 30, 'max': 70, 'description': 'Long threshold'},
+            'threshold_s': {'type': 'int', 'default': 50, 'min': 30, 'max': 70, 'description': 'Short threshold'}
+        },
+        conditions={
+            'inverted_sd_dema_rsi_long': 'Inverted_SD_Dema_RSI long signal',
+            'inverted_sd_dema_rsi_short': 'Inverted_SD_Dema_RSI short signal',
+            'inverted_sd_dema_rsi_bullish': 'Inverted_SD_Dema_RSI bullish condition'
+        },
+        compute_fn=compute_inverted_sd_dema_rsi_indicator,
+        evaluate_conditions_fn=evaluate_inverted_sd_dema_rsi_conditions,
+        category='Momentum'
+    ),
+    
+    'KVO': IndicatorMetadata(
+        name='Klinger Volume Oscillator',
+        description='Volume-based oscillator using trend direction and volume force',
+        parameters={
+            'fast_len': {'type': 'int', 'default': 34, 'min': 5, 'max': 100, 'description': 'Fast EMA length'},
+            'slow_len': {'type': 'int', 'default': 55, 'min': 10, 'max': 200, 'description': 'Slow EMA length'}
+        },
+        conditions={
+            'kvo_long': 'KVO long signal',
+            'kvo_short': 'KVO short signal',
+            'kvo_bullish': 'KVO bullish condition'
+        },
+        compute_fn=compute_kvo_indicator,
+        evaluate_conditions_fn=evaluate_kvo_conditions,
+        category='Volume'
+    ),
+    
+    'STC': IndicatorMetadata(
+        name='Schaff Trend Cycle',
+        description='MACD-based stochastic oscillator for trend identification',
+        parameters={
+            'length': {'type': 'int', 'default': 10, 'min': 5, 'max': 50, 'description': 'Stochastic length'},
+            'fast_length': {'type': 'int', 'default': 23, 'min': 5, 'max': 50, 'description': 'Fast EMA length'},
+            'slow_length': {'type': 'int', 'default': 50, 'min': 10, 'max': 100, 'description': 'Slow EMA length'}
+        },
+        conditions={
+            'stc_long': 'STC long signal',
+            'stc_short': 'STC short signal',
+            'stc_bullish': 'STC bullish condition'
+        },
+        compute_fn=compute_stc_indicator,
+        evaluate_conditions_fn=evaluate_stc_conditions,
+        category='Momentum'
+    ),
+    
+    'ERI': IndicatorMetadata(
+        name='Elder Ray Index',
+        description='Bull and bear power indicator based on EMA',
+        parameters={
+            'length': {'type': 'int', 'default': 13, 'min': 5, 'max': 50, 'description': 'EMA length'}
+        },
+        conditions={
+            'eri_long': 'ERI long signal',
+            'eri_short': 'ERI short signal',
+            'eri_bullish': 'ERI bullish condition'
+        },
+        compute_fn=compute_eri_indicator,
+        evaluate_conditions_fn=evaluate_eri_conditions,
+        category='Momentum'
+    ),
+    
+    'CMO': IndicatorMetadata(
+        name='Chande Momentum Oscillator',
+        description='Momentum oscillator comparing sum of gains to sum of losses',
+        parameters={
+            'length': {'type': 'int', 'default': 14, 'min': 5, 'max': 50, 'description': 'CMO length'}
+        },
+        conditions={
+            'cmo_long': 'CMO long signal',
+            'cmo_short': 'CMO short signal',
+            'cmo_bullish': 'CMO bullish condition'
+        },
+        compute_fn=compute_cmo_indicator,
+        evaluate_conditions_fn=evaluate_cmo_conditions,
+        category='Momentum'
+    ),
+    
+    'FisherTransform': IndicatorMetadata(
+        name='Fisher Transform',
+        description='Price transformation indicator for identifying trend reversals',
+        parameters={
+            'length': {'type': 'int', 'default': 10, 'min': 5, 'max': 50, 'description': 'Period length'}
+        },
+        conditions={
+            'fisher_transform_long': 'Fisher Transform long signal',
+            'fisher_transform_short': 'Fisher Transform short signal',
+            'fisher_transform_bullish': 'Fisher Transform bullish condition'
+        },
+        compute_fn=compute_fisher_transform_indicator,
+        evaluate_conditions_fn=evaluate_fisher_transform_conditions,
+        category='Momentum'
+    ),
+    
+    'BBPercent': IndicatorMetadata(
+        name='Bollinger Band Percent',
+        description='Bollinger Band Percent with z-score normalization',
+        parameters={
+            'bb_len': {'type': 'int', 'default': 20, 'min': 5, 'max': 50, 'description': 'Bollinger Band length'},
+            'bb_mul': {'type': 'float', 'default': 2.0, 'min': 1.0, 'max': 5.0, 'description': 'Bollinger Band multiplier'},
+            'bb_zlen': {'type': 'int', 'default': 20, 'min': 5, 'max': 50, 'description': 'Z-score length'}
+        },
+        conditions={
+            'bb_percent_long': 'BB Percent long signal',
+            'bb_percent_short': 'BB Percent short signal',
+            'bb_percent_bullish': 'BB Percent bullish condition'
+        },
+        compute_fn=compute_bb_percent_indicator,
+        evaluate_conditions_fn=evaluate_bb_percent_conditions,
+        category='Volatility'
+    ),
+    
+    'TSI': IndicatorMetadata(
+        name='True Strength Index',
+        description='True Strength Index with z-score normalization',
+        parameters={
+            'tsi_long': {'type': 'int', 'default': 25, 'min': 10, 'max': 50, 'description': 'Long smoothing period'},
+            'tsi_short': {'type': 'int', 'default': 13, 'min': 5, 'max': 30, 'description': 'Short smoothing period'},
+            'tsi_zlen': {'type': 'int', 'default': 20, 'min': 5, 'max': 50, 'description': 'Z-score length'}
+        },
+        conditions={
+            'tsi_long': 'TSI long signal',
+            'tsi_short': 'TSI short signal',
+            'tsi_bullish': 'TSI bullish condition'
+        },
+        compute_fn=compute_tsi_indicator,
+        evaluate_conditions_fn=evaluate_tsi_conditions,
+        category='Momentum'
+    ),
+    
+    'DisparityIndex': IndicatorMetadata(
+        name='Disparity Index',
+        description='Disparity Index measuring price deviation from moving average',
+        parameters={
+            'lookback': {'type': 'int', 'default': 14, 'min': 5, 'max': 50, 'description': 'Lookback period'},
+            'smoothing': {'type': 'str', 'default': 'EMA', 'description': 'Smoothing method (EMA or SMA)'}
+        },
+        conditions={
+            'disparity_index_long': 'Disparity Index long signal',
+            'disparity_index_short': 'Disparity Index short signal',
+            'disparity_index_bullish': 'Disparity Index bullish condition'
+        },
+        compute_fn=compute_disparity_index_indicator,
+        evaluate_conditions_fn=evaluate_disparity_index_conditions,
+        category='Momentum'
+    ),
+    
+    'ChandeMO': IndicatorMetadata(
+        name='Chande Momentum Oscillator (Alternative)',
+        description='Chande Momentum Oscillator with alternative calculation',
+        parameters={
+            'lookback': {'type': 'int', 'default': 14, 'min': 5, 'max': 50, 'description': 'Lookback period'}
+        },
+        conditions={
+            'chande_mo_long': 'Chande MO long signal',
+            'chande_mo_short': 'Chande MO short signal',
+            'chande_mo_bullish': 'Chande MO bullish condition'
+        },
+        compute_fn=compute_chande_momentum_oscillator_indicator,
+        evaluate_conditions_fn=evaluate_chande_momentum_oscillator_conditions,
+        category='Momentum'
+    ),
+    
+    'RAPR1': IndicatorMetadata(
+        name='RAPR 1',
+        description='Risk-Adjusted Performance Ratio 1 - combines Sharpe, Sortino, and Omega z-scores',
+        parameters={
+            'metric_lookback': {'type': 'int', 'default': 20, 'min': 10, 'max': 100, 'description': 'Metric lookback period'},
+            'valuation_lookback': {'type': 'int', 'default': 0, 'min': 0, 'max': 50, 'description': 'Valuation lookback period'}
+        },
+        conditions={
+            'rapr_1_long': 'RAPR 1 long signal',
+            'rapr_1_short': 'RAPR 1 short signal',
+            'rapr_1_bullish': 'RAPR 1 bullish condition'
+        },
+        compute_fn=compute_rapr_1_indicator,
+        evaluate_conditions_fn=evaluate_rapr_1_conditions,
+        category='Advanced'
+    ),
+    
+    'RAPR2': IndicatorMetadata(
+        name='RAPR 2',
+        description='Risk-Adjusted Performance Ratio 2 - robust variant with multiple lookback periods',
+        parameters={
+            'metric_lookback': {'type': 'int', 'default': 20, 'min': 10, 'max': 100, 'description': 'Metric lookback period'},
+            'valuation_lookback': {'type': 'int', 'default': 0, 'min': 0, 'max': 50, 'description': 'Valuation lookback period'}
+        },
+        conditions={
+            'rapr_2_long': 'RAPR 2 long signal',
+            'rapr_2_short': 'RAPR 2 short signal',
+            'rapr_2_bullish': 'RAPR 2 bullish condition'
+        },
+        compute_fn=compute_rapr_2_indicator,
+        evaluate_conditions_fn=evaluate_rapr_2_conditions,
+        category='Advanced'
+    ),
 }
 
 
