@@ -1,0 +1,716 @@
+"""
+Authentication routes for Google OAuth and user management.
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
+from fastapi.responses import RedirectResponse, JSONResponse
+from sqlalchemy.orm import Session
+from typing import Optional
+from pydantic import BaseModel, EmailStr
+
+from backend.core.database import get_db, engine
+import os
+from sqlalchemy import inspect, text
+from backend.core.auth import (
+    create_access_token,
+    get_current_user,
+    get_current_user_optional,
+    get_google_authorization_url,
+    exchange_google_code_for_token,
+    get_google_user_info,
+    validate_oauth_config,
+    hash_password,
+    verify_password,
+)
+from backend.api.models.db_models import User
+from backend.utils.helpers import get_logger
+import json
+from pathlib import Path
+
+logger = get_logger(__name__)
+
+# #region agent log
+def _log_debug(session_id, run_id, hypothesis_id, location, message, data):
+    try:
+        log_path = Path("/Users/willgranchi/TradingPlat/.cursor/debug.log")
+        log_entry = {
+            "sessionId": session_id,
+            "runId": run_id,
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": int(__import__("time").time() * 1000)
+        }
+        with open(log_path, "a") as f:
+            f.write(json.dumps(log_entry) + "\n")
+    except Exception:
+        pass
+# #endregion agent log
+
+router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+# Handle OPTIONS requests explicitly for CORS preflight
+@router.options("/{path:path}")
+async def options_handler(request: Request, path: str):
+    """Handle CORS preflight OPTIONS requests."""
+    # Get allowed origins from environment (same as main.py)
+    import os
+    cors_origins_env = os.getenv("CORS_ORIGINS", "")
+    if cors_origins_env:
+        allowed_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
+    else:
+        allowed_origins = [
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:3001",
+            "http://127.0.0.1:3001",
+        ]
+    
+    frontend_url = os.getenv("FRONTEND_URL", "")
+    if frontend_url and frontend_url not in allowed_origins:
+        allowed_origins.append(frontend_url)
+    
+    # Get origin from request
+    origin = request.headers.get("origin", "")
+    
+    # Validate origin is in allowed list
+    if origin and origin in allowed_origins:
+        allow_origin = origin
+    elif not origin:
+        # No origin header (same-origin request)
+        allow_origin = "*"
+    else:
+        # Origin not allowed - still return 200 but with no CORS headers
+        # (CORS middleware will handle this, but we return early)
+        return JSONResponse(content={}, status_code=200)
+    
+    return JSONResponse(
+        content={},
+        headers={
+            "Access-Control-Allow-Origin": allow_origin,
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "3600",
+        }
+    )
+
+# Store OAuth state temporarily (in production, use Redis or similar)
+oauth_states = {}
+
+
+# Pydantic models for request/response
+class SignupRequest(BaseModel):
+    email: EmailStr
+    password: str
+    name: Optional[str] = None
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class UpdateProfileRequest(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    profile_picture_url: Optional[str] = None
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@router.post("/signup")
+async def signup(
+    request: SignupRequest,
+    response: Response,
+    http_request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Register a new user with email and password.
+    """
+    try:
+        # Validate password length (bcrypt limit is 72 bytes)
+        if len(request.password.encode('utf-8')) > 72:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password is too long. Maximum length is 72 bytes."
+            )
+        
+        # Validate password minimum length
+        if len(request.password) < 8:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password must be at least 8 characters long"
+            )
+        
+        # Check if user already exists
+        existing_user = db.query(User).filter(User.email == request.email).first()
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
+        
+        # Hash password (ensure it's a string, not bytes)
+        password_str = str(request.password).strip()
+        
+        if password_bytes_len > 72:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Password is too long. Maximum length is 72 bytes, got {password_bytes_len} bytes."
+            )
+        
+        password_hash = hash_password(password_str)
+        
+        # Create new user
+        user = User(
+            email=request.email,
+            name=request.name or request.email.split("@")[0],
+            password_hash=password_hash,
+            theme="dark"
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        
+        # Create JWT token
+        token = create_access_token(data={"sub": user.id})
+        
+        # Get frontend URL from environment
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        
+        # Get cookie security settings
+        environment = os.getenv("ENVIRONMENT", "development")
+        cookie_secure = os.getenv("COOKIE_SECURE", "false").lower() == "true"
+        cookie_samesite = os.getenv("COOKIE_SAMESITE", "lax")
+        
+        if environment == "production":
+            cookie_secure = True
+            cookie_samesite = "lax"
+        
+        # Set HTTP-only cookie with token
+        response.set_cookie(
+            key="token",
+            value=token,
+            httponly=True,
+            secure=cookie_secure,
+            samesite=cookie_samesite,
+            max_age=7 * 24 * 60 * 60,  # 7 days
+            path="/",
+        )
+        
+        # Add CORS headers explicitly for signup response
+        origin = http_request.headers.get("origin", "")
+        if origin:
+            # Check if origin is allowed (same logic as OPTIONS handler)
+            cors_origins_env = os.getenv("CORS_ORIGINS", "")
+            if cors_origins_env:
+                allowed_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
+            else:
+                allowed_origins = []
+            frontend_url = os.getenv("FRONTEND_URL", "")
+            if frontend_url and frontend_url not in allowed_origins:
+                allowed_origins.append(frontend_url)
+            
+            if origin in allowed_origins:
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Credentials"] = "true"
+        
+        return {
+            "message": "User created successfully",
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "name": user.name,
+            },
+            "token": token
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Signup error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create user: {str(e)}"
+        )
+
+
+@router.post("/login")
+async def login(
+    request: LoginRequest,
+    response: Response,
+    db: Session = Depends(get_db)
+):
+    """
+    Login user with email and password.
+    """
+    # #region agent log
+    _log_debug("debug-session", "run1", "A", "auth.py:244", "Login endpoint called", {"email": request.email})
+    # Check database connection info
+    db_url_redacted = os.getenv("DATABASE_URL", "").split("@")[-1] if "@" in os.getenv("DATABASE_URL", "") else "not_set"
+    _log_debug("debug-session", "run1", "E", "auth.py:247", "Database connection info", {"db_host": db_url_redacted})
+    # #endregion agent log
+    try:
+        # #region agent log
+        # Check database schema before querying
+        try:
+            inspector = inspect(engine)
+            users_columns = [col['name'] for col in inspector.get_columns('users')]
+            has_profile_pic_col = 'profile_picture_url' in users_columns
+            _log_debug("debug-session", "run1", "A", "auth.py:256", "Database schema check", {
+                "users_columns": users_columns,
+                "has_profile_picture_url": has_profile_pic_col,
+                "total_columns": len(users_columns)
+            })
+            # Check migration file existence (check both relative and absolute paths)
+            migration_file_rel = Path("backend/alembic/versions/55f96e77095c_add_profile_picture_url_to_users.py")
+            migration_file_abs = Path(__file__).parent.parent.parent / "alembic" / "versions" / "55f96e77095c_add_profile_picture_url_to_users.py"
+            migration_exists_rel = migration_file_rel.exists()
+            migration_exists_abs = migration_file_abs.exists()
+            _log_debug("debug-session", "run1", "B", "auth.py:263", "Migration file check", {
+                "relative_path": str(migration_file_rel),
+                "relative_exists": migration_exists_rel,
+                "absolute_path": str(migration_file_abs),
+                "absolute_exists": migration_exists_abs,
+                "cwd": str(Path.cwd())
+            })
+            # Check alembic version table to see if migration was run
+            try:
+                with engine.connect() as conn:
+                    result = conn.execute(text("SELECT version_num FROM alembic_version LIMIT 1"))
+                    alembic_version = result.fetchone()
+                    _log_debug("debug-session", "run1", "B", "auth.py:275", "Alembic version check", {
+                        "alembic_version": alembic_version[0] if alembic_version else None
+                    })
+            except Exception as alembic_err:
+                _log_debug("debug-session", "run1", "B", "auth.py:279", "Alembic version check failed", {"error": str(alembic_err)})
+        except Exception as schema_err:
+            _log_debug("debug-session", "run1", "C", "auth.py:281", "Schema check failed", {"error": str(schema_err), "error_type": type(schema_err).__name__})
+        # #endregion agent log
+        
+        # Find user by email
+        # #region agent log
+        _log_debug("debug-session", "run1", "D", "auth.py:272", "Querying user before", {"email": request.email})
+        # #endregion agent log
+        user = db.query(User).filter(User.email == request.email).first()
+        # #region agent log
+        _log_debug("debug-session", "run1", "D", "auth.py:275", "Querying user after", {"user_found": user is not None, "user_id": user.id if user else None})
+        # #endregion agent log
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password"
+            )
+        
+        # Check if user has password (not just Google OAuth)
+        if not user.password_hash:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Account was created with Google. Please use Google login."
+            )
+        
+        # Verify password (ensure it's a string)
+        password_str = str(request.password)
+        if len(password_str.encode('utf-8')) > 72:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password is too long. Maximum length is 72 bytes."
+            )
+        
+        if not verify_password(password_str, user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password"
+            )
+        
+        # Create JWT token
+        token = create_access_token(data={"sub": user.id})
+        
+        # Get frontend URL from environment
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        
+        # Get cookie security settings
+        environment = os.getenv("ENVIRONMENT", "development")
+        cookie_secure = os.getenv("COOKIE_SECURE", "false").lower() == "true"
+        cookie_samesite = os.getenv("COOKIE_SAMESITE", "lax")
+        
+        if environment == "production":
+            cookie_secure = True
+            cookie_samesite = "lax"
+        
+        # Set HTTP-only cookie with token
+        response.set_cookie(
+            key="token",
+            value=token,
+            httponly=True,
+            secure=cookie_secure,
+            samesite=cookie_samesite,
+            max_age=7 * 24 * 60 * 60,  # 7 days
+            path="/",
+        )
+        
+        return {
+            "message": "Login successful",
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "name": user.name,
+            },
+            "token": token
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Login error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Login failed: {str(e)}"
+        )
+
+
+@router.get("/google/login")
+async def google_login():
+    """
+    Initiate Google OAuth login flow.
+    Redirects to Google authorization page.
+    """
+    # Validate OAuth configuration
+    is_valid, error_msg = validate_oauth_config()
+    if not is_valid:
+        logger.error(f"Google OAuth not configured: {error_msg}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google OAuth is not configured. Please contact the administrator or check GOOGLE_OAUTH_SETUP.md for setup instructions."
+        )
+    
+    try:
+        result = get_google_authorization_url()
+        if isinstance(result, tuple):
+            authorization_url, state = result
+        else:
+            authorization_url = result
+            state = None
+        
+        # Store state for validation (in production, use Redis with expiration)
+        if state:
+            oauth_states[state] = True
+        
+        return RedirectResponse(url=authorization_url)
+    except ValueError as e:
+        # Re-raise validation errors as HTTP exceptions
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Failed to initiate OAuth flow: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to initiate OAuth flow: {str(e)}"
+        )
+
+
+@router.get("/google/callback")
+async def google_callback(
+    code: str,
+    state: Optional[str] = None,
+    db: Session = Depends(get_db),
+    response: Response = None
+):
+    """
+    Handle Google OAuth callback.
+    Creates or updates user, generates JWT token, and sets cookie.
+    """
+    try:
+        # Exchange code for token
+        token_data = await exchange_google_code_for_token(code)
+        access_token = token_data.get("access_token")
+        
+        if not access_token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to get access token"
+            )
+        
+        # Get user info from Google
+        user_info = await get_google_user_info(access_token)
+        google_id = user_info.get("id")
+        email = user_info.get("email")
+        name = user_info.get("name", "")
+        
+        if not email or not google_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to get user info from Google"
+            )
+        
+        # Find or create user
+        user = db.query(User).filter(User.google_id == google_id).first()
+        
+        if not user:
+            # Check if user with this email exists (legacy account)
+            user = db.query(User).filter(User.email == email).first()
+            if user:
+                # Link Google account to existing user
+                user.google_id = google_id
+                if not user.name:
+                    user.name = name
+            else:
+                # Create new user
+                user = User(
+                    email=email,
+                    name=name,
+                    google_id=google_id,
+                    theme="light"
+                )
+                db.add(user)
+        else:
+            # Update user info
+            user.email = email
+            if not user.name:
+                user.name = name
+        
+        db.commit()
+        db.refresh(user)
+        
+        # Create JWT token
+        token = create_access_token(data={"sub": user.id})
+        
+        # Get frontend URL from environment
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        redirect_response = RedirectResponse(url=f"{frontend_url}/?token={token}")
+        
+        # Get cookie security settings from environment
+        environment = os.getenv("ENVIRONMENT", "development")
+        cookie_secure = os.getenv("COOKIE_SECURE", "false").lower() == "true"
+        cookie_samesite = os.getenv("COOKIE_SAMESITE", "lax")
+        
+        # In production, cookies should be secure
+        if environment == "production" and not cookie_secure:
+            cookie_secure = True
+        
+        # For cross-site redirects (OAuth flow), use SameSite=None with Secure
+        # This allows the cookie to be sent when redirecting from Google back to our site
+        if cookie_secure:
+            # If secure is True (HTTPS), we can use SameSite=None for cross-site cookies
+            cookie_samesite = "none"
+        elif environment == "production":
+            # Production should always use secure cookies
+            cookie_secure = True
+            cookie_samesite = "none"
+        
+        # Set HTTP-only cookie with token
+        redirect_response.set_cookie(
+            key="token",
+            value=token,
+            httponly=True,
+            secure=cookie_secure,
+            samesite=cookie_samesite,
+            max_age=7 * 24 * 60 * 60,  # 7 days
+            path="/",
+            domain=None  # Let browser set domain automatically
+        )
+        
+        return redirect_response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Authentication failed: {str(e)}"
+        )
+
+
+@router.post("/logout")
+async def logout(response: Response):
+    """
+    Logout user by clearing the authentication cookie.
+    """
+    response.delete_cookie(key="token", path="/")
+    return {"message": "Logged out successfully"}
+
+
+@router.get("/me")
+async def get_me(current_user: Optional[User] = Depends(get_current_user_optional)):
+    """
+    Get current user information.
+    Returns None if not authenticated (guest mode).
+    """
+    if current_user is None:
+        return {"authenticated": False}
+    
+    return {
+        "authenticated": True,
+        "user": {
+            "id": current_user.id,
+            "email": current_user.email,
+            "name": current_user.name,
+            "theme": current_user.theme,
+            "profile_picture_url": current_user.profile_picture_url,
+            "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
+        }
+    }
+
+
+@router.post("/theme")
+async def update_theme(
+    theme: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update user theme preference (light/dark).
+    """
+    if theme not in ["light", "dark"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Theme must be 'light' or 'dark'"
+        )
+    
+    current_user.theme = theme
+    db.commit()
+    
+    return {"message": "Theme updated", "theme": theme}
+
+
+@router.put("/profile")
+async def update_profile(
+    request: UpdateProfileRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update user profile (name and/or email).
+    """
+    try:
+        updated = False
+        
+        # Update name if provided
+        if request.name is not None:
+            current_user.name = request.name
+            updated = True
+        
+        # Update email if provided
+        if request.email is not None:
+            # Check if email is already taken by another user
+            existing_user = db.query(User).filter(
+                User.email == request.email,
+                User.id != current_user.id
+            ).first()
+            
+            if existing_user:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Email is already taken by another account"
+                )
+            
+            current_user.email = request.email
+            updated = True
+        
+        # Update profile picture URL if provided
+        if request.profile_picture_url is not None:
+            current_user.profile_picture_url = request.profile_picture_url
+            updated = True
+        
+        if not updated:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No fields provided to update"
+            )
+        
+        db.commit()
+        db.refresh(current_user)
+        
+        return {
+            "message": "Profile updated successfully",
+            "user": {
+                "id": current_user.id,
+                "email": current_user.email,
+                "name": current_user.name,
+                "theme": current_user.theme,
+                "profile_picture_url": current_user.profile_picture_url,
+                "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Profile update error: {str(e)}", exc_info=True)
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update profile: {str(e)}"
+        )
+
+
+@router.post("/change-password")
+async def change_password(
+    request: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Change user password.
+    """
+    try:
+        # Check if user has a password (not just Google OAuth)
+        if not current_user.password_hash:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Account was created with Google. Password cannot be changed."
+            )
+        
+        # Verify current password
+        password_str = str(request.current_password)
+        if len(password_str.encode('utf-8')) > 72:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current password is too long."
+            )
+        
+        if not verify_password(password_str, current_user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Current password is incorrect"
+            )
+        
+        # Validate new password
+        new_password_str = str(request.new_password)
+        if len(new_password_str.encode('utf-8')) > 72:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="New password is too long. Maximum length is 72 bytes."
+            )
+        
+        if len(new_password_str) < 8:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="New password must be at least 8 characters long"
+            )
+        
+        # Hash and update password
+        current_user.password_hash = hash_password(new_password_str)
+        db.commit()
+        
+        return {"message": "Password changed successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Password change error: {str(e)}", exc_info=True)
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to change password: {str(e)}"
+        )
+

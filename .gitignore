@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.log
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+
+# Node/Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+frontend/dist/
+frontend/.env.local
+
+# Database
+*.db
+*.sqlite
+
+# Backups
+*.sql
+backup_*.sql
+
+# Outputs (keep structure but ignore files)
+outputs/*
+!outputs/.gitkeep
+
+# Backend data (keep structure but ignore CSV)
+backend/data/*
+!backend/data/.gitkeep
+# Allow Bitcoin data file for deployment
+!backend/data/Bitcoin Historical Data4.csv
+
+# Misc
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
