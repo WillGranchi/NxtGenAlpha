@@ -72,12 +72,14 @@ app.add_middleware(
 scheduler = AsyncIOScheduler()
 
 async def scheduled_data_update():
-    """Scheduled task to update cryptocurrency data daily."""
+    """Scheduled task to update cryptocurrency data from Binance (2017 onwards)."""
     try:
-        logger.info("Running scheduled data update for Bitcoin...")
-        # Update Bitcoin data (can add more symbols here in the future)
-        # Use force=False to respect freshness check, but ensure we fetch at least 1 year
-        df = update_crypto_data(symbol="BTCUSDT", force=False, days=1825)
+        logger.info("Running scheduled data update for Bitcoin from Binance (2017-01-01 onwards)...")
+        # Update Bitcoin data from Binance (2017-01-01 onwards)
+        # Use force=False to respect freshness check
+        from datetime import datetime
+        binance_start = datetime(2017, 1, 1)
+        df = update_crypto_data(symbol="BTCUSDT", force=False, start_date=binance_start)
         
         # Verify data quality
         days_available = (df.index.max() - df.index.min()).days

@@ -519,59 +519,65 @@ def save_data_to_csv(df: pd.DataFrame, file_path: Optional[str] = None, symbol: 
     return file_path
 
 
-def fetch_crypto_data_hybrid(symbol: str = "BTCUSDT", days: int = 1825, start_date: Optional[datetime] = None) -> Tuple[pd.DataFrame, str, str]:
+def fetch_crypto_data_hybrid(symbol: str = "BTCUSDT", days: int = 1825, start_date: Optional[datetime] = None, use_binance_only: bool = True) -> Tuple[pd.DataFrame, str, str]:
     """
-    Fetch cryptocurrency data using hybrid approach: Binance → CoinGecko (The Graph can be added later).
+    Fetch cryptocurrency data using Binance API (primary) with optional CoinGecko fallback.
     
     Args:
         symbol (str): Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
         days (int): Number of days of historical data to fetch
-        start_date (datetime, optional): Specific start date to fetch from (for historical data)
+        start_date (datetime, optional): Specific start date to fetch from (defaults to 2017-01-01)
+        use_binance_only (bool): If True, only use Binance (no CoinGecko fallback)
         
     Returns:
-        Tuple[pd.DataFrame, str, str]: DataFrame, data_source ("binance", "coingecko", "thegraph"), data_quality ("full_ohlcv", "close_only")
+        Tuple[pd.DataFrame, str, str]: DataFrame, data_source ("binance", "coingecko"), data_quality ("full_ohlcv", "close_only")
         
     Raises:
         Exception: If all data sources fail
     """
     logger = logging.getLogger(__name__)
     
+    # Default to 2017-01-01 (Binance launch date) if no start_date provided
+    if start_date is None:
+        start_date = datetime(2017, 1, 1)
+    
     # Try Binance first (best quality - full OHLCV)
     try:
-        logger.info(f"Attempting to fetch {symbol} data from Binance...")
+        logger.info(f"Fetching {symbol} data from Binance (from {start_date.strftime('%Y-%m-%d')})...")
         df = fetch_crypto_data_from_binance(symbol=symbol, days=days, start_date=start_date, fallback_to_coingecko=False)
         logger.info(f"Successfully fetched {symbol} data from Binance")
         return df, "binance", "full_ohlcv"
     except requests.exceptions.HTTPError as e:
         if e.response.status_code == 451:
-            logger.warning(f"Binance API unavailable (451) for {symbol}, trying fallback sources...")
+            logger.warning(f"Binance API unavailable (451) for {symbol}")
         else:
-            logger.warning(f"Binance API error for {symbol}: {e}, trying fallback sources...")
+            logger.warning(f"Binance API error for {symbol}: {e}")
     except Exception as e:
-        logger.warning(f"Binance fetch failed for {symbol}: {e}, trying fallback sources...")
+        logger.warning(f"Binance fetch failed for {symbol}: {e}")
     
-    # Try CoinGecko for Bitcoin and popular tokens
-    if symbol == "BTCUSDT":
+    # Only use CoinGecko fallback if explicitly allowed
+    if not use_binance_only and symbol == "BTCUSDT":
         try:
-            logger.info(f"Attempting to fetch {symbol} data from CoinGecko...")
+            logger.info(f"Falling back to CoinGecko for {symbol}...")
             df = fetch_btc_data_from_coingecko(days=min(days, 365), start_date=start_date)
             logger.info(f"Successfully fetched {symbol} data from CoinGecko")
             return df, "coingecko", "close_only"
         except Exception as e:
             logger.error(f"CoinGecko fetch failed for {symbol}: {e}")
     
-    raise Exception(f"All data sources failed for {symbol}")
+    raise Exception(f"Failed to fetch {symbol} data from Binance. Please check your connection or try again later.")
 
 
 def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int = 1825, start_date: Optional[datetime] = None) -> pd.DataFrame:
     """
-    Update cryptocurrency data using hybrid data sources and save to CSV.
+    Update cryptocurrency data using Binance API (from 2017-01-01 onwards) and save to CSV.
     Checks if data is fresh (updated within last 6 hours) before fetching.
     
     Args:
         symbol (str): Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
         force (bool): Force update even if data is fresh
-        days (int): Number of days of historical data to fetch (default 1825 = 5 years)
+        days (int): Number of days of historical data to fetch (default 1825 = 5 years, ignored if start_date provided)
+        start_date (datetime, optional): Specific start date to fetch from (defaults to 2017-01-01 for Binance)
         
     Returns:
         pd.DataFrame: Updated DataFrame
@@ -579,6 +585,11 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
     global _last_update_time
     
     logger = logging.getLogger(__name__)
+    
+    # Default to 2017-01-01 (when Binance started) if no start_date provided
+    if start_date is None:
+        start_date = datetime(2017, 1, 1)
+        logger.info(f"Using default start date: {start_date.strftime('%Y-%m-%d')} (Binance launch date)")
     
     # Check if we need to update (every 6 hours for more frequent updates)
     if not force and symbol in _last_update_time:
@@ -590,16 +601,13 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
             return load_crypto_data(symbol=symbol)
     
     try:
-        # If start_date is provided (e.g., 2016), use it; otherwise use days parameter
-        if start_date:
-            # Calculate days from start_date to now
-            fetch_days = (datetime.now() - start_date).days
-            logger.info(f"Fetching data from {start_date.strftime('%Y-%m-%d')} ({fetch_days} days)...")
-        else:
-            # Fetch maximum days (1825 = 5 years) for comprehensive historical data
-            fetch_days = max(days, 1825)  # Always fetch at least 5 years
+        # Calculate days from start_date to now
+        fetch_days = (datetime.now() - start_date).days
+        logger.info(f"Fetching Binance data from {start_date.strftime('%Y-%m-%d')} ({fetch_days} days)...")
         
-        df, data_source, data_quality = fetch_crypto_data_hybrid(symbol=symbol, days=fetch_days, start_date=start_date)
+        # Use Binance only (no CoinGecko fallback for default operations)
+        # Binance has full OHLCV data from 2017 onwards
+        df, data_source, data_quality = fetch_crypto_data_hybrid(symbol=symbol, days=fetch_days, start_date=start_date, use_binance_only=True)
         
         # Log data date range to verify historical depth
         days_available = (df.index.max() - df.index.min()).days
@@ -608,10 +616,11 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
         
         # Verify minimum data requirement (at least 1 year)
         if days_available < 365:
-            logger.warning(f"Only {days_available} days fetched (< 1 year). Attempting Binance direct fetch...")
-            # Try Binance directly to get more historical data
+            logger.warning(f"Only {days_available} days fetched (< 1 year). Attempting Binance direct fetch from 2017...")
+            # Try Binance directly from 2017-01-01
             try:
-                df_binance = fetch_crypto_data_from_binance(symbol=symbol, days=1825, fallback_to_coingecko=False)
+                binance_start = datetime(2017, 1, 1)
+                df_binance = fetch_crypto_data_from_binance(symbol=symbol, start_date=binance_start, fallback_to_coingecko=False)
                 binance_days = (df_binance.index.max() - df_binance.index.min()).days
                 if binance_days > days_available:
                     df = df_binance
@@ -712,22 +721,22 @@ def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None) -
         
     except FileNotFoundError:
         # File doesn't exist - automatically fetch data
-        logger.info(f"Data file not found for {symbol}, automatically fetching historical data...")
+        logger.info(f"Data file not found for {symbol}, automatically fetching Binance data from 2017...")
         try:
             # Clear cache before fetching to ensure fresh data
             load_crypto_data.cache_clear()
             
-            # Fetch maximum historical data (5 years = 1825 days)
-            # This will try Binance first, fallback to CoinGecko if needed
-            df = update_crypto_data(symbol=symbol, force=True, days=1825)
+            # Fetch Binance data from 2017-01-01 onwards (default)
+            binance_start = datetime(2017, 1, 1)
+            df = update_crypto_data(symbol=symbol, force=True, start_date=binance_start)
             
             # Verify we have at least 1 year of data
             days_available = (df.index.max() - df.index.min()).days
             if days_available < 365:
-                logger.warning(f"Only {days_available} days of data fetched. Attempting to fetch more...")
-                # Try fetching again with Binance directly (no fallback limit)
+                logger.warning(f"Only {days_available} days of data fetched. Attempting to fetch more from Binance...")
+                # Try fetching again with Binance directly from 2017
                 try:
-                    df_binance = fetch_crypto_data_from_binance(symbol=symbol, days=1825, fallback_to_coingecko=False)
+                    df_binance = fetch_crypto_data_from_binance(symbol=symbol, start_date=binance_start, fallback_to_coingecko=False)
                     if len(df_binance) > len(df):
                         df = df_binance
                         save_data_to_csv(df, symbol=symbol)
