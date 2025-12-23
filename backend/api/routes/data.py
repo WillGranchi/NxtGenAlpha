@@ -139,15 +139,15 @@ async def get_data_info(symbol: Optional[str] = Query(default="BTCUSDT", descrip
 async def refresh_data(
     symbol: Optional[str] = Query(default="BTCUSDT", description="Cryptocurrency symbol to refresh"),
     force: bool = Query(default=False, description="Force refresh even if data is fresh"),
-    start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD) to fetch historical data from (e.g., 2016-01-01)")
+    start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD) to fetch historical data from (defaults to 2017-01-01 for Binance)")
 ) -> Dict[str, Any]:
     """
-    Manually trigger a data refresh from Binance API or CoinGecko.
+    Manually trigger a data refresh from Binance API (defaults to 2017-01-01).
     
     Args:
         symbol: Trading pair symbol (default: BTCUSDT)
         force: Force refresh even if data is fresh
-        start_date: Start date (YYYY-MM-DD) to fetch historical data from (e.g., 2016-01-01)
+        start_date: Start date (YYYY-MM-DD) to fetch historical data from (defaults to 2017-01-01)
         
     Returns:
         Dict: Refresh status and data info
@@ -155,7 +155,7 @@ async def refresh_data(
     try:
         from datetime import datetime as dt
         
-        start_dt = None
+        # Default to 2017-01-01 (Binance launch date) if no start_date provided
         if start_date:
             try:
                 start_dt = dt.strptime(start_date, '%Y-%m-%d')
@@ -163,10 +163,13 @@ async def refresh_data(
             except ValueError:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Invalid start_date format. Use YYYY-MM-DD (e.g., 2016-01-01)"
+                    detail=f"Invalid start_date format. Use YYYY-MM-DD (e.g., 2017-01-01)"
                 )
+        else:
+            start_dt = dt(2017, 1, 1)
+            logger.info(f"Using default start date: 2017-01-01 (Binance launch date)")
         
-        logger.info(f"Manual data refresh requested for {symbol} (force={force}, start_date={start_date})")
+        logger.info(f"Manual data refresh requested for {symbol} (force={force}, start_date={start_dt.strftime('%Y-%m-%d')})")
         df = update_crypto_data(symbol=symbol, force=force, start_date=start_dt)
         
         summary = get_data_summary(df)

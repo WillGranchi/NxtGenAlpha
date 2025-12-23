@@ -717,6 +717,25 @@ def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None) -
         # Clean and preprocess the data
         df = _clean_data(df)
         
+        # Check if data goes back to 2017 (Binance launch date)
+        # If not, automatically refresh from 2017-01-01
+        data_start = df.index.min()
+        binance_start_date = datetime(2017, 1, 1)
+        
+        if data_start > binance_start_date:
+            logger.warning(f"Data file only goes back to {data_start.strftime('%Y-%m-%d')}, but Binance data is available from {binance_start_date.strftime('%Y-%m-%d')}")
+            logger.info(f"Automatically refreshing {symbol} data from {binance_start_date.strftime('%Y-%m-%d')}...")
+            
+            # Clear cache and refresh
+            load_crypto_data.cache_clear()
+            try:
+                df_refreshed = update_crypto_data(symbol=symbol, force=True, start_date=binance_start_date)
+                logger.info(f"Successfully refreshed data: {len(df_refreshed)} rows from {df_refreshed.index.min()} to {df_refreshed.index.max()}")
+                return df_refreshed
+            except Exception as refresh_error:
+                logger.warning(f"Auto-refresh failed: {refresh_error}. Using existing data.")
+                return df
+        
         return df
         
     except FileNotFoundError:
