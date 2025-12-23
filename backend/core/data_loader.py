@@ -717,8 +717,8 @@ def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None) -
         # Clean and preprocess the data
         df = _clean_data(df)
         
-        # Check if data goes back to 2017 (Binance launch date)
-        # If not, automatically refresh from 2017-01-01
+        # Check if data goes back to 2017-01-01 (Binance launch date)
+        # If not, automatically refresh from Binance
         data_start = df.index.min()
         binance_start_date = datetime(2017, 1, 1)
         

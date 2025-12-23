@@ -218,7 +218,7 @@ const IndicatorsPage: React.FC = () => {
       }));
       
       setPriceData(formattedPriceData);
-      
+        
       // Set combined result
       setCombinedResult(backtestResponse.combined_result);
       
@@ -443,17 +443,17 @@ const IndicatorsPage: React.FC = () => {
               </div>
 
               <div className="bg-bg-tertiary border border-border-default rounded-lg p-4">
-                <VisualConditionBuilder
+                      <VisualConditionBuilder
                   expression={expression}
                   onExpressionChange={setExpression}
-                  availableConditions={availableConditions}
-                  selectedIndicators={selectedIndicators.map(ind => ({
-                    id: ind.id,
-                    params: ind.parameters,
-                    show_on_chart: false,
-                  }))}
-                  availableIndicators={availableIndicators}
-                />
+                        availableConditions={availableConditions}
+                        selectedIndicators={selectedIndicators.map(ind => ({
+                          id: ind.id,
+                          params: ind.parameters,
+                          show_on_chart: false,
+                        }))}
+                        availableIndicators={availableIndicators}
+                      />
               </div>
             </div>
           )}

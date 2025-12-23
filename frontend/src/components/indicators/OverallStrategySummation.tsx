@@ -220,8 +220,8 @@ export const OverallStrategySummation: React.FC<OverallStrategySummationProps> =
       <div>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-text-primary">
-            {hasResults ? 'Combined Equity Curve' : 'Equity Curve'}
-          </h3>
+          {hasResults ? 'Combined Equity Curve' : 'Equity Curve'}
+        </h3>
           {hasResults && Object.keys(individualResults).length > 0 && (
             <label className="flex items-center gap-2 cursor-pointer">
               <input
