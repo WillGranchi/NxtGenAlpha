@@ -138,21 +138,36 @@ async def get_data_info(symbol: Optional[str] = Query(default="BTCUSDT", descrip
 @router.post("/refresh")
 async def refresh_data(
     symbol: Optional[str] = Query(default="BTCUSDT", description="Cryptocurrency symbol to refresh"),
-    force: bool = Query(default=False, description="Force refresh even if data is fresh")
+    force: bool = Query(default=False, description="Force refresh even if data is fresh"),
+    start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD) to fetch historical data from (e.g., 2016-01-01)")
 ) -> Dict[str, Any]:
     """
-    Manually trigger a data refresh from Binance API.
+    Manually trigger a data refresh from Binance API or CoinGecko.
     
     Args:
         symbol: Trading pair symbol (default: BTCUSDT)
         force: Force refresh even if data is fresh
+        start_date: Start date (YYYY-MM-DD) to fetch historical data from (e.g., 2016-01-01)
         
     Returns:
         Dict: Refresh status and data info
     """
     try:
-        logger.info(f"Manual data refresh requested for {symbol} (force={force})")
-        df = update_crypto_data(symbol=symbol, force=force)
+        from datetime import datetime as dt
+        
+        start_dt = None
+        if start_date:
+            try:
+                start_dt = dt.strptime(start_date, '%Y-%m-%d')
+                logger.info(f"Fetching historical data from {start_date}")
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid start_date format. Use YYYY-MM-DD (e.g., 2016-01-01)"
+                )
+        
+        logger.info(f"Manual data refresh requested for {symbol} (force={force}, start_date={start_date})")
+        df = update_crypto_data(symbol=symbol, force=force, start_date=start_dt)
         
         summary = get_data_summary(df)
         last_update = get_last_update_time(symbol=symbol)

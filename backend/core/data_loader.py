@@ -22,13 +22,15 @@ import time
 # Global variable to track last update time per symbol
 _last_update_time: Dict[str, datetime] = {}
 
-def fetch_crypto_data_from_binance(symbol: str = "BTCUSDT", days: int = 1825, fallback_to_coingecko: bool = True) -> pd.DataFrame:
+def fetch_crypto_data_from_binance(symbol: str = "BTCUSDT", days: int = 1825, start_date: Optional[datetime] = None, fallback_to_coingecko: bool = True) -> pd.DataFrame:
     """
     Fetch cryptocurrency historical data from Binance API with full OHLCV data.
     
     Args:
         symbol (str): Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
         days (int): Number of days of historical data to fetch (default 1825 = 5 years)
+        start_date (datetime, optional): Specific start date to fetch from (overrides days)
+        fallback_to_coingecko (bool): Whether to fallback to CoinGecko on failure
         
     Returns:
         pd.DataFrame: DataFrame with OHLCV data (Open, High, Low, Close, Volume)
@@ -46,7 +48,12 @@ def fetch_crypto_data_from_binance(symbol: str = "BTCUSDT", days: int = 1825, fa
         # Calculate start and end times
         # Binance API requires endTime to be current time or past, not future
         end_time = datetime.now()
-        start_time = end_time - timedelta(days=days)
+        if start_date:
+            start_time = start_date
+            # Calculate days from start_date to now
+            days = (end_time - start_time).days
+        else:
+            start_time = end_time - timedelta(days=days)
         
         # Convert to milliseconds (Binance API requirement)
         # Use current time as endTime to avoid future date issues
@@ -189,13 +196,15 @@ def fetch_crypto_data_from_binance(symbol: str = "BTCUSDT", days: int = 1825, fa
         raise
 
 
-def fetch_btc_data_from_coingecko(days: int = 365) -> pd.DataFrame:
+def fetch_btc_data_from_coingecko(days: int = 365, start_date: Optional[datetime] = None) -> pd.DataFrame:
     """
     Fetch Bitcoin historical data from CoinGecko API.
     Uses OHLC endpoint for better data quality when available.
+    Can fetch historical data from specific dates (e.g., 2016) using history endpoint.
     
     Args:
         days (int): Number of days of historical data to fetch (max 365 for free tier)
+        start_date (datetime, optional): Specific start date to fetch from (for historical data beyond 365 days)
         
     Returns:
         pd.DataFrame: DataFrame with OHLC data
@@ -204,6 +213,14 @@ def fetch_btc_data_from_coingecko(days: int = 365) -> pd.DataFrame:
         Exception: If API request fails
     """
     logger = logging.getLogger(__name__)
+    
+    # If start_date is provided and it's more than 365 days ago, use history endpoint
+    if start_date:
+        days_from_start = (datetime.now() - start_date).days
+        if days_from_start > 365:
+            logger.info(f"Fetching historical data from {start_date.strftime('%Y-%m-%d')} (>{days_from_start} days ago)...")
+            return fetch_btc_historical_from_coingecko(start_date=start_date)
+    
     try:
         # Try OHLC endpoint first (better data quality)
         # CoinGecko free tier allows OHLC endpoint for historical data
@@ -314,6 +331,122 @@ def fetch_btc_data_from_coingecko(days: int = 365) -> pd.DataFrame:
         raise
 
 
+def fetch_btc_historical_from_coingecko(start_date: datetime, end_date: Optional[datetime] = None) -> pd.DataFrame:
+    """
+    Fetch Bitcoin historical data from CoinGecko using their history endpoint.
+    This allows fetching data from specific dates (e.g., 2016) beyond the 365-day limit.
+    Optimized to fetch weekly data points to reduce API calls.
+    
+    Args:
+        start_date (datetime): Start date to fetch from
+        end_date (datetime, optional): End date (defaults to today)
+        
+    Returns:
+        pd.DataFrame: DataFrame with OHLC data
+        
+    Raises:
+        Exception: If API request fails
+    """
+    logger = logging.getLogger(__name__)
+    
+    if end_date is None:
+        end_date = datetime.now()
+    
+    logger.info(f"Fetching Bitcoin historical data from CoinGecko: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
+    logger.info("Note: This may take several minutes as we fetch weekly data points to optimize API usage...")
+    
+    all_data = []
+    current_date = start_date
+    
+    # Fetch data weekly (every 7 days) to reduce API calls while maintaining reasonable granularity
+    # For 8 years of data (2016-2024), this is ~416 API calls instead of ~2,920
+    fetch_interval_days = 7
+    
+    # CoinGecko history endpoint: /coins/{id}/history?date={dd-mm-yyyy}
+    request_count = 0
+    while current_date <= end_date:
+        # Format date as dd-mm-yyyy for CoinGecko API
+        date_str = current_date.strftime('%d-%m-%Y')
+        
+        try:
+            url = f"https://api.coingecko.com/api/v3/coins/bitcoin/history"
+            params = {
+                'date': date_str,
+                'localization': 'false'  # Don't need localization data
+            }
+            
+            response = requests.get(url, params=params, timeout=30)
+            
+            if response.status_code == 200:
+                data = response.json()
+                market_data = data.get('market_data', {})
+                
+                if market_data:
+                    current_price = market_data.get('current_price', {}).get('usd')
+                    high_24h = market_data.get('high_24h', {}).get('usd')
+                    low_24h = market_data.get('low_24h', {}).get('usd')
+                    open_24h = market_data.get('opening_price', {}).get('usd') or current_price
+                    volume_24h = market_data.get('total_volume', {}).get('usd', 0)
+                    
+                    if current_price:
+                        all_data.append({
+                            'Date': current_date.date(),
+                            'Open': open_24h or current_price,
+                            'High': high_24h or current_price,
+                            'Low': low_24h or current_price,
+                            'Close': current_price,
+                            'Volume': volume_24h or 0
+                        })
+            
+            # Rate limiting: CoinGecko free tier allows ~10-50 calls/minute
+            # Use 200ms delay to stay well within limits (~300 calls/minute max)
+            time.sleep(0.2)
+            
+            # Move to next week
+            current_date += timedelta(days=fetch_interval_days)
+            request_count += 1
+            
+            # Log progress every 50 requests
+            if request_count % 50 == 0:
+                logger.info(f"Fetched {len(all_data)} data points ({request_count} API calls)...")
+                
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"Error fetching data for {date_str}: {e}")
+            # Continue to next date
+            current_date += timedelta(days=fetch_interval_days)
+            request_count += 1
+            continue
+        except Exception as e:
+            logger.warning(f"Unexpected error for {date_str}: {e}")
+            current_date += timedelta(days=fetch_interval_days)
+            request_count += 1
+            continue
+    
+    if not all_data:
+        raise ValueError(f"No historical data fetched from CoinGecko for date range {start_date} to {end_date}")
+    
+    # Convert to DataFrame
+    df = pd.DataFrame(all_data)
+    df['Date'] = pd.to_datetime(df['Date'])
+    df.set_index('Date', inplace=True)
+    
+    # Interpolate missing days to fill gaps (forward fill for daily data)
+    # Create a full date range and reindex
+    full_date_range = pd.date_range(start=df.index.min(), end=df.index.max(), freq='D')
+    df = df.reindex(full_date_range)
+    
+    # Forward fill OHLC data (use last known values)
+    df[['Open', 'High', 'Low', 'Close']] = df[['Open', 'High', 'Low', 'Close']].fillna(method='ffill')
+    df['Volume'] = df['Volume'].fillna(0)  # Fill volume with 0
+    
+    df.sort_index(inplace=True)
+    
+    logger.info(f"Successfully fetched {len(df)} days of historical data from CoinGecko ({request_count} API calls)")
+    logger.info(f"Date range: {df.index.min()} to {df.index.max()}")
+    
+    return df
+
+
 def get_available_symbols() -> list:
     """
     Get list of available cryptocurrency symbols supported by Binance.
@@ -386,13 +519,14 @@ def save_data_to_csv(df: pd.DataFrame, file_path: Optional[str] = None, symbol: 
     return file_path
 
 
-def fetch_crypto_data_hybrid(symbol: str = "BTCUSDT", days: int = 1825) -> Tuple[pd.DataFrame, str, str]:
+def fetch_crypto_data_hybrid(symbol: str = "BTCUSDT", days: int = 1825, start_date: Optional[datetime] = None) -> Tuple[pd.DataFrame, str, str]:
     """
     Fetch cryptocurrency data using hybrid approach: Binance → CoinGecko (The Graph can be added later).
     
     Args:
         symbol (str): Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
         days (int): Number of days of historical data to fetch
+        start_date (datetime, optional): Specific start date to fetch from (for historical data)
         
     Returns:
         Tuple[pd.DataFrame, str, str]: DataFrame, data_source ("binance", "coingecko", "thegraph"), data_quality ("full_ohlcv", "close_only")
@@ -405,7 +539,7 @@ def fetch_crypto_data_hybrid(symbol: str = "BTCUSDT", days: int = 1825) -> Tuple
     # Try Binance first (best quality - full OHLCV)
     try:
         logger.info(f"Attempting to fetch {symbol} data from Binance...")
-        df = fetch_crypto_data_from_binance(symbol=symbol, days=days, fallback_to_coingecko=False)
+        df = fetch_crypto_data_from_binance(symbol=symbol, days=days, start_date=start_date, fallback_to_coingecko=False)
         logger.info(f"Successfully fetched {symbol} data from Binance")
         return df, "binance", "full_ohlcv"
     except requests.exceptions.HTTPError as e:
@@ -416,11 +550,11 @@ def fetch_crypto_data_hybrid(symbol: str = "BTCUSDT", days: int = 1825) -> Tuple
     except Exception as e:
         logger.warning(f"Binance fetch failed for {symbol}: {e}, trying fallback sources...")
     
-    # Try CoinGecko for Bitcoin and popular tokens (close prices only)
+    # Try CoinGecko for Bitcoin and popular tokens
     if symbol == "BTCUSDT":
         try:
             logger.info(f"Attempting to fetch {symbol} data from CoinGecko...")
-            df = fetch_btc_data_from_coingecko(days=min(days, 365))
+            df = fetch_btc_data_from_coingecko(days=min(days, 365), start_date=start_date)
             logger.info(f"Successfully fetched {symbol} data from CoinGecko")
             return df, "coingecko", "close_only"
         except Exception as e:
@@ -429,7 +563,7 @@ def fetch_crypto_data_hybrid(symbol: str = "BTCUSDT", days: int = 1825) -> Tuple
     raise Exception(f"All data sources failed for {symbol}")
 
 
-def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int = 1825) -> pd.DataFrame:
+def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int = 1825, start_date: Optional[datetime] = None) -> pd.DataFrame:
     """
     Update cryptocurrency data using hybrid data sources and save to CSV.
     Checks if data is fresh (updated within last 6 hours) before fetching.
@@ -456,10 +590,16 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
             return load_crypto_data(symbol=symbol)
     
     try:
-        # Fetch fresh data using hybrid approach with maximum historical depth
-        # Ensure we fetch maximum days (1825 = 5 years) for comprehensive historical data
-        fetch_days = max(days, 1825)  # Always fetch at least 5 years
-        df, data_source, data_quality = fetch_crypto_data_hybrid(symbol=symbol, days=fetch_days)
+        # If start_date is provided (e.g., 2016), use it; otherwise use days parameter
+        if start_date:
+            # Calculate days from start_date to now
+            fetch_days = (datetime.now() - start_date).days
+            logger.info(f"Fetching data from {start_date.strftime('%Y-%m-%d')} ({fetch_days} days)...")
+        else:
+            # Fetch maximum days (1825 = 5 years) for comprehensive historical data
+            fetch_days = max(days, 1825)  # Always fetch at least 5 years
+        
+        df, data_source, data_quality = fetch_crypto_data_hybrid(symbol=symbol, days=fetch_days, start_date=start_date)
         
         # Log data date range to verify historical depth
         days_available = (df.index.max() - df.index.min()).days
