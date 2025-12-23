@@ -76,8 +76,18 @@ async def scheduled_data_update():
     try:
         logger.info("Running scheduled data update for Bitcoin...")
         # Update Bitcoin data (can add more symbols here in the future)
-        update_crypto_data(symbol="BTCUSDT", force=False)
-        logger.info("Scheduled data update completed successfully")
+        # Use force=False to respect freshness check, but ensure we fetch at least 1 year
+        df = update_crypto_data(symbol="BTCUSDT", force=False, days=1825)
+        
+        # Verify data quality
+        days_available = (df.index.max() - df.index.min()).days
+        logger.info(f"Scheduled update completed: {len(df)} rows, {days_available} days ({days_available/365:.2f} years)")
+        
+        if days_available < 365:
+            logger.warning(f"⚠️  WARNING: Less than 1 year of data available ({days_available} days)")
+        else:
+            logger.info(f"✓ Data update successful: {days_available/365:.2f} years of data available")
+            
     except Exception as e:
         logger.error(f"Error in scheduled data update: {e}", exc_info=True)
 

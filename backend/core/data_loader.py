@@ -408,7 +408,26 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
         df, data_source, data_quality = fetch_crypto_data_hybrid(symbol=symbol, days=fetch_days)
         
         # Log data date range to verify historical depth
+        days_available = (df.index.max() - df.index.min()).days
         logger.info(f"Fetched {symbol} data: {len(df)} rows from {df.index.min()} to {df.index.max()}")
+        logger.info(f"Total days available: {days_available} ({days_available/365:.2f} years)")
+        
+        # Verify minimum data requirement (at least 1 year)
+        if days_available < 365:
+            logger.warning(f"Only {days_available} days fetched (< 1 year). Attempting Binance direct fetch...")
+            # Try Binance directly to get more historical data
+            try:
+                df_binance = fetch_crypto_data_from_binance(symbol=symbol, days=1825, fallback_to_coingecko=False)
+                binance_days = (df_binance.index.max() - df_binance.index.min()).days
+                if binance_days > days_available:
+                    df = df_binance
+                    data_source = "binance"
+                    data_quality = "full_ohlcv"
+                    logger.info(f"Binance fetch successful: {binance_days} days ({binance_days/365:.2f} years)")
+                else:
+                    logger.warning(f"Binance fetch didn't improve data ({binance_days} days)")
+            except Exception as binance_error:
+                logger.warning(f"Binance direct fetch failed: {binance_error}. Using available data.")
         
         # Save to CSV
         save_data_to_csv(df, symbol=symbol)
@@ -417,7 +436,8 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
         load_crypto_data.cache_clear()
         _last_update_time[symbol] = datetime.now()
         
-        logger.info(f"{symbol} data updated successfully from {data_source} (quality: {data_quality}, date range: {df.index.min()} to {df.index.max()})")
+        final_days = (df.index.max() - df.index.min()).days
+        logger.info(f"{symbol} data updated successfully from {data_source} (quality: {data_quality}, {final_days} days / {final_days/365:.2f} years)")
         return df
         
     except Exception as e:
@@ -500,10 +520,27 @@ def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None) -
             load_crypto_data.cache_clear()
             
             # Fetch maximum historical data (5 years = 1825 days)
+            # This will try Binance first, fallback to CoinGecko if needed
             df = update_crypto_data(symbol=symbol, force=True, days=1825)
+            
+            # Verify we have at least 1 year of data
+            days_available = (df.index.max() - df.index.min()).days
+            if days_available < 365:
+                logger.warning(f"Only {days_available} days of data fetched. Attempting to fetch more...")
+                # Try fetching again with Binance directly (no fallback limit)
+                try:
+                    df_binance = fetch_crypto_data_from_binance(symbol=symbol, days=1825, fallback_to_coingecko=False)
+                    if len(df_binance) > len(df):
+                        df = df_binance
+                        save_data_to_csv(df, symbol=symbol)
+                        logger.info(f"Successfully fetched {len(df)} rows from Binance")
+                except Exception as binance_error:
+                    logger.warning(f"Binance fetch failed: {binance_error}. Using available data.")
             
             logger.info(f"Successfully fetched and saved {len(df)} rows of {symbol} data")
             logger.info(f"Date range: {df.index.min()} to {df.index.max()}")
+            days_available = (df.index.max() - df.index.min()).days
+            logger.info(f"Total days available: {days_available} ({days_available/365:.2f} years)")
             
             return df
             
