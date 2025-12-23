@@ -192,9 +192,10 @@ def fetch_crypto_data_from_binance(symbol: str = "BTCUSDT", days: int = 1825, fa
 def fetch_btc_data_from_coingecko(days: int = 365) -> pd.DataFrame:
     """
     Fetch Bitcoin historical data from CoinGecko API.
+    Uses OHLC endpoint for better data quality when available.
     
     Args:
-        days (int): Number of days of historical data to fetch (max 365)
+        days (int): Number of days of historical data to fetch (max 365 for free tier)
         
     Returns:
         pd.DataFrame: DataFrame with OHLC data
@@ -204,6 +205,58 @@ def fetch_btc_data_from_coingecko(days: int = 365) -> pd.DataFrame:
     """
     logger = logging.getLogger(__name__)
     try:
+        # Try OHLC endpoint first (better data quality)
+        # CoinGecko free tier allows OHLC endpoint for historical data
+        try:
+            url_ohlc = f"https://api.coingecko.com/api/v3/coins/bitcoin/ohlc"
+            params_ohlc = {
+                'vs_currency': 'usd',
+                'days': min(days, 365),  # CoinGecko free tier limit
+            }
+            
+            logger.info(f"Attempting to fetch Bitcoin OHLC data from CoinGecko ({days} days)...")
+            response_ohlc = requests.get(url_ohlc, params=params_ohlc, timeout=30)
+            
+            if response_ohlc.status_code == 200:
+                ohlc_data = response_ohlc.json()
+                if ohlc_data and len(ohlc_data) > 0:
+                    # OHLC format: [timestamp, open, high, low, close]
+                    df_ohlc = pd.DataFrame(ohlc_data, columns=['timestamp', 'Open', 'High', 'Low', 'Close'])
+                    df_ohlc['Date'] = pd.to_datetime(df_ohlc['timestamp'], unit='ms')
+                    df_ohlc.set_index('Date', inplace=True)
+                    df_ohlc = df_ohlc[['Open', 'High', 'Low', 'Close']]
+                    
+                    # Get volume from market_chart endpoint
+                    url_vol = f"https://api.coingecko.com/api/v3/coins/bitcoin/market_chart"
+                    params_vol = {
+                        'vs_currency': 'usd',
+                        'days': min(days, 365),
+                        'interval': 'daily'
+                    }
+                    response_vol = requests.get(url_vol, params=params_vol, timeout=30)
+                    if response_vol.status_code == 200:
+                        vol_data = response_vol.json()
+                        total_volumes = vol_data.get('total_volumes', [])
+                        if total_volumes:
+                            df_vol = pd.DataFrame(total_volumes, columns=['timestamp', 'Volume'])
+                            df_vol['Date'] = pd.to_datetime(df_vol['timestamp'], unit='ms')
+                            df_vol.set_index('Date', inplace=True)
+                            # Merge volume data
+                            df_ohlc = df_ohlc.join(df_vol, how='left')
+                            df_ohlc['Volume'] = df_ohlc['Volume'].fillna(0)
+                        else:
+                            df_ohlc['Volume'] = 0
+                    else:
+                        df_ohlc['Volume'] = 0
+                    
+                    df_ohlc.sort_index(inplace=True)
+                    logger.info(f"Successfully fetched {len(df_ohlc)} days of OHLC data from CoinGecko")
+                    logger.info(f"Date range: {df_ohlc.index.min()} to {df_ohlc.index.max()}")
+                    return df_ohlc
+        except Exception as ohlc_error:
+            logger.warning(f"OHLC endpoint failed, falling back to market_chart: {ohlc_error}")
+        
+        # Fallback to market_chart endpoint (close prices only)
         url = f"https://api.coingecko.com/api/v3/coins/bitcoin/market_chart"
         params = {
             'vs_currency': 'usd',
@@ -211,13 +264,13 @@ def fetch_btc_data_from_coingecko(days: int = 365) -> pd.DataFrame:
             'interval': 'daily'
         }
         
-        logger.info(f"Fetching Bitcoin data from CoinGecko ({days} days)...")
+        logger.info(f"Fetching Bitcoin data from CoinGecko market_chart ({days} days)...")
         response = requests.get(url, params=params, timeout=30)
         response.raise_for_status()
         
         data = response.json()
         
-        # Extract prices (OHLC data)
+        # Extract prices (close prices)
         prices = data.get('prices', [])
         if not prices:
             raise ValueError("No price data returned from CoinGecko")
@@ -227,22 +280,21 @@ def fetch_btc_data_from_coingecko(days: int = 365) -> pd.DataFrame:
         df['Date'] = pd.to_datetime(df['timestamp'], unit='ms')
         df.set_index('Date', inplace=True)
         
-        # CoinGecko only provides close prices in market_chart endpoint
-        # For OHLC, we'd need a different endpoint or use close as all values
-        # For now, use close price for all OHLC columns
-        df['Open'] = df['price']
-        df['High'] = df['price']
-        df['Low'] = df['price']
+        # CoinGecko market_chart only provides close prices
+        # Use close price for all OHLC columns (approximation)
+        df['Open'] = df['price'].shift(1).fillna(df['price'])  # Use previous close as open
+        df['High'] = df[['Open', 'price']].max(axis=1)  # Approximate high
+        df['Low'] = df[['Open', 'price']].min(axis=1)  # Approximate low
         df['Close'] = df['price']
         
-        # Try to get market cap data for volume estimation
-        market_caps = data.get('market_caps', [])
-        if market_caps:
-            df_mc = pd.DataFrame(market_caps, columns=['timestamp', 'market_cap'])
-            df_mc['Date'] = pd.to_datetime(df_mc['timestamp'], unit='ms')
-            df_mc.set_index('Date', inplace=True)
-            # Estimate volume as a percentage of market cap (rough approximation)
-            df['Volume'] = df_mc['market_cap'] * 0.01  # 1% of market cap as volume estimate
+        # Try to get volume data
+        total_volumes = data.get('total_volumes', [])
+        if total_volumes:
+            df_vol = pd.DataFrame(total_volumes, columns=['timestamp', 'Volume'])
+            df_vol['Date'] = pd.to_datetime(df_vol['timestamp'], unit='ms')
+            df_vol.set_index('Date', inplace=True)
+            df = df.join(df_vol, how='left')
+            df['Volume'] = df['Volume'].fillna(0)
         else:
             df['Volume'] = 0
         
@@ -380,7 +432,7 @@ def fetch_crypto_data_hybrid(symbol: str = "BTCUSDT", days: int = 1825) -> Tuple
 def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int = 1825) -> pd.DataFrame:
     """
     Update cryptocurrency data using hybrid data sources and save to CSV.
-    Checks if data is fresh (updated within last 24 hours) before fetching.
+    Checks if data is fresh (updated within last 6 hours) before fetching.
     
     Args:
         symbol (str): Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
@@ -394,11 +446,13 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
     
     logger = logging.getLogger(__name__)
     
-    # Check if we need to update (once per day)
+    # Check if we need to update (every 6 hours for more frequent updates)
     if not force and symbol in _last_update_time:
         time_since_update = datetime.now() - _last_update_time[symbol]
-        if time_since_update < timedelta(hours=23):  # Update if older than 23 hours
-            logger.info(f"{symbol} data is fresh, skipping update")
+        if time_since_update < timedelta(hours=6):  # Update if older than 6 hours
+            logger.info(f"{symbol} data is fresh (updated {time_since_update.total_seconds()/3600:.1f} hours ago), skipping update")
+            # Still clear cache to ensure latest data is loaded
+            load_crypto_data.cache_clear()
             return load_crypto_data(symbol=symbol)
     
     try:
@@ -432,13 +486,17 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
         # Save to CSV
         save_data_to_csv(df, symbol=symbol)
         
-        # Update cache
+        # Clear cache BEFORE updating timestamp to ensure fresh data is loaded
         load_crypto_data.cache_clear()
         _last_update_time[symbol] = datetime.now()
         
-        final_days = (df.index.max() - df.index.min()).days
+        # Reload to verify it's saved correctly
+        df_verify = load_crypto_data(symbol=symbol)
+        
+        final_days = (df_verify.index.max() - df_verify.index.min()).days
         logger.info(f"{symbol} data updated successfully from {data_source} (quality: {data_quality}, {final_days} days / {final_days/365:.2f} years)")
-        return df
+        logger.info(f"Latest price: ${df_verify['Close'].iloc[-1]:.2f} as of {df_verify.index.max().strftime('%Y-%m-%d')}")
+        return df_verify
         
     except Exception as e:
         logger.error(f"Error updating {symbol} data: {e}")

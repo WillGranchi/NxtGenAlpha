@@ -140,17 +140,32 @@ async def startup_event():
         # This allows the app to start even if DB isn't ready yet (e.g., during Railway deployment)
         logger.warning("Application will continue without database initialization. Database operations may fail until connection is established.")
     
-    # Start scheduler for daily data updates (runs at 2 AM UTC daily)
+    # Start scheduler for frequent data updates (every 6 hours)
     try:
+        # Update every 6 hours to keep data fresh
         scheduler.add_job(
             scheduled_data_update,
-            trigger=CronTrigger(hour=2, minute=0),  # 2 AM UTC daily
-            id='daily_data_update',
-            name='Daily Bitcoin Data Update',
+            trigger=CronTrigger(hour='*/6', minute=0),  # Every 6 hours
+            id='frequent_data_update',
+            name='Frequent Bitcoin Data Update',
             replace_existing=True
         )
         scheduler.start()
-        logger.info("Scheduler started for daily data updates (2 AM UTC)")
+        logger.info("Scheduler started for data updates (every 6 hours)")
+        
+        # Also trigger an immediate update on startup to ensure fresh data (non-blocking)
+        try:
+            logger.info("Triggering startup data refresh...")
+            # Schedule immediate update (runs in background)
+            scheduler.add_job(
+                scheduled_data_update,
+                trigger='date',  # Run immediately
+                id='startup_data_update',
+                name='Startup Bitcoin Data Update',
+                replace_existing=True
+            )
+        except Exception as startup_update_error:
+            logger.warning(f"Startup data update scheduling failed (non-critical): {startup_update_error}")
     except Exception as e:
         logger.error(f"Failed to start scheduler: {e}", exc_info=True)
         logger.warning("Application will continue without scheduler. Manual data updates will still work.")
