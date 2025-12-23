@@ -6,12 +6,19 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import Dict, Any, List, Optional
 import logging
 import pandas as pd
+import numpy as np
 from datetime import datetime
 from sqlalchemy.orm import Session
 
 from backend.core.data_loader import load_crypto_data
 from backend.core.indicators import (
-    rsi, cci, stochastic, williams_r
+    rsi, cci, stochastic, williams_r, macd, roc, momentum, chande_momentum_oscillator,
+    bb_percent, tsi, ema, zscore
+)
+from backend.core.pinescript_indicators import (
+    rsi_zscore_signal, macd_zscore_signal, cmo_zscore_signal, roc_zscore_signal,
+    mom_zscore_signal, cci_zscore_signal, chandeMO_zscore_signal, rapr_combined_signal,
+    ema_zscore_signal
 )
 from backend.core.fundamental_indicators import (
     FUNDAMENTAL_INDICATORS,
@@ -65,6 +72,62 @@ TECHNICAL_INDICATORS = {
         'description': 'Williams %R - Momentum indicator measuring overbought/oversold levels',
         'default_params': {'period': 14}
     },
+    # Z-Score Indicators
+    'rsi_zscore': {
+        'name': 'RSI Z-Score',
+        'description': 'RSI with z-score normalization',
+        'default_params': {'lookback': 14, 'zscore_length': 20}
+    },
+    'macd_zscore': {
+        'name': 'MACD Z-Score',
+        'description': 'MACD histogram with z-score normalization',
+        'default_params': {'fast': 12, 'slow': 26, 'signal_period': 9, 'zscore_length': 20}
+    },
+    'cmo_zscore': {
+        'name': 'CMO Z-Score',
+        'description': 'Chande Momentum Oscillator with z-score normalization',
+        'default_params': {'lookback': 14, 'zscore_length': 20}
+    },
+    'bb_zscore': {
+        'name': 'Bollinger Band Z-Score',
+        'description': 'Bollinger Band Percent with z-score normalization',
+        'default_params': {'bb_len': 20, 'bb_mul': 2.0, 'bb_zlen': 20}
+    },
+    'tsi_zscore': {
+        'name': 'TSI Z-Score',
+        'description': 'True Strength Index with z-score normalization',
+        'default_params': {'tsi_long': 25, 'tsi_short': 13, 'tsi_zlen': 20}
+    },
+    'roc_zscore': {
+        'name': 'ROC Z-Score',
+        'description': 'Rate of Change with z-score normalization',
+        'default_params': {'lookback': 10, 'zscore_length': 20}
+    },
+    'mom_zscore': {
+        'name': 'Momentum Z-Score',
+        'description': 'Momentum with z-score normalization',
+        'default_params': {'lookback': 10, 'zscore_length': 20}
+    },
+    'cci_zscore': {
+        'name': 'CCI Z-Score',
+        'description': 'Commodity Channel Index with z-score normalization',
+        'default_params': {'lookback': 20, 'zscore_length': 20}
+    },
+    'chandeMO_zscore': {
+        'name': 'Chande MO Z-Score',
+        'description': 'Chande Momentum Oscillator with z-score normalization',
+        'default_params': {'lookback': 14, 'zscore_length': 20}
+    },
+    'ema_zscore': {
+        'name': 'EMA Z-Score',
+        'description': 'EMA with z-score normalization',
+        'default_params': {'len': 14, 'src': 0.0, 'lookback': 20, 'threshold_l': 1.0, 'threshold_s': -1.0}
+    },
+    'rapr_combined': {
+        'name': 'RAPR Combined',
+        'description': 'Combined RAPR - averages Sharpe, Omega, and Sortino z-scores from RAPR1 and RAPR2',
+        'default_params': {'metric_lookback': 20, 'valuation_lookback': 0}
+    },
 }
 
 
@@ -78,11 +141,12 @@ def calculate_technical_indicator(df: pd.DataFrame, indicator_id: str, params: D
         params: Indicator parameters
         
     Returns:
-        Pandas Series with indicator values
+        Pandas Series with indicator values (for z-score indicators, returns the z-score values)
     """
     if params is None:
         params = TECHNICAL_INDICATORS.get(indicator_id, {}).get('default_params', {})
     
+    # Standard indicators (non-z-score)
     if indicator_id == 'rsi':
         period = params.get('period', 14)
         return rsi(df['Close'], period)
@@ -97,6 +161,83 @@ def calculate_technical_indicator(df: pd.DataFrame, indicator_id: str, params: D
     elif indicator_id == 'williams_r':
         period = params.get('period', 14)
         return williams_r(df['High'], df['Low'], df['Close'], period)
+    
+    # Z-Score indicators - return the z-score values directly
+    elif indicator_id == 'rsi_zscore':
+        lookback = params.get('lookback', 14)
+        zscore_length = params.get('zscore_length', 20)
+        rsi_val = rsi(df['Close'], lookback)
+        return zscore(rsi_val, zscore_length)
+    elif indicator_id == 'macd_zscore':
+        fast = params.get('fast', 12)
+        slow = params.get('slow', 26)
+        signal_period = params.get('signal_period', 9)
+        zscore_length = params.get('zscore_length', 20)
+        macd_line, signal_line, histogram = macd(df['Close'], fast, slow, signal_period)
+        return zscore(histogram, zscore_length)
+    elif indicator_id == 'cmo_zscore':
+        lookback = params.get('lookback', 14)
+        zscore_length = params.get('zscore_length', 20)
+        cmo_val = chande_momentum_oscillator(df['Close'], lookback)
+        return zscore(cmo_val, zscore_length)
+    elif indicator_id == 'bb_zscore':
+        bb_len = params.get('bb_len', 20)
+        bb_mul = params.get('bb_mul', 2.0)
+        bb_zlen = params.get('bb_zlen', 20)
+        return bb_percent(df['Close'], bb_len, bb_mul, bb_zlen)
+    elif indicator_id == 'tsi_zscore':
+        tsi_long = params.get('tsi_long', 25)
+        tsi_short = params.get('tsi_short', 13)
+        tsi_zlen = params.get('tsi_zlen', 20)
+        return tsi(df['Close'], tsi_long, tsi_short, tsi_zlen)
+    elif indicator_id == 'roc_zscore':
+        lookback = params.get('lookback', 10)
+        zscore_length = params.get('zscore_length', 20)
+        roc_val = roc(df['Close'], lookback)
+        return zscore(roc_val, zscore_length)
+    elif indicator_id == 'mom_zscore':
+        lookback = params.get('lookback', 10)
+        zscore_length = params.get('zscore_length', 20)
+        mom_val = momentum(df['Close'], lookback)
+        return zscore(mom_val, zscore_length)
+    elif indicator_id == 'cci_zscore':
+        lookback = params.get('lookback', 20)
+        zscore_length = params.get('zscore_length', 20)
+        cci_val = cci(df['High'], df['Low'], df['Close'], lookback)
+        return zscore(cci_val, zscore_length)
+    elif indicator_id == 'chandeMO_zscore':
+        lookback = params.get('lookback', 14)
+        zscore_length = params.get('zscore_length', 20)
+        chandeMO_val = chande_momentum_oscillator(df['Close'], lookback)
+        return zscore(chandeMO_val, zscore_length)
+    elif indicator_id == 'ema_zscore':
+        len_period = params.get('len', 14)
+        src = params.get('src', 0.0)
+        lookback = params.get('lookback', 20)
+        threshold_l = params.get('threshold_l', 1.0)
+        threshold_s = params.get('threshold_s', -1.0)
+        # Calculate EMA z-score
+        ema_val = ema(df['Close'] if src == 0.0 else df['Close'], len_period)
+        mean = ema(ema_val, lookback)
+        std_dev = ema_val.rolling(window=lookback).std()
+        z_score = (ema_val - mean) / std_dev.replace(0, np.nan)
+        return z_score
+    elif indicator_id == 'rapr_combined':
+        metric_lookback = params.get('metric_lookback', 20)
+        valuation_lookback = params.get('valuation_lookback', 0)
+        from backend.core.pinescript_indicators import rapr_1, rapr_2
+        rapr1_results = rapr_1(df['Close'], metric_lookback, valuation_lookback)
+        rapr2_results = rapr_2(df['Close'], metric_lookback, valuation_lookback)
+        # Average all 6 z-scores
+        combined_score = (
+            rapr1_results['z_sharpe'].fillna(0) +
+            rapr1_results['z_sortino'].fillna(0) +
+            rapr1_results['z_omega'].fillna(0) +
+            rapr2_results['z_sharpe'].fillna(0) +
+            rapr2_results['z_sortino'].fillna(0) +
+            rapr2_results['z_omega'].fillna(0)
+        ) / 6
+        return combined_score
     else:
         raise ValueError(f"Unknown technical indicator: {indicator_id}")
 

@@ -1542,25 +1542,6 @@ INDICATOR_REGISTRY: Dict[str, IndicatorMetadata] = {
         category='Trend'
     ),
     
-    'EmaZScore': IndicatorMetadata(
-        name='EMA Z-Score',
-        description='EMA-based Z-score indicator',
-        parameters={
-            'len': {'type': 'int', 'default': 14, 'min': 5, 'max': 50, 'description': 'EMA length'},
-            'src': {'type': 'float', 'default': 0.0, 'description': 'Source'},
-            'lookback': {'type': 'int', 'default': 20, 'min': 10, 'max': 50, 'description': 'Lookback period'},
-            'threshold_l': {'type': 'float', 'default': 1.0, 'min': 0.0, 'max': 3.0, 'description': 'Long threshold'},
-            'threshold_s': {'type': 'float', 'default': -1.0, 'min': -3.0, 'max': 0.0, 'description': 'Short threshold'}
-        },
-        conditions={
-            'emazscore_long': 'EmaZScore long signal',
-            'emazscore_short': 'EmaZScore short signal',
-            'emazscore_bullish': 'EmaZScore bullish condition'
-        },
-        compute_fn=compute_emazscore_indicator,
-        evaluate_conditions_fn=evaluate_emazscore_conditions,
-        category='Momentum'
-    ),
     
     'DST': IndicatorMetadata(
         name='DEMA Supertrend',
@@ -1776,41 +1757,6 @@ INDICATOR_REGISTRY: Dict[str, IndicatorMetadata] = {
         category='Momentum'
     ),
     
-    'BBPercent': IndicatorMetadata(
-        name='Bollinger Band Percent',
-        description='Bollinger Band Percent with z-score normalization',
-        parameters={
-            'bb_len': {'type': 'int', 'default': 20, 'min': 5, 'max': 50, 'description': 'Bollinger Band length'},
-            'bb_mul': {'type': 'float', 'default': 2.0, 'min': 1.0, 'max': 5.0, 'description': 'Bollinger Band multiplier'},
-            'bb_zlen': {'type': 'int', 'default': 20, 'min': 5, 'max': 50, 'description': 'Z-score length'}
-        },
-        conditions={
-            'bb_percent_long': 'BB Percent long signal',
-            'bb_percent_short': 'BB Percent short signal',
-            'bb_percent_bullish': 'BB Percent bullish condition'
-        },
-        compute_fn=compute_bb_percent_indicator,
-        evaluate_conditions_fn=evaluate_bb_percent_conditions,
-        category='Volatility'
-    ),
-    
-    'TSI': IndicatorMetadata(
-        name='True Strength Index',
-        description='True Strength Index with z-score normalization',
-        parameters={
-            'tsi_long': {'type': 'int', 'default': 25, 'min': 10, 'max': 50, 'description': 'Long smoothing period'},
-            'tsi_short': {'type': 'int', 'default': 13, 'min': 5, 'max': 30, 'description': 'Short smoothing period'},
-            'tsi_zlen': {'type': 'int', 'default': 20, 'min': 5, 'max': 50, 'description': 'Z-score length'}
-        },
-        conditions={
-            'tsi_long': 'TSI long signal',
-            'tsi_short': 'TSI short signal',
-            'tsi_bullish': 'TSI bullish condition'
-        },
-        compute_fn=compute_tsi_indicator,
-        evaluate_conditions_fn=evaluate_tsi_conditions,
-        category='Momentum'
-    ),
     
     'DisparityIndex': IndicatorMetadata(
         name='Disparity Index',
@@ -1829,55 +1775,6 @@ INDICATOR_REGISTRY: Dict[str, IndicatorMetadata] = {
         category='Momentum'
     ),
     
-    'ChandeMO': IndicatorMetadata(
-        name='Chande Momentum Oscillator (Alternative)',
-        description='Chande Momentum Oscillator with alternative calculation',
-        parameters={
-            'lookback': {'type': 'int', 'default': 14, 'min': 5, 'max': 50, 'description': 'Lookback period'}
-        },
-        conditions={
-            'chande_mo_long': 'Chande MO long signal',
-            'chande_mo_short': 'Chande MO short signal',
-            'chande_mo_bullish': 'Chande MO bullish condition'
-        },
-        compute_fn=compute_chande_momentum_oscillator_indicator,
-        evaluate_conditions_fn=evaluate_chande_momentum_oscillator_conditions,
-        category='Momentum'
-    ),
-    
-    'RAPR1': IndicatorMetadata(
-        name='RAPR 1',
-        description='Risk-Adjusted Performance Ratio 1 - combines Sharpe, Sortino, and Omega z-scores',
-        parameters={
-            'metric_lookback': {'type': 'int', 'default': 20, 'min': 10, 'max': 100, 'description': 'Metric lookback period'},
-            'valuation_lookback': {'type': 'int', 'default': 0, 'min': 0, 'max': 50, 'description': 'Valuation lookback period'}
-        },
-        conditions={
-            'rapr_1_long': 'RAPR 1 long signal',
-            'rapr_1_short': 'RAPR 1 short signal',
-            'rapr_1_bullish': 'RAPR 1 bullish condition'
-        },
-        compute_fn=compute_rapr_1_indicator,
-        evaluate_conditions_fn=evaluate_rapr_1_conditions,
-        category='Advanced'
-    ),
-    
-    'RAPR2': IndicatorMetadata(
-        name='RAPR 2',
-        description='Risk-Adjusted Performance Ratio 2 - robust variant with multiple lookback periods',
-        parameters={
-            'metric_lookback': {'type': 'int', 'default': 20, 'min': 10, 'max': 100, 'description': 'Metric lookback period'},
-            'valuation_lookback': {'type': 'int', 'default': 0, 'min': 0, 'max': 50, 'description': 'Valuation lookback period'}
-        },
-        conditions={
-            'rapr_2_long': 'RAPR 2 long signal',
-            'rapr_2_short': 'RAPR 2 short signal',
-            'rapr_2_bullish': 'RAPR 2 bullish condition'
-        },
-        compute_fn=compute_rapr_2_indicator,
-        evaluate_conditions_fn=evaluate_rapr_2_conditions,
-        category='Advanced'
-    ),
 }
 
 

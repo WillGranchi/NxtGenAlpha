@@ -1250,3 +1250,304 @@ def rapr_2_signal(df: pd.DataFrame, metric_lookback: int, valuation_lookback: in
     
     return signal
 
+
+def rsi_zscore_signal(df: pd.DataFrame, lookback: int, zscore_length: int) -> pd.Series:
+    """
+    RSI Z-Score indicator.
+    
+    Calculates RSI, then applies z-score normalization.
+    
+    Args:
+        df: DataFrame with OHLCV data
+        lookback: RSI period
+        zscore_length: Z-score calculation period
+        
+    Returns:
+        Series with signals: 1 for long, -1 for short, 0 for neutral
+    """
+    rsi_val = rsi(df['Close'], lookback)
+    z_score = zscore(rsi_val, zscore_length)
+    
+    L = z_score > 0
+    S = z_score < 0
+    
+    signal = pd.Series(0, index=df.index, dtype=int)
+    
+    prev_signal = 0
+    for i in range(len(df)):
+        if L.iloc[i] and not S.iloc[i]:
+            signal.iloc[i] = 1
+            prev_signal = 1
+        elif S.iloc[i]:
+            signal.iloc[i] = -1
+            prev_signal = -1
+        else:
+            signal.iloc[i] = prev_signal
+    
+    return signal
+
+
+def macd_zscore_signal(df: pd.DataFrame, fast: int, slow: int, signal_period: int, zscore_length: int) -> pd.Series:
+    """
+    MACD Z-Score indicator.
+    
+    Calculates MACD histogram, then applies z-score normalization.
+    
+    Args:
+        df: DataFrame with OHLCV data
+        fast: Fast EMA period
+        slow: Slow EMA period
+        signal_period: Signal line period
+        zscore_length: Z-score calculation period
+        
+    Returns:
+        Series with signals: 1 for long, -1 for short, 0 for neutral
+    """
+    macd_line, signal_line, histogram = macd(df['Close'], fast, slow, signal_period)
+    z_score = zscore(histogram, zscore_length)
+    
+    L = z_score > 0
+    S = z_score < 0
+    
+    signal = pd.Series(0, index=df.index, dtype=int)
+    
+    prev_signal = 0
+    for i in range(len(df)):
+        if L.iloc[i] and not S.iloc[i]:
+            signal.iloc[i] = 1
+            prev_signal = 1
+        elif S.iloc[i]:
+            signal.iloc[i] = -1
+            prev_signal = -1
+        else:
+            signal.iloc[i] = prev_signal
+    
+    return signal
+
+
+def cmo_zscore_signal(df: pd.DataFrame, lookback: int, zscore_length: int) -> pd.Series:
+    """
+    CMO Z-Score indicator.
+    
+    Calculates Chande Momentum Oscillator, then applies z-score normalization.
+    
+    Args:
+        df: DataFrame with OHLCV data
+        lookback: CMO period
+        zscore_length: Z-score calculation period
+        
+    Returns:
+        Series with signals: 1 for long, -1 for short, 0 for neutral
+    """
+    cmo_val = chande_momentum_oscillator(df['Close'], lookback)
+    z_score = zscore(cmo_val, zscore_length)
+    
+    L = z_score > 0
+    S = z_score < 0
+    
+    signal = pd.Series(0, index=df.index, dtype=int)
+    
+    prev_signal = 0
+    for i in range(len(df)):
+        if L.iloc[i] and not S.iloc[i]:
+            signal.iloc[i] = 1
+            prev_signal = 1
+        elif S.iloc[i]:
+            signal.iloc[i] = -1
+            prev_signal = -1
+        else:
+            signal.iloc[i] = prev_signal
+    
+    return signal
+
+
+def roc_zscore_signal(df: pd.DataFrame, lookback: int, zscore_length: int) -> pd.Series:
+    """
+    ROC Z-Score indicator.
+    
+    Calculates Rate of Change, then applies z-score normalization.
+    
+    Args:
+        df: DataFrame with OHLCV data
+        lookback: ROC period
+        zscore_length: Z-score calculation period
+        
+    Returns:
+        Series with signals: 1 for long, -1 for short, 0 for neutral
+    """
+    roc_val = roc(df['Close'], lookback)
+    z_score = zscore(roc_val, zscore_length)
+    
+    L = z_score > 0
+    S = z_score < 0
+    
+    signal = pd.Series(0, index=df.index, dtype=int)
+    
+    prev_signal = 0
+    for i in range(len(df)):
+        if L.iloc[i] and not S.iloc[i]:
+            signal.iloc[i] = 1
+            prev_signal = 1
+        elif S.iloc[i]:
+            signal.iloc[i] = -1
+            prev_signal = -1
+        else:
+            signal.iloc[i] = prev_signal
+    
+    return signal
+
+
+def mom_zscore_signal(df: pd.DataFrame, lookback: int, zscore_length: int) -> pd.Series:
+    """
+    Momentum Z-Score indicator.
+    
+    Calculates Momentum, then applies z-score normalization.
+    
+    Args:
+        df: DataFrame with OHLCV data
+        lookback: Momentum period
+        zscore_length: Z-score calculation period
+        
+    Returns:
+        Series with signals: 1 for long, -1 for short, 0 for neutral
+    """
+    mom_val = mom_func(df['Close'], lookback)
+    z_score = zscore(mom_val, zscore_length)
+    
+    L = z_score > 0
+    S = z_score < 0
+    
+    signal = pd.Series(0, index=df.index, dtype=int)
+    
+    prev_signal = 0
+    for i in range(len(df)):
+        if L.iloc[i] and not S.iloc[i]:
+            signal.iloc[i] = 1
+            prev_signal = 1
+        elif S.iloc[i]:
+            signal.iloc[i] = -1
+            prev_signal = -1
+        else:
+            signal.iloc[i] = prev_signal
+    
+    return signal
+
+
+def cci_zscore_signal(df: pd.DataFrame, lookback: int, zscore_length: int) -> pd.Series:
+    """
+    CCI Z-Score indicator.
+    
+    Calculates Commodity Channel Index, then applies z-score normalization.
+    
+    Args:
+        df: DataFrame with OHLCV data
+        lookback: CCI period
+        zscore_length: Z-score calculation period
+        
+    Returns:
+        Series with signals: 1 for long, -1 for short, 0 for neutral
+    """
+    cci_val = cci(df['High'], df['Low'], df['Close'], lookback)
+    z_score = zscore(cci_val, zscore_length)
+    
+    L = z_score > 0
+    S = z_score < 0
+    
+    signal = pd.Series(0, index=df.index, dtype=int)
+    
+    prev_signal = 0
+    for i in range(len(df)):
+        if L.iloc[i] and not S.iloc[i]:
+            signal.iloc[i] = 1
+            prev_signal = 1
+        elif S.iloc[i]:
+            signal.iloc[i] = -1
+            prev_signal = -1
+        else:
+            signal.iloc[i] = prev_signal
+    
+    return signal
+
+
+def chandeMO_zscore_signal(df: pd.DataFrame, lookback: int, zscore_length: int) -> pd.Series:
+    """
+    Chande Momentum Oscillator Z-Score indicator.
+    
+    Calculates Chande MO, then applies z-score normalization.
+    
+    Args:
+        df: DataFrame with OHLCV data
+        lookback: Chande MO period
+        zscore_length: Z-score calculation period
+        
+    Returns:
+        Series with signals: 1 for long, -1 for short, 0 for neutral
+    """
+    chandeMO_val = chande_momentum_oscillator(df['Close'], lookback)
+    z_score = zscore(chandeMO_val, zscore_length)
+    
+    L = z_score > 0
+    S = z_score < 0
+    
+    signal = pd.Series(0, index=df.index, dtype=int)
+    
+    prev_signal = 0
+    for i in range(len(df)):
+        if L.iloc[i] and not S.iloc[i]:
+            signal.iloc[i] = 1
+            prev_signal = 1
+        elif S.iloc[i]:
+            signal.iloc[i] = -1
+            prev_signal = -1
+        else:
+            signal.iloc[i] = prev_signal
+    
+    return signal
+
+
+def rapr_combined_signal(df: pd.DataFrame, metric_lookback: int, valuation_lookback: int) -> pd.Series:
+    """
+    Combined RAPR indicator - averages Sharpe, Omega, and Sortino z-scores from RAPR1 and RAPR2.
+    
+    Args:
+        df: DataFrame with OHLCV data
+        metric_lookback: Metric lookback period
+        valuation_lookback: Valuation lookback period
+        
+    Returns:
+        Series with signals: 1 for long, -1 for short, 0 for neutral
+    """
+    from .pinescript_indicators import rapr_1, rapr_2
+    
+    rapr1_results = rapr_1(df['Close'], metric_lookback, valuation_lookback)
+    rapr2_results = rapr_2(df['Close'], metric_lookback, valuation_lookback)
+    
+    # Average all 6 z-scores (3 from RAPR1 + 3 from RAPR2)
+    combined_score = (
+        rapr1_results['z_sharpe'].fillna(0) +
+        rapr1_results['z_sortino'].fillna(0) +
+        rapr1_results['z_omega'].fillna(0) +
+        rapr2_results['z_sharpe'].fillna(0) +
+        rapr2_results['z_sortino'].fillna(0) +
+        rapr2_results['z_omega'].fillna(0)
+    ) / 6
+    
+    # Generate signals
+    L = combined_score > 0
+    S = combined_score < 0
+    
+    signal = pd.Series(0, index=df.index, dtype=int)
+    
+    prev_signal = 0
+    for i in range(len(df)):
+        if L.iloc[i] and not S.iloc[i]:
+            signal.iloc[i] = 1
+            prev_signal = 1
+        elif S.iloc[i]:
+            signal.iloc[i] = -1
+            prev_signal = -1
+        else:
+            signal.iloc[i] = prev_signal
+    
+    return signal
+
