@@ -436,7 +436,7 @@ def fetch_btc_historical_from_coingecko(start_date: datetime, end_date: Optional
     df = df.reindex(full_date_range)
     
     # Forward fill OHLC data (use last known values)
-    df[['Open', 'High', 'Low', 'Close']] = df[['Open', 'High', 'Low', 'Close']].fillna(method='ffill')
+    df[['Open', 'High', 'Low', 'Close']] = df[['Open', 'High', 'Low', 'Close']].ffill()
     df['Volume'] = df['Volume'].fillna(0)  # Fill volume with 0
     
     df.sort_index(inplace=True)
