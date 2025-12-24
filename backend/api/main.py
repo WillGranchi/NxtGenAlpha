@@ -107,19 +107,32 @@ async def startup_event():
                 logger.info("Checking BTC data date range on startup...")
                 df = load_crypto_data(symbol="BTCUSDT")
                 data_start = df.index.min()
+                data_end = df.index.max()
                 binance_start = datetime(2017, 1, 1)
+                current_date = datetime.now()
                 
-                if data_start > binance_start:
-                    logger.warning(f"BTC data only goes back to {data_start.strftime('%Y-%m-%d')}, triggering refresh from {binance_start.strftime('%Y-%m-%d')}...")
+                # Check for invalid data (future dates or missing historical data)
+                has_future_dates = data_end > current_date
+                missing_historical_data = data_start > binance_start
+                
+                if has_future_dates:
+                    logger.error(f"⚠️ INVALID DATA: CSV contains future dates (up to {data_end.strftime('%Y-%m-%d')}). This is mock/test data!")
+                if missing_historical_data:
+                    logger.warning(f"BTC data only goes back to {data_start.strftime('%Y-%m-%d')}, should start from {binance_start.strftime('%Y-%m-%d')}")
+                
+                if has_future_dates or missing_historical_data:
+                    logger.info(f"Triggering refresh from Binance ({binance_start.strftime('%Y-%m-%d')} onwards)...")
                     try:
                         df_refreshed = update_crypto_data(symbol="BTCUSDT", force=True, start_date=binance_start)
-                        logger.info(f"✓ Startup data refresh successful: {len(df_refreshed)} rows from {df_refreshed.index.min()} to {df_refreshed.index.max()}")
+                        refreshed_start = df_refreshed.index.min()
+                        refreshed_end = df_refreshed.index.max()
+                        logger.info(f"✓ Startup data refresh successful: {len(df_refreshed)} rows from {refreshed_start.strftime('%Y-%m-%d')} to {refreshed_end.strftime('%Y-%m-%d')}")
                     except Exception as refresh_error:
-                        logger.warning(f"Startup data refresh failed (non-critical): {refresh_error}")
+                        logger.error(f"❌ Startup data refresh failed: {refresh_error}", exc_info=True)
                 else:
-                    logger.info(f"✓ BTC data is up to date: {len(df)} rows from {data_start.strftime('%Y-%m-%d')} to {df.index.max().strftime('%Y-%m-%d')}")
+                    logger.info(f"✓ BTC data is valid: {len(df)} rows from {data_start.strftime('%Y-%m-%d')} to {data_end.strftime('%Y-%m-%d')}")
             except Exception as e:
-                logger.warning(f"Startup data check failed (non-critical): {e}")
+                logger.error(f"Startup data check failed: {e}", exc_info=True)
         
         # Run data check in background (non-blocking)
         import asyncio
