@@ -15,7 +15,7 @@ import { Button } from '../components/ui/Button';
 import TradingAPI from '../services/api';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { useMobile } from '../hooks/useMobile';
-import { Loader2, ChevronDown, ChevronUp, Settings, Play } from 'lucide-react';
+import { Loader2, ChevronDown, ChevronUp, Settings, Play, RefreshCw } from 'lucide-react';
 import type { IndicatorMetadata, BacktestResult, IndicatorConfig, EquityDataPoint } from '../services/api';
 
 const IndicatorsPage: React.FC = () => {
