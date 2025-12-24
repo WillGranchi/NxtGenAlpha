@@ -597,7 +597,16 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
         if time_since_update < timedelta(hours=6):  # Update if older than 6 hours
             logger.info(f"{symbol} data is fresh (updated {time_since_update.total_seconds()/3600:.1f} hours ago), skipping update")
             # Still clear cache to ensure latest data is loaded
-            load_crypto_data.cache_clear()
+            import os
+            data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
+            if symbol == "BTCUSDT":
+                old_file = os.path.join(data_dir, 'Bitcoin Historical Data4.csv')
+                file_path = old_file if os.path.exists(old_file) else os.path.join(data_dir, f'{symbol}_historical_data.csv')
+            else:
+                file_path = os.path.join(data_dir, f'{symbol}_historical_data.csv')
+            cache_key = f"{symbol}_{file_path}"
+            if cache_key in _dataframe_cache:
+                del _dataframe_cache[cache_key]
             return load_crypto_data(symbol=symbol)
     
     try:
@@ -650,9 +659,7 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
         _last_update_time[symbol] = datetime.now()
         
         # Reload to verify it's saved correctly (cache is cleared, so this will load fresh)
-        # Clear cache again before reload to ensure we get the fresh data
-        if cache_key in _dataframe_cache:
-            del _dataframe_cache[cache_key]
+        # Cache is already cleared above, so this will load fresh data
         df_verify = load_crypto_data(symbol=symbol)
         
         final_days = (df_verify.index.max() - df_verify.index.min()).days
