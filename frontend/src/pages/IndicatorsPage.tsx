@@ -79,34 +79,54 @@ const IndicatorsPage: React.FC = () => {
   }, [isMobile]);
   
   // Load base price data for default chart display
-  useEffect(() => {
-    const loadBasePriceData = async () => {
-      try {
-        const response = await TradingAPI.getValuationData({
-          symbol,
-          indicators: [], // No indicators, just price
-          start_date: startDate || undefined,
-          end_date: endDate || undefined,
-        });
-        
-        if (response.success && response.data) {
-          const formattedData = response.data.map((d) => ({
-            Date: d.date,
-            Price: d.price,
-            Position: 0, // No signals
-            Portfolio_Value: d.price,
-            Capital: 0,
-            Shares: 0,
-          }));
-          setBasePriceData(formattedData);
-        }
-      } catch (err) {
-        console.error('Failed to load base price data:', err);
+  const loadBasePriceData = useCallback(async () => {
+    try {
+      const response = await TradingAPI.getValuationData({
+        symbol,
+        indicators: [], // No indicators, just price
+        start_date: startDate || undefined,
+        end_date: endDate || undefined,
+      });
+      
+      if (response.success && response.data) {
+        const formattedData = response.data.map((d) => ({
+          Date: d.date,
+          Price: d.price,
+          Position: 0, // No signals
+          Portfolio_Value: d.price,
+          Capital: 0,
+          Shares: 0,
+        }));
+        setBasePriceData(formattedData);
+        setError(null);
       }
-    };
-    
-    loadBasePriceData();
+    } catch (err) {
+      console.error('Failed to load base price data:', err);
+      setError('Failed to load price data. Click "Refresh Data" to fetch from Binance.');
+    }
   }, [symbol, startDate, endDate]);
+
+  useEffect(() => {
+    loadBasePriceData();
+  }, [loadBasePriceData]);
+
+  // Handle manual data refresh
+  const handleRefreshData = async () => {
+    setIsRefreshingData(true);
+    setError(null);
+    try {
+      // Force refresh from Binance starting from 2017-01-01
+      await TradingAPI.refreshData(symbol, true, '2017-01-01');
+      // Reload price data after refresh
+      await loadBasePriceData();
+      setError(null);
+    } catch (err: any) {
+      console.error('Failed to refresh data:', err);
+      setError(err?.response?.data?.detail || 'Failed to refresh data from Binance');
+    } finally {
+      setIsRefreshingData(false);
+    }
+  };
   
   // Load available indicators
   useEffect(() => {
