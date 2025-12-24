@@ -78,7 +78,12 @@ def fetch_crypto_data_from_binance(symbol: str = "BTCUSDT", days: int = 1825, st
         
         while current_start < end_time_ms and request_count < max_requests:
             # Calculate end time for this request (current_start + limit days, but not beyond end_time_ms)
+            # Ensure endTime is not in the future
             request_end = min(current_start + (limit * 24 * 60 * 60 * 1000), end_time_ms)
+            
+            # Binance API doesn't accept future dates - ensure endTime is not beyond current time
+            if request_end > current_time_ms:
+                request_end = current_time_ms
             
             params = {
                 'symbol': symbol,
@@ -87,6 +92,8 @@ def fetch_crypto_data_from_binance(symbol: str = "BTCUSDT", days: int = 1825, st
                 'endTime': request_end,
                 'limit': limit
             }
+            
+            logger.debug(f"Request {request_count + 1}: fetching from {datetime.fromtimestamp(current_start/1000).strftime('%Y-%m-%d')} to {datetime.fromtimestamp(request_end/1000).strftime('%Y-%m-%d')}")
             
             # Rate limiting: Binance allows 1200 requests/minute
             if request_count > 0:
@@ -763,24 +770,37 @@ def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None) -
         df = _clean_data(df)
         
         # Check if data goes back to 2017-01-01 (Binance launch date)
-        # If not, automatically refresh from Binance
+        # Also check for invalid future dates (indicates mock/test data)
         data_start = df.index.min()
+        data_end = df.index.max()
         binance_start_date = datetime(2017, 1, 1)
+        current_date = datetime.now()
         
-        if data_start > binance_start_date:
-            logger.warning(f"Data file only goes back to {data_start.strftime('%Y-%m-%d')}, but Binance data is available from {binance_start_date.strftime('%Y-%m-%d')}")
-            logger.info(f"Automatically refreshing {symbol} data from {binance_start_date.strftime('%Y-%m-%d')}...")
+        # Check if data is invalid (future dates or doesn't go back to 2017)
+        has_future_dates = data_end > current_date
+        missing_historical_data = data_start > binance_start_date
+        
+        if has_future_dates or missing_historical_data:
+            if has_future_dates:
+                logger.error(f"⚠️ INVALID DATA DETECTED: CSV contains future dates (up to {data_end.strftime('%Y-%m-%d')}). This appears to be mock/test data.")
+            if missing_historical_data:
+                logger.warning(f"Data file only goes back to {data_start.strftime('%Y-%m-%d')}, but Binance data is available from {binance_start_date.strftime('%Y-%m-%d')}")
+            
+            logger.info(f"Automatically refreshing {symbol} data from Binance ({binance_start_date.strftime('%Y-%m-%d')} onwards)...")
             
             # Clear cache before refresh to ensure fresh data
             if cache_key in _dataframe_cache:
                 del _dataframe_cache[cache_key]
             
             try:
+                # Force refresh from Binance, ignoring freshness check
                 df_refreshed = update_crypto_data(symbol=symbol, force=True, start_date=binance_start_date)
                 
                 # Verify refresh was successful
                 refreshed_start = df_refreshed.index.min()
-                if refreshed_start <= binance_start_date:
+                refreshed_end = df_refreshed.index.max()
+                
+                if refreshed_start <= binance_start_date and refreshed_end <= current_date:
                     logger.info(f"✓ Successfully refreshed data: {len(df_refreshed)} rows from {df_refreshed.index.min()} to {df_refreshed.index.max()}")
                     # Update cache with refreshed data
                     import os
@@ -788,18 +808,16 @@ def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None) -
                         _dataframe_cache[cache_key] = (df_refreshed, os.path.getmtime(file_path))
                     return df_refreshed
                 else:
-                    logger.warning(f"Refresh didn't extend data range (still starts at {refreshed_start.strftime('%Y-%m-%d')})")
-                    # Update cache anyway
+                    logger.error(f"⚠️ Refresh validation failed: start={refreshed_start.strftime('%Y-%m-%d')}, end={refreshed_end.strftime('%Y-%m-%d')}")
+                    # Still return refreshed data, but log warning
                     import os
                     if os.path.exists(file_path):
                         _dataframe_cache[cache_key] = (df_refreshed, os.path.getmtime(file_path))
                     return df_refreshed
             except Exception as refresh_error:
-                logger.error(f"Auto-refresh failed: {refresh_error}", exc_info=True)
-                logger.warning(f"Using existing data (may be incomplete)")
-                # Cache the existing data
-                if file_exists:
-                    _dataframe_cache[cache_key] = (df, file_mtime)
+                logger.error(f"❌ Auto-refresh failed: {refresh_error}", exc_info=True)
+                logger.error(f"⚠️ Using existing data (may be invalid/mock data)")
+                # Don't cache invalid data
                 return df
         
         # Cache the loaded data
