@@ -178,9 +178,21 @@ def fetch_crypto_data_from_binance(symbol: str = "BTCUSDT", days: int = 1825, st
         # Sort by date
         df.sort_index(inplace=True)
         
+        # Remove any future dates (shouldn't happen, but safety check)
+        current_date = datetime.now()
+        if df.index.max() > current_date:
+            logger.warning(f"Removing future dates from Binance data (max date: {df.index.max()})")
+            df = df[df.index <= current_date]
+        
         logger.info(f"Successfully fetched {len(df)} days of {symbol} data from Binance")
         logger.info(f"Date range: {df.index.min()} to {df.index.max()}")
         logger.info(f"Price range: ${df['Close'].min():.2f} - ${df['Close'].max():.2f}")
+        
+        # Verify data is valid (no future dates)
+        if df.index.max() > datetime.now():
+            logger.error(f"⚠️ ERROR: Binance API returned future dates! Max date: {df.index.max()}")
+            # Remove future dates
+            df = df[df.index <= datetime.now()]
         
         return df
         
