@@ -36,7 +36,7 @@ import { Menu, ChevronDown, ChevronUp } from 'lucide-react';
 export const Dashboard: React.FC = () => {
   const [mode, setMode] = useState<'simple' | 'advanced'>('advanced');
   const [initialCapital, setInitialCapital] = useState(10000);
-  const [startDate, setStartDate] = useState<string>('2018-01-01');
+  const [startDate, setStartDate] = useState<string>('2017-01-01');
   const [endDate, setEndDate] = useState<string>('');
   const [strategyType, setStrategyType] = useState<'long_cash' | 'long_short'>('long_cash');
   const [expression, setExpression] = useState(''); // Legacy single expression

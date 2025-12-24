@@ -90,7 +90,7 @@ export const useValuation = (): UseValuationReturn => {
   const [averageWindow, setAverageWindow] = useState<number | null>(null);
   
   // Date range
-  const [startDate, setStartDate] = useState<string>('2018-01-01');
+  const [startDate, setStartDate] = useState<string>('2017-01-01');
   const [endDate, setEndDate] = useState<string>('');
   const [timeframe, setTimeframe] = useState<'1h' | '4h' | '6h' | '12h' | '1d' | '1w' | 'custom' | null>(null);
   

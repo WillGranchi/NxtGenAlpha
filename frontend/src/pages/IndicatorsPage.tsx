@@ -29,7 +29,7 @@ const IndicatorsPage: React.FC = () => {
   
   // Settings
   const [symbol, setSymbol] = useState<string>('BTCUSDT');
-  const [startDate, setStartDate] = useState<string>('2020-01-01');
+  const [startDate, setStartDate] = useState<string>('2017-01-01');
   const [endDate, setEndDate] = useState<string>('');
   const [strategyType, setStrategyType] = useState<'long_cash' | 'long_short'>('long_cash');
   const [initialCapital, setInitialCapital] = useState<number>(10000);
