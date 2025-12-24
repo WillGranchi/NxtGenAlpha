@@ -29,7 +29,7 @@ const IndicatorsPage: React.FC = () => {
   
   // Settings
   const [symbol, setSymbol] = useState<string>('BTCUSDT');
-  const [startDate, setStartDate] = useState<string>('2017-01-01');
+  const [startDate, setStartDate] = useState<string>('2010-01-01');
   const [endDate, setEndDate] = useState<string>('');
   const [strategyType, setStrategyType] = useState<'long_cash' | 'long_short'>('long_cash');
   const [initialCapital, setInitialCapital] = useState<number>(10000);
@@ -102,7 +102,7 @@ const IndicatorsPage: React.FC = () => {
       }
     } catch (err) {
       console.error('Failed to load base price data:', err);
-      setError('Failed to load price data. Click "Refresh Data" to fetch from Binance.');
+      setError('Failed to load price data. Click "Refresh Data" to fetch from CoinGecko.');
     }
   }, [symbol, startDate, endDate]);
 
@@ -115,8 +115,8 @@ const IndicatorsPage: React.FC = () => {
     setIsRefreshingData(true);
     setError(null);
     try {
-      // Force refresh from Binance starting from 2017-01-01
-      await TradingAPI.refreshData(symbol, true, '2017-01-01');
+      // Force refresh from CoinGecko starting from 2010-01-01
+      await TradingAPI.refreshData(symbol, true, '2010-01-01');
       // Reload price data after refresh
       await loadBasePriceData();
       setError(null);

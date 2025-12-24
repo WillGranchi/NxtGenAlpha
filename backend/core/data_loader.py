@@ -215,171 +215,273 @@ def fetch_crypto_data_from_binance(symbol: str = "BTCUSDT", days: int = 1825, st
         raise
 
 
-def fetch_btc_data_from_coingecko(days: int = 365, start_date: Optional[datetime] = None) -> pd.DataFrame:
+def fetch_crypto_recent_from_coingecko(symbol: str, days: int = 365) -> pd.DataFrame:
     """
-    Fetch Bitcoin historical data from CoinGecko API.
-    Uses OHLC endpoint for better data quality when available.
-    Can fetch historical data from specific dates (e.g., 2016) using history endpoint.
+    Fetch recent cryptocurrency data from CoinGecko using OHLC endpoint.
+    Best quality data for recent periods (≤365 days).
     
     Args:
+        symbol (str): Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
         days (int): Number of days of historical data to fetch (max 365 for free tier)
-        start_date (datetime, optional): Specific start date to fetch from (for historical data beyond 365 days)
         
     Returns:
-        pd.DataFrame: DataFrame with OHLC data
+        pd.DataFrame: DataFrame with OHLCV data
         
     Raises:
-        Exception: If API request fails
+        Exception: If API request fails or symbol not supported
     """
     logger = logging.getLogger(__name__)
     
-    # If start_date is provided and it's more than 365 days ago, use history endpoint
-    if start_date:
-        days_from_start = (datetime.now() - start_date).days
-        if days_from_start > 365:
-            logger.info(f"Fetching historical data from {start_date.strftime('%Y-%m-%d')} (>{days_from_start} days ago)...")
-            return fetch_btc_historical_from_coingecko(start_date=start_date)
+    # Get CoinGecko coin ID
+    coin_id = get_coingecko_coin_id(symbol)
+    if not coin_id:
+        raise ValueError(f"Symbol {symbol} is not supported by CoinGecko. Please use a supported symbol.")
     
     try:
         # Try OHLC endpoint first (better data quality)
-        # CoinGecko free tier allows OHLC endpoint for historical data
-        try:
-            url_ohlc = f"https://api.coingecko.com/api/v3/coins/bitcoin/ohlc"
-            params_ohlc = {
-                'vs_currency': 'usd',
-                'days': min(days, 365),  # CoinGecko free tier limit
-            }
-            
-            logger.info(f"Attempting to fetch Bitcoin OHLC data from CoinGecko ({days} days)...")
-            response_ohlc = requests.get(url_ohlc, params=params_ohlc, timeout=30)
-            
-            if response_ohlc.status_code == 200:
-                ohlc_data = response_ohlc.json()
-                if ohlc_data and len(ohlc_data) > 0:
-                    # OHLC format: [timestamp, open, high, low, close]
-                    df_ohlc = pd.DataFrame(ohlc_data, columns=['timestamp', 'Open', 'High', 'Low', 'Close'])
-                    df_ohlc['Date'] = pd.to_datetime(df_ohlc['timestamp'], unit='ms')
-                    df_ohlc.set_index('Date', inplace=True)
-                    df_ohlc = df_ohlc[['Open', 'High', 'Low', 'Close']]
-                    
-                    # Get volume from market_chart endpoint
-                    url_vol = f"https://api.coingecko.com/api/v3/coins/bitcoin/market_chart"
-                    params_vol = {
-                        'vs_currency': 'usd',
-                        'days': min(days, 365),
-                        'interval': 'daily'
-                    }
-                    response_vol = requests.get(url_vol, params=params_vol, timeout=30)
-                    if response_vol.status_code == 200:
-                        vol_data = response_vol.json()
-                        total_volumes = vol_data.get('total_volumes', [])
-                        if total_volumes:
-                            df_vol = pd.DataFrame(total_volumes, columns=['timestamp', 'Volume'])
-                            df_vol['Date'] = pd.to_datetime(df_vol['timestamp'], unit='ms')
-                            df_vol.set_index('Date', inplace=True)
-                            # Merge volume data
-                            df_ohlc = df_ohlc.join(df_vol, how='left')
-                            df_ohlc['Volume'] = df_ohlc['Volume'].fillna(0)
-                        else:
-                            df_ohlc['Volume'] = 0
-                    else:
-                        df_ohlc['Volume'] = 0
-                    
-                    df_ohlc.sort_index(inplace=True)
-                    logger.info(f"Successfully fetched {len(df_ohlc)} days of OHLC data from CoinGecko")
-                    logger.info(f"Date range: {df_ohlc.index.min()} to {df_ohlc.index.max()}")
-                    return df_ohlc
-        except Exception as ohlc_error:
-            logger.warning(f"OHLC endpoint failed, falling back to market_chart: {ohlc_error}")
-        
-        # Fallback to market_chart endpoint (close prices only)
-        url = f"https://api.coingecko.com/api/v3/coins/bitcoin/market_chart"
-        params = {
+        url_ohlc = f"https://api.coingecko.com/api/v3/coins/{coin_id}/ohlc"
+        params_ohlc = {
             'vs_currency': 'usd',
             'days': min(days, 365),  # CoinGecko free tier limit
-            'interval': 'daily'
         }
         
-        logger.info(f"Fetching Bitcoin data from CoinGecko market_chart ({days} days)...")
-        response = requests.get(url, params=params, timeout=30)
-        response.raise_for_status()
+        logger.info(f"Fetching {symbol} ({coin_id}) OHLC data from CoinGecko ({days} days)...")
+        response_ohlc = requests.get(url_ohlc, params=params_ohlc, timeout=30)
         
-        data = response.json()
-        
-        # Extract prices (close prices)
-        prices = data.get('prices', [])
-        if not prices:
-            raise ValueError("No price data returned from CoinGecko")
-        
-        # Convert to DataFrame
-        df = pd.DataFrame(prices, columns=['timestamp', 'price'])
-        df['Date'] = pd.to_datetime(df['timestamp'], unit='ms')
-        df.set_index('Date', inplace=True)
-        
-        # CoinGecko market_chart only provides close prices
-        # Use close price for all OHLC columns (approximation)
-        df['Open'] = df['price'].shift(1).fillna(df['price'])  # Use previous close as open
-        df['High'] = df[['Open', 'price']].max(axis=1)  # Approximate high
-        df['Low'] = df[['Open', 'price']].min(axis=1)  # Approximate low
-        df['Close'] = df['price']
-        
-        # Try to get volume data
-        total_volumes = data.get('total_volumes', [])
-        if total_volumes:
-            df_vol = pd.DataFrame(total_volumes, columns=['timestamp', 'Volume'])
-            df_vol['Date'] = pd.to_datetime(df_vol['timestamp'], unit='ms')
-            df_vol.set_index('Date', inplace=True)
-            df = df.join(df_vol, how='left')
-            df['Volume'] = df['Volume'].fillna(0)
+        if response_ohlc.status_code == 200:
+            ohlc_data = response_ohlc.json()
+            if ohlc_data and len(ohlc_data) > 0:
+                # OHLC format: [timestamp, open, high, low, close]
+                df_ohlc = pd.DataFrame(ohlc_data, columns=['timestamp', 'Open', 'High', 'Low', 'Close'])
+                df_ohlc['Date'] = pd.to_datetime(df_ohlc['timestamp'], unit='ms')
+                df_ohlc.set_index('Date', inplace=True)
+                df_ohlc = df_ohlc[['Open', 'High', 'Low', 'Close']]
+                
+                # Get volume from market_chart endpoint
+                url_vol = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
+                params_vol = {
+                    'vs_currency': 'usd',
+                    'days': min(days, 365),
+                    'interval': 'daily'
+                }
+                response_vol = requests.get(url_vol, params=params_vol, timeout=30)
+                if response_vol.status_code == 200:
+                    vol_data = response_vol.json()
+                    total_volumes = vol_data.get('total_volumes', [])
+                    if total_volumes:
+                        df_vol = pd.DataFrame(total_volumes, columns=['timestamp', 'Volume'])
+                        df_vol['Date'] = pd.to_datetime(df_vol['timestamp'], unit='ms')
+                        df_vol.set_index('Date', inplace=True)
+                        # Merge volume data
+                        df_ohlc = df_ohlc.join(df_vol, how='left')
+                        df_ohlc['Volume'] = df_ohlc['Volume'].fillna(0)
+                    else:
+                        df_ohlc['Volume'] = 0
+                else:
+                    df_ohlc['Volume'] = 0
+                
+                df_ohlc.sort_index(inplace=True)
+                logger.info(f"Successfully fetched {len(df_ohlc)} days of OHLC data from CoinGecko")
+                logger.info(f"Date range: {df_ohlc.index.min()} to {df_ohlc.index.max()}")
+                return df_ohlc
         else:
-            df['Volume'] = 0
-        
-        df.drop(['timestamp', 'price'], axis=1, inplace=True)
-        df.sort_index(inplace=True)
-        
-        logger.info(f"Successfully fetched {len(df)} days of data from CoinGecko")
-        logger.info(f"Date range: {df.index.min()} to {df.index.max()}")
-        
-        return df
-        
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error fetching data from CoinGecko: {e}")
-        raise Exception(f"Failed to fetch data from CoinGecko: {str(e)}")
-    except Exception as e:
-        logger.error(f"Unexpected error fetching data: {e}")
-        raise
+            logger.warning(f"OHLC endpoint returned status {response_ohlc.status_code}, falling back to market_chart")
+    except Exception as ohlc_error:
+        logger.warning(f"OHLC endpoint failed, falling back to market_chart: {ohlc_error}")
+    
+    # Fallback to market_chart endpoint (close prices only)
+    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
+    params = {
+        'vs_currency': 'usd',
+        'days': min(days, 365),  # CoinGecko free tier limit
+        'interval': 'daily'
+    }
+    
+    logger.info(f"Fetching {symbol} data from CoinGecko market_chart ({days} days)...")
+    response = requests.get(url, params=params, timeout=30)
+    response.raise_for_status()
+    
+    data = response.json()
+    
+    # Extract prices (close prices)
+    prices = data.get('prices', [])
+    if not prices:
+        raise ValueError(f"No price data returned from CoinGecko for {symbol}")
+    
+    # Convert to DataFrame
+    df = pd.DataFrame(prices, columns=['timestamp', 'price'])
+    df['Date'] = pd.to_datetime(df['timestamp'], unit='ms')
+    df.set_index('Date', inplace=True)
+    
+    # CoinGecko market_chart only provides close prices
+    # Use close price for all OHLC columns (approximation)
+    df['Open'] = df['price'].shift(1).fillna(df['price'])  # Use previous close as open
+    df['High'] = df[['Open', 'price']].max(axis=1)  # Approximate high
+    df['Low'] = df[['Open', 'price']].min(axis=1)  # Approximate low
+    df['Close'] = df['price']
+    
+    # Try to get volume data
+    total_volumes = data.get('total_volumes', [])
+    if total_volumes:
+        df_vol = pd.DataFrame(total_volumes, columns=['timestamp', 'Volume'])
+        df_vol['Date'] = pd.to_datetime(df_vol['timestamp'], unit='ms')
+        df_vol.set_index('Date', inplace=True)
+        df = df.join(df_vol, how='left')
+        df['Volume'] = df['Volume'].fillna(0)
+    else:
+        df['Volume'] = 0
+    
+    df.drop(['timestamp', 'price'], axis=1, inplace=True)
+    df.sort_index(inplace=True)
+    
+    logger.info(f"Successfully fetched {len(df)} days of data from CoinGecko")
+    logger.info(f"Date range: {df.index.min()} to {df.index.max()}")
+    
+    return df
 
 
-def fetch_btc_historical_from_coingecko(start_date: datetime, end_date: Optional[datetime] = None) -> pd.DataFrame:
+def fetch_crypto_data_from_coingecko(symbol: str = "BTCUSDT", start_date: Optional[datetime] = None, end_date: Optional[datetime] = None) -> pd.DataFrame:
     """
-    Fetch Bitcoin historical data from CoinGecko using their history endpoint.
-    This allows fetching data from specific dates (e.g., 2016) beyond the 365-day limit.
-    Optimized to fetch weekly data points to reduce API calls.
+    Fetch cryptocurrency data from CoinGecko using optimal strategy:
+    - Recent data (≤365 days): Use OHLC endpoint (single call, best quality)
+    - Historical data (>365 days): Use history endpoint (weekly sampling)
+    - Combines both for full range (2010-today)
     
     Args:
-        start_date (datetime): Start date to fetch from
+        symbol (str): Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
+        start_date (datetime, optional): Start date (defaults to 2010-01-01)
         end_date (datetime, optional): End date (defaults to today)
         
     Returns:
-        pd.DataFrame: DataFrame with OHLC data
+        pd.DataFrame: DataFrame with OHLCV data from start_date to end_date
         
     Raises:
-        Exception: If API request fails
+        Exception: If API request fails or symbol not supported
     """
     logger = logging.getLogger(__name__)
+    
+    # Get CoinGecko coin ID
+    coin_id = get_coingecko_coin_id(symbol)
+    if not coin_id:
+        raise ValueError(f"Symbol {symbol} is not supported by CoinGecko. Please use a supported symbol.")
+    
+    # Default to earliest available date
+    if start_date is None:
+        start_date = datetime(2010, 1, 1)
     
     if end_date is None:
         end_date = datetime.now()
     
-    logger.info(f"Fetching Bitcoin historical data from CoinGecko: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
-    logger.info("Note: This may take several minutes as we fetch weekly data points to optimize API usage...")
+    # Calculate days from start to end
+    days_from_start = (end_date - start_date).days
+    
+    # If range is ≤365 days, use OHLC endpoint only
+    if days_from_start <= 365:
+        logger.info(f"Fetching {symbol} data from CoinGecko (recent data, {days_from_start} days)...")
+        df_recent = fetch_crypto_recent_from_coingecko(symbol, days=days_from_start)
+        # Filter to requested date range
+        df_recent = df_recent[(df_recent.index >= start_date) & (df_recent.index <= end_date)]
+        return df_recent
+    
+    # For longer ranges, combine OHLC (recent) + history (historical)
+    logger.info(f"Fetching {symbol} data from CoinGecko (full range: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')})...")
+    
+    # 1. Fetch recent data (last 365 days) using OHLC endpoint
+    logger.info("Step 1: Fetching recent data (last 365 days) from OHLC endpoint...")
+    df_recent = fetch_crypto_recent_from_coingecko(symbol, days=365)
+    
+    # 2. Fetch historical data (start_date to 365 days ago) using history endpoint
+    # Calculate historical_end as 365 days before end_date, but not before start_date
+    historical_end = max(start_date, end_date - timedelta(days=365))
+    if start_date < historical_end:
+        logger.info(f"Step 2: Fetching historical data ({start_date.strftime('%Y-%m-%d')} to {historical_end.strftime('%Y-%m-%d')}) from history endpoint...")
+        df_historical = fetch_crypto_historical_from_coingecko(symbol, start_date=start_date, end_date=historical_end, fetch_interval_days=7)
+    else:
+        df_historical = pd.DataFrame()
+    
+    # 3. Merge both datasets
+    if not df_historical.empty:
+        # Remove overlap: prefer recent data (OHLC) for overlapping dates
+        overlap_start = df_recent.index.min()
+        df_historical = df_historical[df_historical.index < overlap_start]
+        
+        # Combine historical + recent
+        df_combined = pd.concat([df_historical, df_recent])
+    else:
+        df_combined = df_recent
+    
+    # Filter to exact date range requested
+    df_combined = df_combined[(df_combined.index >= start_date) & (df_combined.index <= end_date)]
+    
+    # Remove duplicates (keep last occurrence)
+    df_combined = df_combined[~df_combined.index.duplicated(keep='last')]
+    
+    # Sort by date
+    df_combined.sort_index(inplace=True)
+    
+    logger.info(f"Successfully fetched {len(df_combined)} days of data from CoinGecko")
+    logger.info(f"Date range: {df_combined.index.min()} to {df_combined.index.max()}")
+    
+    return df_combined
+
+
+def fetch_btc_data_from_coingecko(days: int = 365, start_date: Optional[datetime] = None) -> pd.DataFrame:
+    """
+    Fetch Bitcoin historical data from CoinGecko API (backward compatibility wrapper).
+    Uses the generic CoinGecko fetch function.
+    
+    Args:
+        days (int): Number of days of historical data to fetch (max 365 for free tier)
+        start_date (datetime, optional): Specific start date to fetch from
+        
+    Returns:
+        pd.DataFrame: DataFrame with OHLC data
+        
+    Raises:
+        Exception: If API request fails
+    """
+    if start_date:
+        end_date = datetime.now()
+        return fetch_crypto_data_from_coingecko("BTCUSDT", start_date=start_date, end_date=end_date)
+    else:
+        # Calculate start_date from days
+        start_date = datetime.now() - timedelta(days=days)
+        return fetch_crypto_data_from_coingecko("BTCUSDT", start_date=start_date)
+
+
+def fetch_crypto_historical_from_coingecko(symbol: str, start_date: datetime, end_date: Optional[datetime] = None, fetch_interval_days: int = 7) -> pd.DataFrame:
+    """
+    Fetch cryptocurrency historical data from CoinGecko using their history endpoint.
+    This allows fetching data from specific dates (e.g., 2010) beyond the 365-day limit.
+    Optimized to fetch weekly data points to reduce API calls.
+    
+    Args:
+        symbol (str): Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
+        start_date (datetime): Start date to fetch from
+        end_date (datetime, optional): End date (defaults to today)
+        fetch_interval_days (int): Days between samples (default: 7 for weekly)
+        
+    Returns:
+        pd.DataFrame: DataFrame with OHLC data
+        
+    Raises:
+        Exception: If API request fails or symbol not supported
+    """
+    logger = logging.getLogger(__name__)
+    
+    # Get CoinGecko coin ID
+    coin_id = get_coingecko_coin_id(symbol)
+    if not coin_id:
+        raise ValueError(f"Symbol {symbol} is not supported by CoinGecko. Please use a supported symbol.")
+    
+    if end_date is None:
+        end_date = datetime.now()
+    
+    logger.info(f"Fetching {symbol} ({coin_id}) historical data from CoinGecko: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
+    logger.info(f"Note: This may take several minutes as we fetch data points every {fetch_interval_days} days to optimize API usage...")
     
     all_data = []
     current_date = start_date
-    
-    # Fetch data weekly (every 7 days) to reduce API calls while maintaining reasonable granularity
-    # For 8 years of data (2016-2024), this is ~416 API calls instead of ~2,920
-    fetch_interval_days = 7
     
     # CoinGecko history endpoint: /coins/{id}/history?date={dd-mm-yyyy}
     request_count = 0
@@ -388,7 +490,7 @@ def fetch_btc_historical_from_coingecko(start_date: datetime, end_date: Optional
         date_str = current_date.strftime('%d-%m-%Y')
         
         try:
-            url = f"https://api.coingecko.com/api/v3/coins/bitcoin/history"
+            url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/history"
             params = {
                 'date': date_str,
                 'localization': 'false'  # Don't need localization data
@@ -416,12 +518,19 @@ def fetch_btc_historical_from_coingecko(start_date: datetime, end_date: Optional
                             'Close': current_price,
                             'Volume': volume_24h or 0
                         })
+            elif response.status_code == 429:
+                # Rate limit - wait longer
+                logger.warning(f"Rate limit hit, waiting 5 seconds...")
+                time.sleep(5)
+                continue
+            else:
+                logger.warning(f"API returned status {response.status_code} for {date_str}")
             
             # Rate limiting: CoinGecko free tier allows ~10-50 calls/minute
             # Use 200ms delay to stay well within limits (~300 calls/minute max)
             time.sleep(0.2)
             
-            # Move to next week
+            # Move to next interval
             current_date += timedelta(days=fetch_interval_days)
             request_count += 1
             
@@ -442,7 +551,7 @@ def fetch_btc_historical_from_coingecko(start_date: datetime, end_date: Optional
             continue
     
     if not all_data:
-        raise ValueError(f"No historical data fetched from CoinGecko for date range {start_date} to {end_date}")
+        raise ValueError(f"No historical data fetched from CoinGecko for {symbol} in date range {start_date} to {end_date}")
     
     # Convert to DataFrame
     df = pd.DataFrame(all_data)
@@ -466,14 +575,50 @@ def fetch_btc_historical_from_coingecko(start_date: datetime, end_date: Optional
     return df
 
 
+# Keep backward compatibility
+def fetch_btc_historical_from_coingecko(start_date: datetime, end_date: Optional[datetime] = None) -> pd.DataFrame:
+    """Backward compatibility wrapper for Bitcoin historical fetch."""
+    return fetch_crypto_historical_from_coingecko("BTCUSDT", start_date, end_date)
+
+
+def get_coingecko_coin_id(symbol: str) -> Optional[str]:
+    """
+    Map trading pair symbol to CoinGecko coin ID.
+    
+    Args:
+        symbol (str): Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
+        
+    Returns:
+        Optional[str]: CoinGecko coin ID (e.g., "bitcoin", "ethereum") or None if not supported
+    """
+    symbol_to_coingecko = {
+        'BTCUSDT': 'bitcoin',
+        'ETHUSDT': 'ethereum',
+        'BNBUSDT': 'binancecoin',
+        'ADAUSDT': 'cardano',
+        'SOLUSDT': 'solana',
+        'XRPUSDT': 'ripple',
+        'DOTUSDT': 'polkadot',
+        'DOGEUSDT': 'dogecoin',
+        'AVAXUSDT': 'avalanche-2',
+        'MATICUSDT': 'matic-network',
+        'LINKUSDT': 'chainlink',
+        'UNIUSDT': 'uniswap',
+        'LTCUSDT': 'litecoin',
+        'ATOMUSDT': 'cosmos',
+        'ETCUSDT': 'ethereum-classic',
+    }
+    return symbol_to_coingecko.get(symbol)
+
+
 def get_available_symbols() -> list:
     """
-    Get list of available cryptocurrency symbols supported by Binance.
+    Get list of available cryptocurrency symbols supported by CoinGecko.
     
     Returns:
         list: List of symbol strings (e.g., ['BTCUSDT', 'ETHUSDT', ...])
     """
-    # Common cryptocurrency pairs available on Binance
+    # Common cryptocurrency pairs available on CoinGecko
     return [
         'BTCUSDT',   # Bitcoin
         'ETHUSDT',   # Ethereum
@@ -540,63 +685,54 @@ def save_data_to_csv(df: pd.DataFrame, file_path: Optional[str] = None, symbol: 
 
 def fetch_crypto_data_hybrid(symbol: str = "BTCUSDT", days: int = 1825, start_date: Optional[datetime] = None, use_binance_only: bool = True) -> Tuple[pd.DataFrame, str, str]:
     """
-    Fetch cryptocurrency data using Binance API (primary) with optional CoinGecko fallback.
+    Fetch cryptocurrency data using CoinGecko API exclusively.
+    This ensures consistent, seamless data across all charts and indicators.
     
     Args:
         symbol (str): Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
-        days (int): Number of days of historical data to fetch
-        start_date (datetime, optional): Specific start date to fetch from (defaults to 2017-01-01)
-        use_binance_only (bool): If True, only use Binance (no CoinGecko fallback)
+        days (int): Number of days of historical data to fetch (ignored if start_date provided)
+        start_date (datetime, optional): Specific start date to fetch from (defaults to 2010-01-01)
+        use_binance_only (bool): Deprecated - kept for backward compatibility, ignored
         
     Returns:
-        Tuple[pd.DataFrame, str, str]: DataFrame, data_source ("binance", "coingecko"), data_quality ("full_ohlcv", "close_only")
+        Tuple[pd.DataFrame, str, str]: DataFrame, data_source ("coingecko"), data_quality ("ohlc")
         
     Raises:
-        Exception: If all data sources fail
+        Exception: If CoinGecko fetch fails or symbol not supported
     """
     logger = logging.getLogger(__name__)
     
-    # Default to 2017-01-01 (Binance launch date) if no start_date provided
+    # Default to 2010-01-01 (earliest CoinGecko data) if no start_date provided
     if start_date is None:
-        start_date = datetime(2017, 1, 1)
+        start_date = datetime(2010, 1, 1)
+        logger.info(f"Using default start date: {start_date.strftime('%Y-%m-%d')} (earliest CoinGecko data)")
     
-    # Try Binance first (best quality - full OHLCV)
+    # Calculate end_date from days if needed
+    if days and start_date:
+        end_date = start_date + timedelta(days=days)
+    else:
+        end_date = datetime.now()
+    
     try:
-        logger.info(f"Fetching {symbol} data from Binance (from {start_date.strftime('%Y-%m-%d')})...")
-        df = fetch_crypto_data_from_binance(symbol=symbol, days=days, start_date=start_date, fallback_to_coingecko=False)
-        logger.info(f"Successfully fetched {symbol} data from Binance")
-        return df, "binance", "full_ohlcv"
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 451:
-            logger.warning(f"Binance API unavailable (451) for {symbol}")
-        else:
-            logger.warning(f"Binance API error for {symbol}: {e}")
+        logger.info(f"Fetching {symbol} data from CoinGecko (from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')})...")
+        df = fetch_crypto_data_from_coingecko(symbol=symbol, start_date=start_date, end_date=end_date)
+        logger.info(f"Successfully fetched {symbol} data from CoinGecko")
+        return df, "coingecko", "ohlc"
     except Exception as e:
-        logger.warning(f"Binance fetch failed for {symbol}: {e}")
-    
-    # Only use CoinGecko fallback if explicitly allowed
-    if not use_binance_only and symbol == "BTCUSDT":
-        try:
-            logger.info(f"Falling back to CoinGecko for {symbol}...")
-            df = fetch_btc_data_from_coingecko(days=min(days, 365), start_date=start_date)
-            logger.info(f"Successfully fetched {symbol} data from CoinGecko")
-            return df, "coingecko", "close_only"
-        except Exception as e:
-            logger.error(f"CoinGecko fetch failed for {symbol}: {e}")
-    
-    raise Exception(f"Failed to fetch {symbol} data from Binance. Please check your connection or try again later.")
+        logger.error(f"CoinGecko fetch failed for {symbol}: {e}")
+        raise Exception(f"Failed to fetch {symbol} data from CoinGecko: {str(e)}")
 
 
 def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int = 1825, start_date: Optional[datetime] = None) -> pd.DataFrame:
     """
-    Update cryptocurrency data using Binance API (from 2017-01-01 onwards) and save to CSV.
+    Update cryptocurrency data using CoinGecko API (from 2010-01-01 onwards) and save to CSV.
     Checks if data is fresh (updated within last 6 hours) before fetching.
     
     Args:
         symbol (str): Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
         force (bool): Force update even if data is fresh
         days (int): Number of days of historical data to fetch (default 1825 = 5 years, ignored if start_date provided)
-        start_date (datetime, optional): Specific start date to fetch from (defaults to 2017-01-01 for Binance)
+        start_date (datetime, optional): Specific start date to fetch from (defaults to 2010-01-01 for CoinGecko)
         
     Returns:
         pd.DataFrame: Updated DataFrame
@@ -605,10 +741,10 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
     
     logger = logging.getLogger(__name__)
     
-    # Default to 2017-01-01 (when Binance started) if no start_date provided
+    # Default to 2010-01-01 (earliest CoinGecko data) if no start_date provided
     if start_date is None:
-        start_date = datetime(2017, 1, 1)
-        logger.info(f"Using default start date: {start_date.strftime('%Y-%m-%d')} (Binance launch date)")
+        start_date = datetime(2010, 1, 1)
+        logger.info(f"Using default start date: {start_date.strftime('%Y-%m-%d')} (earliest CoinGecko data)")
     
     # Check if we need to update (every 6 hours for more frequent updates)
     if not force and symbol in _last_update_time:
@@ -629,13 +765,13 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
             return load_crypto_data(symbol=symbol)
     
     try:
-        # Calculate days from start_date to now
-        fetch_days = (datetime.now() - start_date).days
-        logger.info(f"Fetching Binance data from {start_date.strftime('%Y-%m-%d')} ({fetch_days} days)...")
+        # Calculate end_date (today)
+        end_date = datetime.now()
+        fetch_days = (end_date - start_date).days
+        logger.info(f"Fetching CoinGecko data from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')} ({fetch_days} days)...")
         
-        # Use Binance only (no CoinGecko fallback for default operations)
-        # Binance has full OHLCV data from 2017 onwards
-        df, data_source, data_quality = fetch_crypto_data_hybrid(symbol=symbol, days=fetch_days, start_date=start_date, use_binance_only=True)
+        # Use CoinGecko exclusively for all symbols
+        df, data_source, data_quality = fetch_crypto_data_hybrid(symbol=symbol, days=fetch_days, start_date=start_date, use_binance_only=False)
         
         # Log data date range to verify historical depth
         days_available = (df.index.max() - df.index.min()).days
@@ -644,21 +780,7 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
         
         # Verify minimum data requirement (at least 1 year)
         if days_available < 365:
-            logger.warning(f"Only {days_available} days fetched (< 1 year). Attempting Binance direct fetch from 2017...")
-            # Try Binance directly from 2017-01-01
-            try:
-                binance_start = datetime(2017, 1, 1)
-                df_binance = fetch_crypto_data_from_binance(symbol=symbol, start_date=binance_start, fallback_to_coingecko=False)
-                binance_days = (df_binance.index.max() - df_binance.index.min()).days
-                if binance_days > days_available:
-                    df = df_binance
-                    data_source = "binance"
-                    data_quality = "full_ohlcv"
-                    logger.info(f"Binance fetch successful: {binance_days} days ({binance_days/365:.2f} years)")
-                else:
-                    logger.warning(f"Binance fetch didn't improve data ({binance_days} days)")
-            except Exception as binance_error:
-                logger.warning(f"Binance direct fetch failed: {binance_error}. Using available data.")
+            logger.warning(f"Only {days_available} days fetched (< 1 year). This may indicate limited historical data for {symbol}.")
         
         # Save to CSV
         csv_path = save_data_to_csv(df, symbol=symbol)
@@ -678,7 +800,6 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
         _last_update_time[symbol] = datetime.now()
         
         # Reload to verify it's saved correctly (cache is cleared, so this will load fresh)
-        # Cache is already cleared above, so this will load fresh data
         df_verify = load_crypto_data(symbol=symbol)
         
         final_days = (df_verify.index.max() - df_verify.index.min()).days
@@ -781,38 +902,38 @@ def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None) -
         # Clean and preprocess the data
         df = _clean_data(df)
         
-        # Check if data goes back to 2017-01-01 (Binance launch date)
+        # Check if data goes back to 2010-01-01 (earliest CoinGecko data)
         # Also check for invalid future dates (indicates mock/test data)
         data_start = df.index.min()
         data_end = df.index.max()
-        binance_start_date = datetime(2017, 1, 1)
+        earliest_start_date = datetime(2010, 1, 1)
         current_date = datetime.now()
         
-        # Check if data is invalid (future dates or doesn't go back to 2017)
+        # Check if data is invalid (future dates or doesn't go back to 2010)
         has_future_dates = data_end > current_date
-        missing_historical_data = data_start > binance_start_date
+        missing_historical_data = data_start > earliest_start_date
         
         if has_future_dates or missing_historical_data:
             if has_future_dates:
                 logger.error(f"⚠️ INVALID DATA DETECTED: CSV contains future dates (up to {data_end.strftime('%Y-%m-%d')}). This appears to be mock/test data.")
             if missing_historical_data:
-                logger.warning(f"Data file only goes back to {data_start.strftime('%Y-%m-%d')}, but Binance data is available from {binance_start_date.strftime('%Y-%m-%d')}")
+                logger.warning(f"Data file only goes back to {data_start.strftime('%Y-%m-%d')}, but CoinGecko data is available from {earliest_start_date.strftime('%Y-%m-%d')}")
             
-            logger.info(f"Automatically refreshing {symbol} data from Binance ({binance_start_date.strftime('%Y-%m-%d')} onwards)...")
+            logger.info(f"Automatically refreshing {symbol} data from CoinGecko ({earliest_start_date.strftime('%Y-%m-%d')} onwards)...")
             
             # Clear cache before refresh to ensure fresh data
             if cache_key in _dataframe_cache:
                 del _dataframe_cache[cache_key]
             
             try:
-                # Force refresh from Binance, ignoring freshness check
-                df_refreshed = update_crypto_data(symbol=symbol, force=True, start_date=binance_start_date)
+                # Force refresh from CoinGecko, ignoring freshness check
+                df_refreshed = update_crypto_data(symbol=symbol, force=True, start_date=earliest_start_date)
                 
                 # Verify refresh was successful
                 refreshed_start = df_refreshed.index.min()
                 refreshed_end = df_refreshed.index.max()
                 
-                if refreshed_start <= binance_start_date and refreshed_end <= current_date:
+                if refreshed_start <= earliest_start_date and refreshed_end <= current_date:
                     logger.info(f"✓ Successfully refreshed data: {len(df_refreshed)} rows from {df_refreshed.index.min()} to {df_refreshed.index.max()}")
                     # Update cache with refreshed data
                     import os
