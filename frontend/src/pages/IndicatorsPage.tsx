@@ -351,7 +351,7 @@ const IndicatorsPage: React.FC = () => {
                         Date Range
                       </label>
                       <Button
-                        variant="outline"
+                        variant="secondary"
                         size="sm"
                         onClick={handleRefreshData}
                         disabled={isRefreshingData}
