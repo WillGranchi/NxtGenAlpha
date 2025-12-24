@@ -122,7 +122,7 @@ const IndicatorsPage: React.FC = () => {
       setError(null);
     } catch (err: any) {
       console.error('Failed to refresh data:', err);
-      setError(err?.response?.data?.detail || 'Failed to refresh data from Binance');
+      setError(err?.response?.data?.detail || 'Failed to refresh data from CoinGecko');
     } finally {
       setIsRefreshingData(false);
     }
