@@ -71,6 +71,7 @@ const IndicatorsPage: React.FC = () => {
   const [loadingIndicators, setLoadingIndicators] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [settingsExpanded, setSettingsExpanded] = useState<boolean>(false);
+  const [isRefreshingData, setIsRefreshingData] = useState(false);
   
   // Auto-expand settings on desktop, collapse on mobile
   useEffect(() => {

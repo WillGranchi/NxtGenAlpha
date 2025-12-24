@@ -415,10 +415,12 @@ export class TradingAPI {
     return response.data;
   }
 
-  static async refreshData(symbol?: string, force: boolean = false): Promise<DataRefreshResponse> {
-    const response: AxiosResponse<DataRefreshResponse> = await api.post('/api/data/refresh', null, {
-      params: { ...(symbol ? { symbol } : {}), force }
-    });
+  static async refreshData(symbol?: string, force: boolean = false, start_date?: string): Promise<DataRefreshResponse> {
+    const params: any = { ...(symbol ? { symbol } : {}), force };
+    if (start_date) {
+      params.start_date = start_date;
+    }
+    const response: AxiosResponse<DataRefreshResponse> = await api.post('/api/data/refresh', null, { params });
     return response.data;
   }
 
