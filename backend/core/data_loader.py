@@ -633,13 +633,26 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
                 logger.warning(f"Binance direct fetch failed: {binance_error}. Using available data.")
         
         # Save to CSV
-        save_data_to_csv(df, symbol=symbol)
+        csv_path = save_data_to_csv(df, symbol=symbol)
+        logger.info(f"Data saved to CSV: {csv_path}")
         
         # Clear cache BEFORE updating timestamp to ensure fresh data is loaded
-        load_crypto_data.cache_clear()
+        cache_key = f"{symbol}_{csv_path}"
+        if cache_key in _dataframe_cache:
+            del _dataframe_cache[cache_key]
+        logger.debug(f"Cache cleared after saving {symbol} data")
+        
+        # Update file modification time cache
+        import os
+        if os.path.exists(csv_path):
+            _file_mtime_cache[cache_key] = os.path.getmtime(csv_path)
+        
         _last_update_time[symbol] = datetime.now()
         
-        # Reload to verify it's saved correctly
+        # Reload to verify it's saved correctly (cache is cleared, so this will load fresh)
+        # Clear cache again before reload to ensure we get the fresh data
+        if cache_key in _dataframe_cache:
+            del _dataframe_cache[cache_key]
         df_verify = load_crypto_data(symbol=symbol)
         
         final_days = (df_verify.index.max() - df_verify.index.min()).days
@@ -674,11 +687,17 @@ def get_last_update_time(symbol: str = "BTCUSDT") -> Optional[datetime]:
     return _last_update_time.get(symbol)
 
 
-@lru_cache(maxsize=10)
+# Cache for file modification times to detect CSV changes
+_file_mtime_cache: Dict[str, float] = {}
+
+# Simple cache for DataFrames (will be cleared when files change)
+_dataframe_cache: Dict[str, Tuple[pd.DataFrame, float]] = {}
+
 def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None) -> pd.DataFrame:
     """
-    Load cryptocurrency historical data from CSV file with caching.
-    Automatically fetches data if file doesn't exist.
+    Load cryptocurrency historical data from CSV file with intelligent caching.
+    Automatically fetches data if file doesn't exist or doesn't go back to 2017.
+    Cache is invalidated when CSV file modification time changes.
     
     Args:
         symbol (str): Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
@@ -706,6 +725,25 @@ def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None) -
         else:
             file_path = os.path.join(data_dir, f'{symbol}_historical_data.csv')
     
+    # Check if file exists and get modification time for cache-busting
+    import os
+    file_exists = os.path.exists(file_path)
+    file_mtime = os.path.getmtime(file_path) if file_exists else 0
+    
+    # Check cache with file modification time (cache-busting)
+    cache_key = f"{symbol}_{file_path}"
+    if cache_key in _dataframe_cache:
+        cached_df, cached_mtime = _dataframe_cache[cache_key]
+        if cached_mtime == file_mtime and file_exists:
+            logger.debug(f"Returning cached data for {symbol} (file unchanged)")
+            return cached_df
+        else:
+            logger.debug(f"Cache invalidated for {symbol} (file modified or missing)")
+            del _dataframe_cache[cache_key]
+    
+    # Store file modification time
+    _file_mtime_cache[cache_key] = file_mtime
+    
     try:
         # Load the CSV file
         df = pd.read_csv(file_path)
@@ -726,15 +764,40 @@ def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None) -
             logger.warning(f"Data file only goes back to {data_start.strftime('%Y-%m-%d')}, but Binance data is available from {binance_start_date.strftime('%Y-%m-%d')}")
             logger.info(f"Automatically refreshing {symbol} data from {binance_start_date.strftime('%Y-%m-%d')}...")
             
-            # Clear cache and refresh
-            load_crypto_data.cache_clear()
+            # Clear cache before refresh to ensure fresh data
+            if cache_key in _dataframe_cache:
+                del _dataframe_cache[cache_key]
+            
             try:
                 df_refreshed = update_crypto_data(symbol=symbol, force=True, start_date=binance_start_date)
-                logger.info(f"Successfully refreshed data: {len(df_refreshed)} rows from {df_refreshed.index.min()} to {df_refreshed.index.max()}")
-                return df_refreshed
+                
+                # Verify refresh was successful
+                refreshed_start = df_refreshed.index.min()
+                if refreshed_start <= binance_start_date:
+                    logger.info(f"✓ Successfully refreshed data: {len(df_refreshed)} rows from {df_refreshed.index.min()} to {df_refreshed.index.max()}")
+                    # Update cache with refreshed data
+                    import os
+                    if os.path.exists(file_path):
+                        _dataframe_cache[cache_key] = (df_refreshed, os.path.getmtime(file_path))
+                    return df_refreshed
+                else:
+                    logger.warning(f"Refresh didn't extend data range (still starts at {refreshed_start.strftime('%Y-%m-%d')})")
+                    # Update cache anyway
+                    import os
+                    if os.path.exists(file_path):
+                        _dataframe_cache[cache_key] = (df_refreshed, os.path.getmtime(file_path))
+                    return df_refreshed
             except Exception as refresh_error:
-                logger.warning(f"Auto-refresh failed: {refresh_error}. Using existing data.")
+                logger.error(f"Auto-refresh failed: {refresh_error}", exc_info=True)
+                logger.warning(f"Using existing data (may be incomplete)")
+                # Cache the existing data
+                if file_exists:
+                    _dataframe_cache[cache_key] = (df, file_mtime)
                 return df
+        
+        # Cache the loaded data
+        if file_exists:
+            _dataframe_cache[cache_key] = (df, file_mtime)
         
         return df
         
@@ -743,7 +806,9 @@ def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None) -
         logger.info(f"Data file not found for {symbol}, automatically fetching Binance data from 2017...")
         try:
             # Clear cache before fetching to ensure fresh data
-            load_crypto_data.cache_clear()
+            cache_key = f"{symbol}_{file_path}"
+            if cache_key in _dataframe_cache:
+                del _dataframe_cache[cache_key]
             
             # Fetch Binance data from 2017-01-01 onwards (default)
             binance_start = datetime(2017, 1, 1)

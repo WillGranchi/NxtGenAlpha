@@ -154,6 +154,14 @@ async def refresh_data(
     """
     try:
         from datetime import datetime as dt
+        from backend.core.data_loader import _dataframe_cache
+        
+        # Clear cache BEFORE refresh to ensure we get fresh data
+        # Clear all cache entries for this symbol
+        keys_to_remove = [k for k in _dataframe_cache.keys() if k.startswith(f"{symbol}_")]
+        for key in keys_to_remove:
+            del _dataframe_cache[key]
+        logger.info(f"Cache cleared before manual refresh for {symbol} ({len(keys_to_remove)} entries)")
         
         start_dt = None
         if start_date:
@@ -169,8 +177,19 @@ async def refresh_data(
         logger.info(f"Manual data refresh requested for {symbol} (force={force}, start_date={start_date})")
         df = update_crypto_data(symbol=symbol, force=force, start_date=start_dt)
         
+        # Clear cache AFTER refresh to ensure fresh data is available
+        keys_to_remove = [k for k in _dataframe_cache.keys() if k.startswith(f"{symbol}_")]
+        for key in keys_to_remove:
+            del _dataframe_cache[key]
+        logger.info(f"Cache cleared after manual refresh for {symbol} ({len(keys_to_remove)} entries)")
+        
         summary = get_data_summary(df)
         last_update = get_last_update_time(symbol=symbol)
+        
+        # Verify the refresh actually worked
+        data_start = df.index.min()
+        data_end = df.index.max()
+        days_available = (data_end - data_start).days
         
         return {
             "success": True,
@@ -178,6 +197,9 @@ async def refresh_data(
             "symbol": symbol,
             "records": len(df),
             "date_range": summary['date_range'],
+            "days_available": days_available,
+            "years_available": round(days_available / 365.0, 2),
+            "data_source": summary.get('data_source', 'unknown'),
             "last_update": last_update.isoformat() if last_update else None
         }
     except Exception as e:

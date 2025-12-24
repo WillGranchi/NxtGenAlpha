@@ -96,7 +96,38 @@ async def scheduled_data_update():
 # Initialize database on startup
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database tables, run migrations, and scheduler on application startup."""
+    """Initialize database tables, run migrations, scheduler, and verify data on application startup."""
+    try:
+        # Check and refresh BTC data if needed (non-blocking)
+        async def check_and_refresh_data():
+            try:
+                from backend.core.data_loader import load_crypto_data, update_crypto_data
+                from datetime import datetime
+                
+                logger.info("Checking BTC data date range on startup...")
+                df = load_crypto_data(symbol="BTCUSDT")
+                data_start = df.index.min()
+                binance_start = datetime(2017, 1, 1)
+                
+                if data_start > binance_start:
+                    logger.warning(f"BTC data only goes back to {data_start.strftime('%Y-%m-%d')}, triggering refresh from {binance_start.strftime('%Y-%m-%d')}...")
+                    try:
+                        df_refreshed = update_crypto_data(symbol="BTCUSDT", force=True, start_date=binance_start)
+                        logger.info(f"✓ Startup data refresh successful: {len(df_refreshed)} rows from {df_refreshed.index.min()} to {df_refreshed.index.max()}")
+                    except Exception as refresh_error:
+                        logger.warning(f"Startup data refresh failed (non-critical): {refresh_error}")
+                else:
+                    logger.info(f"✓ BTC data is up to date: {len(df)} rows from {data_start.strftime('%Y-%m-%d')} to {df.index.max().strftime('%Y-%m-%d')}")
+            except Exception as e:
+                logger.warning(f"Startup data check failed (non-critical): {e}")
+        
+        # Run data check in background (non-blocking)
+        import asyncio
+        asyncio.create_task(check_and_refresh_data())
+        
+    except Exception as e:
+        logger.warning(f"Startup data check setup failed (non-critical): {e}")
+    
     try:
         # Run Alembic migrations first
         try:
