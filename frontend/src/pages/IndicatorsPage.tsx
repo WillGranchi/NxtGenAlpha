@@ -326,15 +326,32 @@ const IndicatorsPage: React.FC = () => {
                   
                   {/* Date Range */}
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-text-secondary mb-2">
-                      Date Range
-                    </label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm font-medium text-text-secondary">
+                        Date Range
+                      </label>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRefreshData}
+                        disabled={isRefreshingData}
+                        className="flex items-center gap-2"
+                      >
+                        <RefreshCw className={`h-4 w-4 ${isRefreshingData ? 'animate-spin' : ''}`} />
+                        {isRefreshingData ? 'Refreshing...' : 'Refresh Data'}
+                      </Button>
+                    </div>
                     <DateRangePicker
                       startDate={startDate}
                       endDate={endDate}
                       onStartDateChange={setStartDate}
                       onEndDateChange={setEndDate}
                     />
+                    {error && (
+                      <div className="mt-2 text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-2 rounded">
+                        {error}
+                      </div>
+                    )}
                   </div>
                   
                   {/* Strategy Type */}
