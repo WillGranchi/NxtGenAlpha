@@ -804,52 +804,33 @@ def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None) -
             if cache_key in _dataframe_cache:
                 del _dataframe_cache[cache_key]
             
-            # Also clear file modification time cache
-            if cache_key in _file_mtime_cache:
-                del _file_mtime_cache[cache_key]
-            
-            # If data has future dates (mock data), delete the CSV file to force fresh fetch
-            if has_future_dates:
-                import os
-                logger.warning(f"Deleting invalid CSV file with future dates: {file_path}")
-                try:
-                    if os.path.exists(file_path):
-                        os.remove(file_path)
-                        logger.info(f"✓ Deleted invalid CSV file: {file_path}")
-                except Exception as delete_error:
-                    logger.warning(f"Could not delete invalid CSV file: {delete_error}")
-            
             try:
                 # Force refresh from Binance, ignoring freshness check
                 df_refreshed = update_crypto_data(symbol=symbol, force=True, start_date=binance_start_date)
                 
-                # Verify refresh was successful - strict validation
+                # Verify refresh was successful
                 refreshed_start = df_refreshed.index.min()
                 refreshed_end = df_refreshed.index.max()
                 
-                # Validate: must start from 2017 or earlier, and end before today
                 if refreshed_start <= binance_start_date and refreshed_end <= current_date:
-                    logger.info(f"✓ Successfully refreshed data: {len(df_refreshed)} rows from {refreshed_start.strftime('%Y-%m-%d')} to {refreshed_end.strftime('%Y-%m-%d')}")
+                    logger.info(f"✓ Successfully refreshed data: {len(df_refreshed)} rows from {df_refreshed.index.min()} to {df_refreshed.index.max()}")
                     # Update cache with refreshed data
                     import os
                     if os.path.exists(file_path):
-                        file_mtime = os.path.getmtime(file_path)
-                        _dataframe_cache[cache_key] = (df_refreshed, file_mtime)
-                        _file_mtime_cache[cache_key] = file_mtime
+                        _dataframe_cache[cache_key] = (df_refreshed, os.path.getmtime(file_path))
                     return df_refreshed
                 else:
-                    error_msg = f"Refresh validation failed: start={refreshed_start.strftime('%Y-%m-%d')} (expected <= {binance_start_date.strftime('%Y-%m-%d')}), end={refreshed_end.strftime('%Y-%m-%d')} (expected <= {current_date.strftime('%Y-%m-%d')})"
-                    logger.error(f"⚠️ {error_msg}")
-                    raise Exception(f"Data refresh failed validation: {error_msg}")
+                    logger.error(f"⚠️ Refresh validation failed: start={refreshed_start.strftime('%Y-%m-%d')}, end={refreshed_end.strftime('%Y-%m-%d')}")
+                    # Still return refreshed data, but log warning
+                    import os
+                    if os.path.exists(file_path):
+                        _dataframe_cache[cache_key] = (df_refreshed, os.path.getmtime(file_path))
+                    return df_refreshed
             except Exception as refresh_error:
                 logger.error(f"❌ Auto-refresh failed: {refresh_error}", exc_info=True)
-                logger.error(f"⚠️ Cannot use invalid/mock data. Raising error to force manual refresh.")
-                # Don't return invalid data - raise error instead
-                raise Exception(
-                    f"Invalid data detected (future dates or missing historical data) and automatic refresh failed. "
-                    f"Please manually refresh data using the 'Refresh Data' button or API endpoint. "
-                    f"Error: {str(refresh_error)}"
-                )
+                logger.error(f"⚠️ Using existing data (may be invalid/mock data)")
+                # Don't cache invalid data
+                return df
         
         # Cache the loaded data
         if file_exists:
