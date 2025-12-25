@@ -231,14 +231,14 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         color: '#9CA3AF',
         gridcolor: '#374151',
         showgrid: true,
-        side: 'left',
+        side: 'left' as const,
       },
       yaxis2: {
         title: 'Z-Score',
         color: '#9CA3AF',
         gridcolor: '#374151',
         showgrid: true,
-        side: 'right',
+        side: 'right' as const,
         overlaying: 'y',
         range: [-3.5, 3.5],
       },
@@ -269,7 +269,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
     displayModeBar: true,
     responsive: true,
     displaylogo: false,
-    modeBarButtonsToRemove: ['pan2d', 'lasso2d'],
+    modeBarButtonsToRemove: ['pan2d', 'lasso2d'] as any,
   };
 
   if (!chartData || chartData.length === 0) {
