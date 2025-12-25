@@ -680,12 +680,14 @@ def fetch_crypto_data_from_yahoo_finance(
     if not ticker:
         raise ValueError(f"Symbol {symbol} is not supported by Yahoo Finance. Please use a supported symbol.")
     
-    # Default dates
+    # Default dates - fetch all available data from launch
     if end_date is None:
         end_date = datetime.now()
     if start_date is None:
-        # Default to 5 years back
-        start_date = end_date - timedelta(days=5*365)
+        # Default to token launch date (Yahoo Finance has good historical coverage)
+        launch_date = get_token_launch_date(symbol)
+        start_date = launch_date
+        logger.info(f"Using token launch date as start: {start_date.strftime('%Y-%m-%d')}")
     
     try:
         logger.info(f"Fetching {symbol} ({ticker}) data from Yahoo Finance from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}...")
