@@ -138,15 +138,12 @@ async def startup_event():
                         if missing_historical_data:
                             logger.warning(f"{symbol} data only goes back to {data_start.strftime('%Y-%m-%d')}, should start from {earliest_start.strftime('%Y-%m-%d')}")
                         
+                        # Skip automatic refresh on startup - let scheduled jobs handle it
+                        # This prevents blocking server startup with slow API calls
                         if has_future_dates or missing_historical_data:
-                            logger.info(f"Triggering refresh for {symbol} ({earliest_start.strftime('%Y-%m-%d')} onwards)...")
-                            try:
-                                df_refreshed = update_crypto_data(symbol=symbol, force=True, start_date=earliest_start)
-                                refreshed_start = df_refreshed.index.min()
-                                refreshed_end = df_refreshed.index.max()
-                                logger.info(f"✓ {symbol} startup data refresh successful: {len(df_refreshed)} rows from {refreshed_start.strftime('%Y-%m-%d')} to {refreshed_end.strftime('%Y-%m-%d')}")
-                            except Exception as refresh_error:
-                                logger.error(f"❌ {symbol} startup data refresh failed: {refresh_error}", exc_info=True)
+                            logger.info(f"⚠️ {symbol} data needs refresh (will be handled by scheduled job or manual refresh)")
+                            logger.info(f"   Current data: {len(df)} rows from {data_start.strftime('%Y-%m-%d')} to {data_end.strftime('%Y-%m-%d')}")
+                            logger.info(f"   Expected range: {earliest_start.strftime('%Y-%m-%d')} onwards")
                         else:
                             logger.info(f"✓ {symbol} data is valid: {len(df)} rows from {data_start.strftime('%Y-%m-%d')} to {data_end.strftime('%Y-%m-%d')}")
                     except Exception as e:
@@ -221,19 +218,9 @@ async def startup_event():
         scheduler.start()
         logger.info("Scheduler started for data updates (every 6 hours)")
         
-        # Also trigger an immediate update on startup to ensure fresh data (non-blocking)
-        try:
-            logger.info("Triggering startup data refresh...")
-            # Schedule immediate update (runs in background)
-            scheduler.add_job(
-                scheduled_data_update,
-                trigger='date',  # Run immediately
-                id='startup_data_update',
-                name='Startup Bitcoin Data Update',
-                replace_existing=True
-            )
-        except Exception as startup_update_error:
-            logger.warning(f"Startup data update scheduling failed (non-critical): {startup_update_error}")
+        # Skip immediate data update on startup to prevent blocking server startup
+        # Data updates will be handled by scheduled daily jobs or manual refresh endpoint
+        logger.info("Startup data refresh skipped - will be handled by scheduled daily jobs")
     except Exception as e:
         logger.error(f"Failed to start scheduler: {e}", exc_info=True)
         logger.warning("Application will continue without scheduler. Manual data updates will still work.")
