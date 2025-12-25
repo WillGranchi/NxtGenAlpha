@@ -1295,39 +1295,13 @@ def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None) -
             if missing_historical_data:
                 logger.warning(f"Data file only goes back to {data_start.strftime('%Y-%m-%d')}, but CoinGecko data is available from {earliest_start_date.strftime('%Y-%m-%d')}")
             
-            logger.info(f"Automatically refreshing {symbol} data from CoinGecko ({earliest_start_date.strftime('%Y-%m-%d')} onwards)...")
+            # Skip automatic refresh to prevent blocking server startup
+            # Data refresh should be handled by scheduled jobs or manual refresh endpoint
+            logger.info(f"⚠️ {symbol} data needs refresh (current: {data_start.strftime('%Y-%m-%d')} to {data_end.strftime('%Y-%m-%d')}, expected: {earliest_start_date.strftime('%Y-%m-%d')} onwards)")
+            logger.info(f"   Use /api/data/refresh endpoint or wait for scheduled daily update to refresh data")
             
-            # Clear cache before refresh to ensure fresh data
-            if cache_key in _dataframe_cache:
-                del _dataframe_cache[cache_key]
-            
-            try:
-                # Force refresh from CoinGecko, ignoring freshness check
-                df_refreshed = update_crypto_data(symbol=symbol, force=True, start_date=earliest_start_date)
-                
-                # Verify refresh was successful
-                refreshed_start = df_refreshed.index.min()
-                refreshed_end = df_refreshed.index.max()
-                
-                if refreshed_start <= earliest_start_date and refreshed_end <= current_date:
-                    logger.info(f"✓ Successfully refreshed data: {len(df_refreshed)} rows from {df_refreshed.index.min()} to {df_refreshed.index.max()}")
-                    # Update cache with refreshed data
-                    import os
-                    if os.path.exists(file_path):
-                        _dataframe_cache[cache_key] = (df_refreshed, os.path.getmtime(file_path))
-                    return df_refreshed
-                else:
-                    logger.error(f"⚠️ Refresh validation failed: start={refreshed_start.strftime('%Y-%m-%d')}, end={refreshed_end.strftime('%Y-%m-%d')}")
-                    # Still return refreshed data, but log warning
-                    import os
-                    if os.path.exists(file_path):
-                        _dataframe_cache[cache_key] = (df_refreshed, os.path.getmtime(file_path))
-                    return df_refreshed
-            except Exception as refresh_error:
-                logger.error(f"❌ Auto-refresh failed: {refresh_error}", exc_info=True)
-                logger.error(f"⚠️ Using existing data (may be invalid/mock data)")
-                # Don't cache invalid data
-                return df
+            # Return existing data - don't block on refresh
+            return df
         
         # Cache the loaded data
         if file_exists:
