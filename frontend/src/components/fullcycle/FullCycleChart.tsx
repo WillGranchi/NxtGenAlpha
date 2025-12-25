@@ -239,7 +239,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         gridcolor: '#374151',
         showgrid: true,
         side: 'right' as const,
-        overlaying: 'y',
+        overlaying: 'y' as const,
         range: [-3.5, 3.5],
       },
       plot_bgcolor: 'rgba(0, 0, 0, 0)',
