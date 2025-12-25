@@ -17,6 +17,11 @@ import os
 import json
 from pathlib import Path
 import time
+try:
+    import yfinance as yf
+    YFINANCE_AVAILABLE = True
+except ImportError:
+    YFINANCE_AVAILABLE = False
 from .data_quality import validate_data_quality, cross_validate_sources, calculate_quality_score
 
 
@@ -613,6 +618,133 @@ def get_coingecko_coin_id(symbol: str) -> Optional[str]:
     return symbol_to_coingecko.get(symbol)
 
 
+def get_yahoo_finance_ticker(symbol: str) -> Optional[str]:
+    """
+    Map trading pair symbol to Yahoo Finance ticker.
+    
+    Args:
+        symbol (str): Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
+        
+    Returns:
+        Optional[str]: Yahoo Finance ticker (e.g., "BTC-USD", "ETH-USD") or None if not supported
+    """
+    symbol_to_yahoo = {
+        'BTCUSDT': 'BTC-USD',
+        'ETHUSDT': 'ETH-USD',
+        'BNBUSDT': 'BNB-USD',
+        'ADAUSDT': 'ADA-USD',
+        'SOLUSDT': 'SOL-USD',
+        'XRPUSDT': 'XRP-USD',
+        'SUIUSDT': 'SUI-USD',
+        'DOTUSDT': 'DOT-USD',
+        'DOGEUSDT': 'DOGE-USD',
+        'AVAXUSDT': 'AVAX-USD',
+        'MATICUSDT': 'MATIC-USD',
+        'LINKUSDT': 'LINK-USD',
+        'UNIUSDT': 'UNI-USD',
+        'LTCUSDT': 'LTC-USD',
+        'ATOMUSDT': 'ATOM-USD',
+        'ETCUSDT': 'ETC-USD',
+    }
+    return symbol_to_yahoo.get(symbol)
+
+
+def fetch_crypto_data_from_yahoo_finance(
+    symbol: str = "BTCUSDT",
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None
+) -> pd.DataFrame:
+    """
+    Fetch cryptocurrency historical data from Yahoo Finance using yfinance library.
+    Yahoo Finance provides free, reliable historical data with good coverage.
+    
+    Args:
+        symbol (str): Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
+        start_date (datetime, optional): Start date to fetch from (defaults to 5 years ago)
+        end_date (datetime, optional): End date (defaults to today)
+        
+    Returns:
+        pd.DataFrame: DataFrame with OHLCV data (Open, High, Low, Close, Volume)
+        
+    Raises:
+        ValueError: If symbol not supported or yfinance not available
+        Exception: If API request fails
+    """
+    logger = logging.getLogger(__name__)
+    
+    if not YFINANCE_AVAILABLE:
+        raise ValueError("yfinance library is not installed. Please install it: pip install yfinance")
+    
+    # Get Yahoo Finance ticker
+    ticker = get_yahoo_finance_ticker(symbol)
+    if not ticker:
+        raise ValueError(f"Symbol {symbol} is not supported by Yahoo Finance. Please use a supported symbol.")
+    
+    # Default dates
+    if end_date is None:
+        end_date = datetime.now()
+    if start_date is None:
+        # Default to 5 years back
+        start_date = end_date - timedelta(days=5*365)
+    
+    try:
+        logger.info(f"Fetching {symbol} ({ticker}) data from Yahoo Finance from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}...")
+        
+        # Create ticker object
+        yf_ticker = yf.Ticker(ticker)
+        
+        # Fetch historical data
+        df = yf_ticker.history(start=start_date, end=end_date, interval='1d')
+        
+        if df.empty:
+            raise ValueError(f"No data returned from Yahoo Finance for {symbol} ({ticker})")
+        
+        # Rename columns to match our standard format
+        # yfinance returns: Open, High, Low, Close, Volume, Dividends, Stock Splits
+        required_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+        
+        # Ensure we have the right columns
+        if not all(col in df.columns for col in required_columns):
+            # Use adjusted close if regular close is not available
+            if 'Adj Close' in df.columns and 'Close' not in df.columns:
+                df['Close'] = df['Adj Close']
+        
+        # Select only required columns
+        df = df[required_columns].copy()
+        
+        # Ensure index is datetime
+        if not isinstance(df.index, pd.DatetimeIndex):
+            df.index = pd.to_datetime(df.index)
+        
+        # Remove timezone if present (yfinance sometimes includes timezone)
+        if df.index.tz is not None:
+            df.index = df.index.tz_localize(None)
+        
+        # Sort by date
+        df = df.sort_index()
+        
+        # Remove any duplicate dates
+        df = df[~df.index.duplicated(keep='last')]
+        
+        # Filter to requested date range
+        df = df[(df.index >= start_date) & (df.index <= end_date)]
+        
+        # Ensure all values are numeric
+        for col in required_columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # Remove rows with all NaN values
+        df = df.dropna(how='all')
+        
+        logger.info(f"Successfully fetched {len(df)} rows from Yahoo Finance ({df.index.min()} to {df.index.max()})")
+        
+        return df
+        
+    except Exception as e:
+        logger.error(f"Error fetching {symbol} data from Yahoo Finance: {e}", exc_info=True)
+        raise Exception(f"Failed to fetch {symbol} data from Yahoo Finance: {str(e)}")
+
+
 def get_cryptocompare_symbol(symbol: str) -> Optional[str]:
     """
     Map trading pair symbol to CryptoCompare symbol format.
@@ -843,15 +975,14 @@ def fetch_crypto_data_smart(
     cross_validate: bool = True
 ) -> Tuple[pd.DataFrame, str, Dict]:
     """
-    Smart data fetching strategy that uses multiple sources with quality validation.
+    Smart data fetching strategy that uses Yahoo Finance as primary source.
     
     Priority:
-    1. Check local cache (if fresh < 24 hours old)
-    2. Fetch recent data from Binance (last 1000 days, full OHLCV, fast)
-    3. Fetch historical data from CoinGecko (beyond 1000 days, slower but deeper)
-    4. Cross-validate with CryptoCompare (optional, for quality assurance)
-    5. Merge, deduplicate, and validate quality
-    6. Cache result
+    1. Fetch data from Yahoo Finance (primary source - free, reliable, good coverage)
+    2. Fallback to CoinGecko if Yahoo Finance fails
+    3. Cross-validate with CryptoCompare (optional, for quality assurance)
+    4. Merge, deduplicate, and validate quality
+    5. Cache result
     
     Args:
         symbol: Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
@@ -871,49 +1002,33 @@ def fetch_crypto_data_smart(
     if start_date is None:
         start_date, _ = calculate_historical_range(symbol, years=5)
     
-    # Check cache first
-    # Note: load_crypto_data is defined later in this file, but Python handles forward references
-    # We'll skip cache check in smart fetch to avoid potential issues - cache is handled in update_crypto_data
-    # This function is primarily for fetching fresh data from multiple sources
-    
-    # Calculate days needed
-    days_needed = (end_date - start_date).days
-    days_recent = min(1000, days_needed)  # Binance can fetch up to 1000 days efficiently
-    
-    df_binance = None
+    df_yahoo = None
     df_coingecko = None
     df_cryptocompare = None
     
     sources_used = []
     
-    # Step 1: Try Binance for recent data (last 1000 days)
-    if days_recent > 0:
-        try:
-            logger.info(f"Fetching {symbol} recent data from Binance (last {days_recent} days)...")
-            binance_start = max(start_date, end_date - timedelta(days=days_recent))
-            df_binance = fetch_crypto_data_from_binance(
-                symbol=symbol,
-                start_date=binance_start,
-                fallback_to_coingecko=False
-            )
-            if not df_binance.empty:
-                sources_used.append("binance")
-                logger.info(f"Successfully fetched {len(df_binance)} days from Binance")
-        except Exception as e:
-            logger.warning(f"Binance fetch failed: {e}, will use CoinGecko")
+    # Step 1: Try Yahoo Finance first (primary source - easiest and most reliable)
+    try:
+        logger.info(f"Fetching {symbol} data from Yahoo Finance ({start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')})...")
+        df_yahoo = fetch_crypto_data_from_yahoo_finance(
+            symbol=symbol,
+            start_date=start_date,
+            end_date=end_date
+        )
+        if not df_yahoo.empty:
+            sources_used.append("yahoo_finance")
+            logger.info(f"Successfully fetched {len(df_yahoo)} days from Yahoo Finance")
+    except Exception as e:
+        logger.warning(f"Yahoo Finance fetch failed: {e}, will try CoinGecko")
     
-    # Step 2: Fetch historical data from CoinGecko (beyond 1000 days or if Binance failed)
-    historical_start = start_date
-    if df_binance is not None and not df_binance.empty:
-        # Only fetch data before Binance's start date
-        historical_start = min(start_date, df_binance.index.min() - timedelta(days=1))
-    
-    if historical_start < end_date:
+    # Step 2: Fallback to CoinGecko if Yahoo Finance failed
+    if df_yahoo is None or df_yahoo.empty:
         try:
-            logger.info(f"Fetching {symbol} historical data from CoinGecko ({historical_start.strftime('%Y-%m-%d')} onwards)...")
+            logger.info(f"Fetching {symbol} data from CoinGecko ({start_date.strftime('%Y-%m-%d')} onwards)...")
             df_coingecko = fetch_crypto_data_from_coingecko(
                 symbol=symbol,
-                start_date=historical_start,
+                start_date=start_date,
                 end_date=end_date
             )
             if not df_coingecko.empty:
@@ -923,6 +1038,7 @@ def fetch_crypto_data_smart(
             logger.warning(f"CoinGecko fetch failed: {e}")
     
     # Step 3: Cross-validate with CryptoCompare (optional, for quality)
+    days_needed = (end_date - start_date).days
     if cross_validate and days_needed <= 2000:  # CryptoCompare can fetch up to 2000 days
         try:
             logger.info(f"Cross-validating {symbol} data with CryptoCompare...")
@@ -937,33 +1053,14 @@ def fetch_crypto_data_smart(
         except Exception as e:
             logger.debug(f"CryptoCompare validation skipped: {e}")
     
-    # Step 4: Merge data from multiple sources
-    dfs_to_merge = []
-    if df_binance is not None and not df_binance.empty:
-        dfs_to_merge.append(df_binance)
-    if df_coingecko is not None and not df_coingecko.empty:
-        dfs_to_merge.append(df_coingecko)
-    
-    if not dfs_to_merge:
-        # Fallback: try CoinGecko for all data
-        logger.warning(f"All primary sources failed, trying CoinGecko for full range...")
-        try:
-            df_coingecko = fetch_crypto_data_from_coingecko(symbol=symbol, start_date=start_date, end_date=end_date)
-            if not df_coingecko.empty:
-                dfs_to_merge.append(df_coingecko)
-                sources_used = ["coingecko"]
-        except Exception as e:
-            logger.error(f"CoinGecko fallback also failed: {e}")
-            raise Exception(f"Failed to fetch {symbol} data from any source")
-    
-    # Merge DataFrames
-    if len(dfs_to_merge) == 1:
-        df_merged = dfs_to_merge[0]
+    # Step 4: Use Yahoo Finance data if available, otherwise CoinGecko
+    if df_yahoo is not None and not df_yahoo.empty:
+        df_merged = df_yahoo
+    elif df_coingecko is not None and not df_coingecko.empty:
+        df_merged = df_coingecko
     else:
-        # Combine and deduplicate (prefer Binance data for overlapping dates)
-        df_merged = pd.concat(dfs_to_merge, axis=0)
-        df_merged = df_merged[~df_merged.index.duplicated(keep='first')]
-        df_merged.sort_index(inplace=True)
+        # All sources failed
+        raise Exception(f"Failed to fetch {symbol} data from any source (Yahoo Finance or CoinGecko)")
     
     # Filter to requested date range
     df_merged = df_merged[(df_merged.index >= start_date) & (df_merged.index <= end_date)]
@@ -975,7 +1072,7 @@ def fetch_crypto_data_smart(
         cv_results = cross_validate_sources(
             df_merged,
             df_cryptocompare,
-            source1_name="merged",
+            source1_name="primary",
             source2_name="cryptocompare"
         )
         quality_metrics['cross_validation'] = cv_results
@@ -988,8 +1085,8 @@ def fetch_crypto_data_smart(
         )
     
     # Determine primary source name
-    if "binance" in sources_used:
-        primary_source = "binance"
+    if "yahoo_finance" in sources_used:
+        primary_source = "yahoo_finance"
     elif "coingecko" in sources_used:
         primary_source = "coingecko"
     else:

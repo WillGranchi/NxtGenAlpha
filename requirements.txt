@@ -45,5 +45,5 @@ requests>=2.31.0
 apscheduler>=3.10.0
 
 # Optional: For enhanced data sources
-# yfinance>=0.2.0
+yfinance>=0.2.0
 # ccxt>=4.0.0
