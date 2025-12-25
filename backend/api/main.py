@@ -72,24 +72,34 @@ app.add_middleware(
 scheduler = AsyncIOScheduler()
 
 async def scheduled_data_update():
-    """Scheduled task to update cryptocurrency data from CoinGecko (2010 onwards)."""
+    """Scheduled task to update cryptocurrency data for all supported symbols (daily updates)."""
     try:
-        logger.info("Running scheduled data update for Bitcoin from CoinGecko (2010-01-01 onwards)...")
-        # Update Bitcoin data from CoinGecko (2010-01-01 onwards)
-        # Use force=False to respect freshness check
-        from datetime import datetime
-        earliest_start = datetime(2010, 1, 1)
-        df = update_crypto_data(symbol="BTCUSDT", force=False, start_date=earliest_start)
+        # Supported symbols (BTC and ETH first, then others)
+        symbols = ["BTCUSDT", "ETHUSDT"]
         
-        # Verify data quality
-        days_available = (df.index.max() - df.index.min()).days
-        logger.info(f"Scheduled update completed: {len(df)} rows, {days_available} days ({days_available/365:.2f} years)")
+        logger.info(f"Running scheduled data update for {len(symbols)} symbols...")
         
-        if days_available < 365:
-            logger.warning(f"⚠️  WARNING: Less than 1 year of data available ({days_available} days)")
-        else:
-            logger.info(f"✓ Data update successful: {days_available/365:.2f} years of data available")
-            
+        for symbol in symbols:
+            try:
+                logger.info(f"Updating {symbol} data...")
+                # Use smart fetching (Binance + CoinGecko + CryptoCompare with quality validation)
+                # force=False to respect freshness check (24 hours)
+                df = update_crypto_data(symbol=symbol, force=False)
+                
+                # Verify data quality
+                days_available = (df.index.max() - df.index.min()).days
+                logger.info(f"{symbol} update completed: {len(df)} rows, {days_available} days ({days_available/365:.2f} years)")
+                
+                if days_available < 365:
+                    logger.warning(f"⚠️  WARNING: {symbol} has less than 1 year of data ({days_available} days)")
+                else:
+                    logger.info(f"✓ {symbol} data update successful: {days_available/365:.2f} years of data available")
+                    
+            except Exception as e:
+                logger.error(f"Error updating {symbol} data: {e}", exc_info=True)
+                # Continue with other symbols even if one fails
+                continue
+                
     except Exception as e:
         logger.error(f"Error in scheduled data update: {e}", exc_info=True)
 
@@ -104,33 +114,45 @@ async def startup_event():
                 from backend.core.data_loader import load_crypto_data, update_crypto_data
                 from datetime import datetime
                 
-                logger.info("Checking BTC data date range on startup...")
-                df = load_crypto_data(symbol="BTCUSDT")
-                data_start = df.index.min()
-                data_end = df.index.max()
-                earliest_start = datetime(2010, 1, 1)
-                current_date = datetime.now()
+                # Check data for BTC and ETH
+                symbols_to_check = ["BTCUSDT", "ETHUSDT"]
                 
-                # Check for invalid data (future dates or missing historical data)
-                has_future_dates = data_end > current_date
-                missing_historical_data = data_start > earliest_start
-                
-                if has_future_dates:
-                    logger.error(f"⚠️ INVALID DATA: CSV contains future dates (up to {data_end.strftime('%Y-%m-%d')}). This is mock/test data!")
-                if missing_historical_data:
-                    logger.warning(f"BTC data only goes back to {data_start.strftime('%Y-%m-%d')}, should start from {earliest_start.strftime('%Y-%m-%d')}")
-                
-                if has_future_dates or missing_historical_data:
-                    logger.info(f"Triggering refresh from CoinGecko ({earliest_start.strftime('%Y-%m-%d')} onwards)...")
+                for symbol in symbols_to_check:
                     try:
-                        df_refreshed = update_crypto_data(symbol="BTCUSDT", force=True, start_date=earliest_start)
-                        refreshed_start = df_refreshed.index.min()
-                        refreshed_end = df_refreshed.index.max()
-                        logger.info(f"✓ Startup data refresh successful: {len(df_refreshed)} rows from {refreshed_start.strftime('%Y-%m-%d')} to {refreshed_end.strftime('%Y-%m-%d')}")
-                    except Exception as refresh_error:
-                        logger.error(f"❌ Startup data refresh failed: {refresh_error}", exc_info=True)
-                else:
-                    logger.info(f"✓ BTC data is valid: {len(df)} rows from {data_start.strftime('%Y-%m-%d')} to {data_end.strftime('%Y-%m-%d')}")
+                        logger.info(f"Checking {symbol} data date range on startup...")
+                        df = load_crypto_data(symbol=symbol)
+                        data_start = df.index.min()
+                        data_end = df.index.max()
+                        
+                        # Get token-specific earliest start date (5 years back or token launch)
+                        from backend.core.data_loader import calculate_historical_range
+                        earliest_start, _ = calculate_historical_range(symbol, years=5)
+                        current_date = datetime.now()
+                        
+                        # Check for invalid data (future dates or missing historical data)
+                        has_future_dates = data_end > current_date
+                        missing_historical_data = data_start > earliest_start
+                        
+                        if has_future_dates:
+                            logger.error(f"⚠️ INVALID DATA: {symbol} CSV contains future dates (up to {data_end.strftime('%Y-%m-%d')}). This is mock/test data!")
+                        if missing_historical_data:
+                            logger.warning(f"{symbol} data only goes back to {data_start.strftime('%Y-%m-%d')}, should start from {earliest_start.strftime('%Y-%m-%d')}")
+                        
+                        if has_future_dates or missing_historical_data:
+                            logger.info(f"Triggering refresh for {symbol} ({earliest_start.strftime('%Y-%m-%d')} onwards)...")
+                            try:
+                                df_refreshed = update_crypto_data(symbol=symbol, force=True, start_date=earliest_start)
+                                refreshed_start = df_refreshed.index.min()
+                                refreshed_end = df_refreshed.index.max()
+                                logger.info(f"✓ {symbol} startup data refresh successful: {len(df_refreshed)} rows from {refreshed_start.strftime('%Y-%m-%d')} to {refreshed_end.strftime('%Y-%m-%d')}")
+                            except Exception as refresh_error:
+                                logger.error(f"❌ {symbol} startup data refresh failed: {refresh_error}", exc_info=True)
+                        else:
+                            logger.info(f"✓ {symbol} data is valid: {len(df)} rows from {data_start.strftime('%Y-%m-%d')} to {data_end.strftime('%Y-%m-%d')}")
+                    except Exception as e:
+                        logger.error(f"Startup data check failed for {symbol}: {e}", exc_info=True)
+                        # Continue with other symbols even if one fails
+                        continue
             except Exception as e:
                 logger.error(f"Startup data check failed: {e}", exc_info=True)
         
@@ -191,7 +213,7 @@ async def startup_event():
         # Update every 6 hours to keep data fresh
         scheduler.add_job(
             scheduled_data_update,
-            trigger=CronTrigger(hour='*/6', minute=0),  # Every 6 hours
+            trigger=CronTrigger(hour=0, minute=0),  # Daily at midnight UTC
             id='frequent_data_update',
             name='Frequent Bitcoin Data Update',
             replace_existing=True

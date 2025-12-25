@@ -11,6 +11,7 @@ from backend.core.data_loader import (
     update_btc_data, update_crypto_data, get_last_update_time,
     get_available_symbols
 )
+from backend.core.data_quality import validate_data_quality
 from backend.api.models.backtest_models import DataInfoResponse, ErrorResponse
 from datetime import datetime
 
@@ -191,6 +192,9 @@ async def refresh_data(
         data_end = df.index.max()
         days_available = (data_end - data_start).days
         
+        # Get quality metrics
+        quality_metrics = validate_data_quality(df, symbol)
+        
         return {
             "success": True,
             "message": f"{symbol} data refreshed successfully",
@@ -200,7 +204,14 @@ async def refresh_data(
             "days_available": days_available,
             "years_available": round(days_available / 365.0, 2),
             "data_source": summary.get('data_source', 'unknown'),
-            "last_update": last_update.isoformat() if last_update else None
+            "last_update": last_update.isoformat() if last_update else None,
+            "quality": {
+                "quality_score": quality_metrics.get('quality_score', 0.0),
+                "completeness_score": quality_metrics.get('completeness_score', 0.0),
+                "consistency_score": quality_metrics.get('consistency_score', 0.0),
+                "freshness_score": quality_metrics.get('freshness_score', 0.0),
+                "issues": quality_metrics.get('issues', [])
+            }
         }
     except Exception as e:
         logger.error(f"Error refreshing data: {e}")

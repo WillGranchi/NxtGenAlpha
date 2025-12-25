@@ -42,9 +42,10 @@ export const TokenSelector: React.FC<TokenSelectorProps> = ({
               'BTCUSDT': { name: 'Bitcoin', chain: 'Bitcoin' },
               'ETHUSDT': { name: 'Ethereum', chain: 'Ethereum' },
               'BNBUSDT': { name: 'Binance Coin', chain: 'BSC' },
-              'ADAUSDT': { name: 'Cardano', chain: 'Cardano' },
               'SOLUSDT': { name: 'Solana', chain: 'Solana' },
+              'SUIUSDT': { name: 'Sui', chain: 'Sui' },
               'XRPUSDT': { name: 'Ripple', chain: 'Ripple' },
+              'ADAUSDT': { name: 'Cardano', chain: 'Cardano' },
               'DOTUSDT': { name: 'Polkadot', chain: 'Polkadot' },
               'DOGEUSDT': { name: 'Dogecoin', chain: 'Dogecoin' },
               'AVAXUSDT': { name: 'Avalanche', chain: 'Avalanche' },
@@ -66,11 +67,14 @@ export const TokenSelector: React.FC<TokenSelectorProps> = ({
           setTokens(tokenList);
         }
       } catch (error) {
-        // Fallback to default tokens
+        // Fallback to default tokens (BTC and ETH first, then others)
         setTokens([
           { symbol: 'BTCUSDT', name: 'Bitcoin', chain: 'Bitcoin' },
           { symbol: 'ETHUSDT', name: 'Ethereum', chain: 'Ethereum' },
+          { symbol: 'SOLUSDT', name: 'Solana', chain: 'Solana' },
+          { symbol: 'SUIUSDT', name: 'Sui', chain: 'Sui' },
           { symbol: 'BNBUSDT', name: 'Binance Coin', chain: 'BSC' },
+          { symbol: 'XRPUSDT', name: 'Ripple', chain: 'Ripple' },
         ]);
       } finally {
         setIsLoading(false);

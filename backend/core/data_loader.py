@@ -9,7 +9,7 @@ datetime indexing and data cleaning.
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from typing import Optional, Tuple, Dict
+from typing import Optional, Tuple, Dict, List
 from functools import lru_cache
 import logging
 import requests
@@ -17,6 +17,7 @@ import os
 import json
 from pathlib import Path
 import time
+from .data_quality import validate_data_quality, cross_validate_sources, calculate_quality_score
 
 
 # Global variable to track last update time per symbol
@@ -598,6 +599,7 @@ def get_coingecko_coin_id(symbol: str) -> Optional[str]:
         'ADAUSDT': 'cardano',
         'SOLUSDT': 'solana',
         'XRPUSDT': 'ripple',
+        'SUIUSDT': 'sui',
         'DOTUSDT': 'polkadot',
         'DOGEUSDT': 'dogecoin',
         'AVAXUSDT': 'avalanche-2',
@@ -609,6 +611,161 @@ def get_coingecko_coin_id(symbol: str) -> Optional[str]:
         'ETCUSDT': 'ethereum-classic',
     }
     return symbol_to_coingecko.get(symbol)
+
+
+def get_cryptocompare_symbol(symbol: str) -> Optional[str]:
+    """
+    Map trading pair symbol to CryptoCompare symbol format.
+    
+    Args:
+        symbol (str): Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
+        
+    Returns:
+        Optional[str]: CryptoCompare symbol (e.g., "BTC", "ETH") or None if not supported
+    """
+    symbol_to_cryptocompare = {
+        'BTCUSDT': 'BTC',
+        'ETHUSDT': 'ETH',
+        'BNBUSDT': 'BNB',
+        'SOLUSDT': 'SOL',
+        'XRPUSDT': 'XRP',
+        'SUIUSDT': 'SUI',
+        'ADAUSDT': 'ADA',
+        'DOTUSDT': 'DOT',
+        'DOGEUSDT': 'DOGE',
+        'AVAXUSDT': 'AVAX',
+        'MATICUSDT': 'MATIC',
+        'LINKUSDT': 'LINK',
+        'UNIUSDT': 'UNI',
+        'LTCUSDT': 'LTC',
+        'ATOMUSDT': 'ATOM',
+        'ETCUSDT': 'ETC',
+    }
+    return symbol_to_cryptocompare.get(symbol)
+
+
+def fetch_crypto_data_from_cryptocompare(
+    symbol: str = "BTCUSDT",
+    days: int = 365,
+    start_date: Optional[datetime] = None
+) -> pd.DataFrame:
+    """
+    Fetch cryptocurrency historical data from CryptoCompare API (free tier).
+    
+    Args:
+        symbol (str): Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
+        days (int): Number of days of historical data to fetch
+        start_date (datetime, optional): Specific start date to fetch from (overrides days)
+        
+    Returns:
+        pd.DataFrame: DataFrame with OHLCV data (Open, High, Low, Close, Volume)
+        
+    Raises:
+        ValueError: If symbol not supported or API request fails
+    """
+    logger = logging.getLogger(__name__)
+    
+    # Get CryptoCompare symbol
+    cc_symbol = get_cryptocompare_symbol(symbol)
+    if not cc_symbol:
+        raise ValueError(f"Symbol {symbol} is not supported by CryptoCompare")
+    
+    try:
+        # CryptoCompare free API endpoint
+        # Note: Free tier allows 100k calls/month, no API key required for basic endpoints
+        base_url = "https://min-api.cryptocompare.com/data/v2/histoday"
+        
+        # Calculate time range
+        end_time = datetime.now()
+        if start_date:
+            start_time = start_date
+            days = (end_time - start_time).days
+        else:
+            start_time = end_time - timedelta(days=days)
+        
+        # CryptoCompare API uses Unix timestamps
+        to_ts = int(end_time.timestamp())
+        limit = min(days, 2000)  # CryptoCompare allows up to 2000 days per request
+        
+        # For requests > 2000 days, we need to paginate
+        all_data = []
+        current_to_ts = to_ts
+        request_count = 0
+        max_requests = (days // 2000) + 2
+        
+        logger.info(f"Fetching {symbol} ({cc_symbol}) data from CryptoCompare ({days} days)...")
+        
+        while request_count < max_requests and limit > 0:
+            params = {
+                'fsym': cc_symbol,  # From symbol (e.g., BTC)
+                'tsym': 'USD',      # To symbol (USD)
+                'limit': limit,
+                'toTs': current_to_ts
+            }
+            
+            try:
+                response = requests.get(base_url, params=params, timeout=30)
+                response.raise_for_status()
+                data = response.json()
+                
+                if data.get('Response') == 'Error':
+                    error_msg = data.get('Message', 'Unknown error')
+                    logger.error(f"CryptoCompare API error: {error_msg}")
+                    break
+                
+                if data.get('Data', {}).get('Data'):
+                    candles = data['Data']['Data']
+                    if candles:
+                        all_data.extend(candles)
+                        # Update timestamp for next request (go back in time)
+                        current_to_ts = candles[0]['time'] - 1
+                        limit = min(2000, days - len(all_data))
+                        request_count += 1
+                        
+                        # Rate limiting: CryptoCompare free tier allows ~10 calls/second
+                        if request_count > 0:
+                            time.sleep(0.1)  # 100ms delay between requests
+                    else:
+                        break
+                else:
+                    break
+                    
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Error fetching CryptoCompare data: {e}")
+                break
+        
+        if not all_data:
+            raise ValueError(f"No data returned from CryptoCompare for {symbol}")
+        
+        # Parse CryptoCompare response format
+        # CryptoCompare returns: time, high, low, open, close, volumefrom, volumeto
+        df_data = []
+        for candle in all_data:
+            df_data.append({
+                'Date': pd.Timestamp.fromtimestamp(candle['time']),
+                'Open': candle['open'],
+                'High': candle['high'],
+                'Low': candle['low'],
+                'Close': candle['close'],
+                'Volume': candle.get('volumeto', candle.get('volumefrom', 0))  # Use volumeto (USD volume)
+            })
+        
+        df = pd.DataFrame(df_data)
+        df.set_index('Date', inplace=True)
+        df.sort_index(inplace=True)
+        
+        # Remove duplicates
+        df = df[~df.index.duplicated(keep='first')]
+        
+        # Clean data
+        df = _clean_data(df)
+        
+        logger.info(f"Successfully fetched {len(df)} days of {symbol} data from CryptoCompare")
+        return df
+        
+    except Exception as e:
+        logger.error(f"Error fetching data from CryptoCompare: {e}", exc_info=True)
+        raise Exception(f"Failed to fetch data from CryptoCompare: {str(e)}")
 
 
 def get_available_symbols() -> list:
@@ -626,6 +783,7 @@ def get_available_symbols() -> list:
         'ADAUSDT',   # Cardano
         'SOLUSDT',   # Solana
         'XRPUSDT',   # Ripple
+        'SUIUSDT',   # Sui
         'DOTUSDT',   # Polkadot
         'DOGEUSDT',  # Dogecoin
         'AVAXUSDT',  # Avalanche
@@ -635,7 +793,229 @@ def get_available_symbols() -> list:
         'LTCUSDT',   # Litecoin
         'ATOMUSDT',  # Cosmos
         'ETCUSDT',   # Ethereum Classic
+        'SUIUSDT',   # Sui
     ]
+
+
+def get_token_launch_date(symbol: str) -> datetime:
+    """
+    Get token launch date for calculating historical ranges.
+    
+    Args:
+        symbol (str): Trading pair symbol
+        
+    Returns:
+        datetime: Token launch date
+    """
+    launch_dates = {
+        'BTCUSDT': datetime(2010, 1, 1),
+        'ETHUSDT': datetime(2015, 7, 30),
+        'SOLUSDT': datetime(2020, 3, 16),
+        'SUIUSDT': datetime(2023, 5, 3),
+        'BNBUSDT': datetime(2017, 7, 25),
+        'XRPUSDT': datetime(2013, 8, 4),
+    }
+    return launch_dates.get(symbol, datetime(2010, 1, 1))  # Default to BTC launch date
+
+
+def calculate_historical_range(symbol: str, years: int = 5) -> Tuple[datetime, datetime]:
+    """
+    Calculate historical date range for a token (5 years back or from launch, whichever is later).
+    
+    Args:
+        symbol (str): Trading pair symbol
+        years (int): Number of years to look back (default 5)
+        
+    Returns:
+        Tuple[datetime, datetime]: (start_date, end_date)
+    """
+    end_date = datetime.now()
+    launch_date = get_token_launch_date(symbol)
+    start_date = max(launch_date, end_date - timedelta(days=years * 365))
+    return start_date, end_date
+
+
+def fetch_crypto_data_smart(
+    symbol: str = "BTCUSDT",
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    use_cache: bool = True,
+    cross_validate: bool = True
+) -> Tuple[pd.DataFrame, str, Dict]:
+    """
+    Smart data fetching strategy that uses multiple sources with quality validation.
+    
+    Priority:
+    1. Check local cache (if fresh < 24 hours old)
+    2. Fetch recent data from Binance (last 1000 days, full OHLCV, fast)
+    3. Fetch historical data from CoinGecko (beyond 1000 days, slower but deeper)
+    4. Cross-validate with CryptoCompare (optional, for quality assurance)
+    5. Merge, deduplicate, and validate quality
+    6. Cache result
+    
+    Args:
+        symbol: Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
+        start_date: Start date for historical data (defaults to 5 years back or token launch)
+        end_date: End date (defaults to today)
+        use_cache: Whether to use cached data if fresh
+        cross_validate: Whether to cross-validate with CryptoCompare
+        
+    Returns:
+        Tuple[pd.DataFrame, str, Dict]: DataFrame, data_source, quality_metrics
+    """
+    logger = logging.getLogger(__name__)
+    
+    # Calculate date range (5 years back or from token launch)
+    if end_date is None:
+        end_date = datetime.now()
+    if start_date is None:
+        start_date, _ = calculate_historical_range(symbol, years=5)
+    
+    # Check cache first
+    if use_cache:
+        try:
+            cached_df = load_crypto_data(symbol=symbol)
+            if not cached_df.empty:
+                cached_start = cached_df.index.min()
+                cached_end = cached_df.index.max()
+                # Check if cache covers our date range and is fresh (< 24 hours old)
+                cache_file_path = os.path.join(
+                    os.path.dirname(__file__), '..', 'data', f'{symbol}_historical_data.csv'
+                )
+                if os.path.exists(cache_file_path):
+                    cache_age_hours = (datetime.now().timestamp() - os.path.getmtime(cache_file_path)) / 3600
+                    if cache_age_hours < 24 and cached_start <= start_date and cached_end >= end_date:
+                        logger.info(f"Using cached data for {symbol} (age: {cache_age_hours:.1f} hours)")
+                        # Filter to requested date range
+                        filtered_df = cached_df[(cached_df.index >= start_date) & (cached_df.index <= end_date)]
+                        if not filtered_df.empty:
+                            quality_metrics = validate_data_quality(filtered_df, symbol)
+                            return filtered_df, "cache", quality_metrics
+        except Exception as e:
+            logger.debug(f"Cache check failed: {e}, proceeding with fetch")
+    
+    # Calculate days needed
+    days_needed = (end_date - start_date).days
+    days_recent = min(1000, days_needed)  # Binance can fetch up to 1000 days efficiently
+    
+    df_binance = None
+    df_coingecko = None
+    df_cryptocompare = None
+    
+    sources_used = []
+    
+    # Step 1: Try Binance for recent data (last 1000 days)
+    if days_recent > 0:
+        try:
+            logger.info(f"Fetching {symbol} recent data from Binance (last {days_recent} days)...")
+            binance_start = max(start_date, end_date - timedelta(days=days_recent))
+            df_binance = fetch_crypto_data_from_binance(
+                symbol=symbol,
+                start_date=binance_start,
+                fallback_to_coingecko=False
+            )
+            if not df_binance.empty:
+                sources_used.append("binance")
+                logger.info(f"Successfully fetched {len(df_binance)} days from Binance")
+        except Exception as e:
+            logger.warning(f"Binance fetch failed: {e}, will use CoinGecko")
+    
+    # Step 2: Fetch historical data from CoinGecko (beyond 1000 days or if Binance failed)
+    historical_start = start_date
+    if df_binance is not None and not df_binance.empty:
+        # Only fetch data before Binance's start date
+        historical_start = min(start_date, df_binance.index.min() - timedelta(days=1))
+    
+    if historical_start < end_date:
+        try:
+            logger.info(f"Fetching {symbol} historical data from CoinGecko ({historical_start.strftime('%Y-%m-%d')} onwards)...")
+            df_coingecko = fetch_crypto_data_from_coingecko(
+                symbol=symbol,
+                start_date=historical_start,
+                end_date=end_date
+            )
+            if not df_coingecko.empty:
+                sources_used.append("coingecko")
+                logger.info(f"Successfully fetched {len(df_coingecko)} days from CoinGecko")
+        except Exception as e:
+            logger.warning(f"CoinGecko fetch failed: {e}")
+    
+    # Step 3: Cross-validate with CryptoCompare (optional, for quality)
+    if cross_validate and days_needed <= 2000:  # CryptoCompare can fetch up to 2000 days
+        try:
+            logger.info(f"Cross-validating {symbol} data with CryptoCompare...")
+            df_cryptocompare = fetch_crypto_data_from_cryptocompare(
+                symbol=symbol,
+                days=min(days_needed, 2000),
+                start_date=start_date
+            )
+            if not df_cryptocompare.empty:
+                sources_used.append("cryptocompare")
+                logger.info(f"Successfully fetched {len(df_cryptocompare)} days from CryptoCompare for validation")
+        except Exception as e:
+            logger.debug(f"CryptoCompare validation skipped: {e}")
+    
+    # Step 4: Merge data from multiple sources
+    dfs_to_merge = []
+    if df_binance is not None and not df_binance.empty:
+        dfs_to_merge.append(df_binance)
+    if df_coingecko is not None and not df_coingecko.empty:
+        dfs_to_merge.append(df_coingecko)
+    
+    if not dfs_to_merge:
+        # Fallback: try CoinGecko for all data
+        logger.warning(f"All primary sources failed, trying CoinGecko for full range...")
+        try:
+            df_coingecko = fetch_crypto_data_from_coingecko(symbol=symbol, start_date=start_date, end_date=end_date)
+            if not df_coingecko.empty:
+                dfs_to_merge.append(df_coingecko)
+                sources_used = ["coingecko"]
+        except Exception as e:
+            logger.error(f"CoinGecko fallback also failed: {e}")
+            raise Exception(f"Failed to fetch {symbol} data from any source")
+    
+    # Merge DataFrames
+    if len(dfs_to_merge) == 1:
+        df_merged = dfs_to_merge[0]
+    else:
+        # Combine and deduplicate (prefer Binance data for overlapping dates)
+        df_merged = pd.concat(dfs_to_merge, axis=0)
+        df_merged = df_merged[~df_merged.index.duplicated(keep='first')]
+        df_merged.sort_index(inplace=True)
+    
+    # Filter to requested date range
+    df_merged = df_merged[(df_merged.index >= start_date) & (df_merged.index <= end_date)]
+    
+    # Step 5: Cross-validate quality if CryptoCompare data available
+    quality_metrics = validate_data_quality(df_merged, symbol)
+    
+    if df_cryptocompare is not None and not df_cryptocompare.empty:
+        cv_results = cross_validate_sources(
+            df_merged,
+            df_cryptocompare,
+            source1_name="merged",
+            source2_name="cryptocompare"
+        )
+        quality_metrics['cross_validation'] = cv_results
+        # Update quality score with accuracy from cross-validation
+        quality_metrics['quality_score'] = calculate_quality_score(
+            quality_metrics['completeness_score'],
+            quality_metrics['consistency_score'],
+            quality_metrics['freshness_score'],
+            cv_results['accuracy_score']
+        )
+    
+    # Determine primary source name
+    if "binance" in sources_used:
+        primary_source = "binance"
+    elif "coingecko" in sources_used:
+        primary_source = "coingecko"
+    else:
+        primary_source = "unknown"
+    
+    logger.info(f"Data fetch complete for {symbol}: {len(df_merged)} days, sources: {sources_used}, quality score: {quality_metrics['quality_score']:.2f}")
+    
+    return df_merged, primary_source, quality_metrics
 
 
 def save_data_to_csv(df: pd.DataFrame, file_path: Optional[str] = None, symbol: str = "BTCUSDT") -> str:
@@ -725,31 +1105,32 @@ def fetch_crypto_data_hybrid(symbol: str = "BTCUSDT", days: int = 1825, start_da
 
 def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int = 1825, start_date: Optional[datetime] = None) -> pd.DataFrame:
     """
-    Update cryptocurrency data using CoinGecko API (from 2010-01-01 onwards) and save to CSV.
-    Checks if data is fresh (updated within last 6 hours) before fetching.
+    Update cryptocurrency data using smart multi-source fetching (Binance + CoinGecko + CryptoCompare)
+    with quality validation. Saves to CSV and caches locally.
+    Checks if data is fresh (updated within last 24 hours) before fetching.
     
     Args:
         symbol (str): Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
         force (bool): Force update even if data is fresh
         days (int): Number of days of historical data to fetch (default 1825 = 5 years, ignored if start_date provided)
-        start_date (datetime, optional): Specific start date to fetch from (defaults to 2010-01-01 for CoinGecko)
+        start_date (datetime, optional): Specific start date to fetch from (defaults to 5 years back or token launch)
         
     Returns:
-        pd.DataFrame: Updated DataFrame
+        pd.DataFrame: Updated DataFrame with quality metrics
     """
     global _last_update_time
     
     logger = logging.getLogger(__name__)
     
-    # Default to 2010-01-01 (earliest CoinGecko data) if no start_date provided
+    # Calculate historical range (5 years back or from token launch)
     if start_date is None:
-        start_date = datetime(2010, 1, 1)
-        logger.info(f"Using default start date: {start_date.strftime('%Y-%m-%d')} (earliest CoinGecko data)")
+        start_date, _ = calculate_historical_range(symbol, years=5)
+        logger.info(f"Using calculated start date: {start_date.strftime('%Y-%m-%d')} (5 years back or token launch)")
     
-    # Check if we need to update (every 6 hours for more frequent updates)
+    # Check if we need to update (every 24 hours for daily updates)
     if not force and symbol in _last_update_time:
         time_since_update = datetime.now() - _last_update_time[symbol]
-        if time_since_update < timedelta(hours=6):  # Update if older than 6 hours
+        if time_since_update < timedelta(hours=24):  # Update if older than 24 hours
             logger.info(f"{symbol} data is fresh (updated {time_since_update.total_seconds()/3600:.1f} hours ago), skipping update")
             # Still clear cache to ensure latest data is loaded
             import os
@@ -768,15 +1149,27 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
         # Calculate end_date (today)
         end_date = datetime.now()
         fetch_days = (end_date - start_date).days
-        logger.info(f"Fetching CoinGecko data from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')} ({fetch_days} days)...")
+        logger.info(f"Fetching {symbol} data using smart multi-source strategy from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')} ({fetch_days} days)...")
         
-        # Use CoinGecko exclusively for all symbols
-        df, data_source, data_quality = fetch_crypto_data_hybrid(symbol=symbol, days=fetch_days, start_date=start_date, use_binance_only=False)
+        # Use smart fetching strategy (Binance + CoinGecko + CryptoCompare with quality validation)
+        df, data_source, quality_metrics = fetch_crypto_data_smart(
+            symbol=symbol,
+            start_date=start_date,
+            end_date=end_date,
+            use_cache=False,  # Force fresh fetch
+            cross_validate=True  # Enable cross-validation for quality
+        )
         
-        # Log data date range to verify historical depth
+        # Log data date range and quality metrics
         days_available = (df.index.max() - df.index.min()).days
+        quality_score = quality_metrics.get('quality_score', 0.0)
         logger.info(f"Fetched {symbol} data: {len(df)} rows from {df.index.min()} to {df.index.max()}")
         logger.info(f"Total days available: {days_available} ({days_available/365:.2f} years)")
+        logger.info(f"Data source: {data_source}, Quality score: {quality_score:.2f}")
+        
+        # Log quality issues if any
+        if quality_metrics.get('issues'):
+            logger.warning(f"Data quality issues detected for {symbol}: {quality_metrics['issues']}")
         
         # Verify minimum data requirement (at least 1 year)
         if days_available < 365:
@@ -803,7 +1196,8 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
         df_verify = load_crypto_data(symbol=symbol)
         
         final_days = (df_verify.index.max() - df_verify.index.min()).days
-        logger.info(f"{symbol} data updated successfully from {data_source} (quality: {data_quality}, {final_days} days / {final_days/365:.2f} years)")
+        quality_score = quality_metrics.get('quality_score', 0.0)
+        logger.info(f"{symbol} data updated successfully from {data_source} (quality score: {quality_score:.2f}, {final_days} days / {final_days/365:.2f} years)")
         logger.info(f"Latest price: ${df_verify['Close'].iloc[-1]:.2f} as of {df_verify.index.max().strftime('%Y-%m-%d')}")
         return df_verify
         
