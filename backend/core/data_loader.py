@@ -872,27 +872,9 @@ def fetch_crypto_data_smart(
         start_date, _ = calculate_historical_range(symbol, years=5)
     
     # Check cache first
-    if use_cache:
-        try:
-            cached_df = load_crypto_data(symbol=symbol)
-            if not cached_df.empty:
-                cached_start = cached_df.index.min()
-                cached_end = cached_df.index.max()
-                # Check if cache covers our date range and is fresh (< 24 hours old)
-                cache_file_path = os.path.join(
-                    os.path.dirname(__file__), '..', 'data', f'{symbol}_historical_data.csv'
-                )
-                if os.path.exists(cache_file_path):
-                    cache_age_hours = (datetime.now().timestamp() - os.path.getmtime(cache_file_path)) / 3600
-                    if cache_age_hours < 24 and cached_start <= start_date and cached_end >= end_date:
-                        logger.info(f"Using cached data for {symbol} (age: {cache_age_hours:.1f} hours)")
-                        # Filter to requested date range
-                        filtered_df = cached_df[(cached_df.index >= start_date) & (cached_df.index <= end_date)]
-                        if not filtered_df.empty:
-                            quality_metrics = validate_data_quality(filtered_df, symbol)
-                            return filtered_df, "cache", quality_metrics
-        except Exception as e:
-            logger.debug(f"Cache check failed: {e}, proceeding with fetch")
+    # Note: load_crypto_data is defined later in this file, but Python handles forward references
+    # We'll skip cache check in smart fetch to avoid potential issues - cache is handled in update_crypto_data
+    # This function is primarily for fetching fresh data from multiple sources
     
     # Calculate days needed
     days_needed = (end_date - start_date).days
