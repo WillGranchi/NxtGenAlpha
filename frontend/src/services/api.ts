@@ -771,6 +771,52 @@ export class TradingAPI {
     return response.data;
   }
 
+  // Full Cycle Methods
+
+  /**
+   * Get list of available full cycle indicators.
+   */
+  static async getFullCycleIndicators(): Promise<{
+    success: boolean;
+    indicators: Array<{
+      id: string;
+      name: string;
+      category: 'fundamental' | 'technical';
+      default_params: Record<string, any>;
+    }>;
+    count: number;
+  }> {
+    const response: AxiosResponse<any> = await api.get('/api/fullcycle/indicators');
+    return response.data;
+  }
+
+  /**
+   * Calculate full cycle z-scores for selected indicators.
+   */
+  static async calculateFullCycleZScores(request: {
+    indicators: string[];
+    indicator_params?: Record<string, Record<string, any>>;
+    start_date?: string;
+    end_date?: string;
+    roc_days?: number;
+  }): Promise<{
+    success: boolean;
+    data: Array<{
+      date: string;
+      price: number;
+      indicators: Record<string, { zscore: number }>;
+    }>;
+    roc: Record<string, number>;
+    date_range: {
+      start: string;
+      end: string;
+    };
+    symbol: string;
+  }> {
+    const response: AxiosResponse<any> = await api.post('/api/fullcycle/zscores', request);
+    return response.data;
+  }
+
   // Saved Valuation CRUD Methods
 
   /**

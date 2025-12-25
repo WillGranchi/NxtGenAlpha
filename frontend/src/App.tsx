@@ -15,6 +15,7 @@ import IndicatorsPage from './pages/IndicatorsPage';
 import StrategyLibraryPage from './pages/StrategyLibraryPage';
 import SettingsPage from './pages/SettingsPage';
 import ValuationPage from './pages/ValuationPage';
+import FullCyclePage from './pages/FullCyclePage';
 
 export const App: React.FC = () => {
   return (
@@ -83,6 +84,16 @@ export const App: React.FC = () => {
               <ProtectedRoute>
                 <Layout>
                   <ValuationPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fullcycle"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <FullCyclePage />
                 </Layout>
               </ProtectedRoute>
             }

@@ -17,7 +17,7 @@ from pathlib import Path
 backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
-from backend.api.routes import data, strategies, backtest, auth, custom_indicators, valuation, indicators
+from backend.api.routes import data, strategies, backtest, auth, custom_indicators, valuation, indicators, fullcycle
 from backend.utils.helpers import get_logger
 from backend.core.database import init_db
 from backend.core.data_loader import update_btc_data, update_crypto_data
@@ -233,6 +233,7 @@ app.include_router(auth.router)
 app.include_router(custom_indicators.router)
 app.include_router(valuation.router)
 app.include_router(indicators.router)
+app.include_router(fullcycle.router)
 
 
 @app.get("/")
