@@ -105,10 +105,17 @@ async def get_data_info(symbol: Optional[str] = Query(default="BTCUSDT", descrip
         data_info['symbol'] = symbol
         
         # Infer data source and quality from columns
-        # Full OHLCV indicates Binance, Close-only indicates CoinGecko
+        # Full OHLCV with Volume indicates Yahoo Finance or Binance
+        # Close-only indicates CoinGecko
         has_full_ohlcv = all(col in df.columns for col in ['Open', 'High', 'Low', 'Close'])
         if has_full_ohlcv and 'Volume' in df.columns:
-            data_info['data_source'] = 'binance'
+            # Yahoo Finance is primary source, but could also be Binance
+            # Check data range - Yahoo Finance typically has data from ~2014-2015 for BTC
+            data_start_year = df.index.min().year
+            if data_start_year >= 2014:
+                data_info['data_source'] = 'yahoo_finance'
+            else:
+                data_info['data_source'] = 'binance'
             data_info['data_quality'] = 'full_ohlcv'
         elif 'Close' in df.columns and not has_full_ohlcv:
             data_info['data_source'] = 'coingecko'
@@ -143,12 +150,12 @@ async def refresh_data(
     start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD) to fetch historical data from (e.g., 2016-01-01)")
 ) -> Dict[str, Any]:
     """
-    Manually trigger a data refresh from Binance API or CoinGecko.
+    Manually trigger a data refresh from Yahoo Finance (with CoinGecko fallback).
     
     Args:
         symbol: Trading pair symbol (default: BTCUSDT)
         force: Force refresh even if data is fresh
-        start_date: Start date (YYYY-MM-DD) to fetch historical data from (e.g., 2016-01-01)
+        start_date: Start date (YYYY-MM-DD) to fetch historical data from (defaults to token launch date)
         
     Returns:
         Dict: Refresh status and data info
@@ -214,10 +221,18 @@ async def refresh_data(
             }
         }
     except Exception as e:
-        logger.error(f"Error refreshing data: {e}")
+        logger.error(f"Error refreshing data: {e}", exc_info=True)
+        error_msg = str(e)
+        # Provide more helpful error messages
+        if "Yahoo Finance" in error_msg or "yfinance" in error_msg.lower():
+            detail_msg = f"Failed to refresh data from Yahoo Finance: {error_msg}. Falling back to CoinGecko."
+        elif "CoinGecko" in error_msg:
+            detail_msg = f"Failed to refresh data from CoinGecko: {error_msg}"
+        else:
+            detail_msg = f"Failed to refresh data: {error_msg}"
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to refresh data: {str(e)}"
+            detail=detail_msg
         )
 
 

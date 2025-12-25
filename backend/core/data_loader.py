@@ -742,6 +742,10 @@ def fetch_crypto_data_from_yahoo_finance(
         
         return df
         
+    except ValueError as e:
+        # ValueError usually means symbol not supported or no data
+        logger.error(f"Yahoo Finance error for {symbol}: {e}")
+        raise Exception(f"Yahoo Finance: {str(e)}")
     except Exception as e:
         logger.error(f"Error fetching {symbol} data from Yahoo Finance: {e}", exc_info=True)
         raise Exception(f"Failed to fetch {symbol} data from Yahoo Finance: {str(e)}")

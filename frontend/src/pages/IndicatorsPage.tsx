@@ -102,7 +102,7 @@ const IndicatorsPage: React.FC = () => {
       }
     } catch (err) {
       console.error('Failed to load base price data:', err);
-      setError('Failed to load price data. Click "Refresh Data" to fetch from CoinGecko.');
+      setError('Failed to load price data. Click "Refresh Data" to fetch from Yahoo Finance.');
     }
   }, [symbol, startDate, endDate]);
 
@@ -110,19 +110,92 @@ const IndicatorsPage: React.FC = () => {
     loadBasePriceData();
   }, [loadBasePriceData]);
 
+  // Auto-refresh data on first page load if data is incomplete
+  useEffect(() => {
+    const checkAndRefreshData = async () => {
+      try {
+        // Check if auto-refresh has been attempted recently (within last hour)
+        const refreshKey = `data_refresh_attempted_${symbol}`;
+        const lastAttempt = localStorage.getItem(refreshKey);
+        if (lastAttempt) {
+          const lastAttemptTime = parseInt(lastAttempt, 10);
+          const hoursSinceAttempt = (Date.now() - lastAttemptTime) / (1000 * 60 * 60);
+          if (hoursSinceAttempt < 1) {
+            // Already attempted within last hour, skip
+            return;
+          }
+        }
+
+        // Check data completeness
+        const dataInfo = await TradingAPI.getDataInfo(symbol);
+        if (!dataInfo.success || !dataInfo.data_info) {
+          return;
+        }
+
+        const { date_range, total_records } = dataInfo.data_info;
+        const dataStart = new Date(date_range.start);
+        const dataEnd = new Date(date_range.end);
+        
+        // Calculate expected start date (token launch dates)
+        const tokenLaunchDates: Record<string, string> = {
+          'BTCUSDT': '2010-01-01',
+          'ETHUSDT': '2015-07-30',
+          'SOLUSDT': '2020-03-16',
+          'SUIUSDT': '2023-05-03',
+          'BNBUSDT': '2017-07-25',
+          'XRPUSDT': '2013-08-04',
+        };
+        const expectedStart = new Date(tokenLaunchDates[symbol] || '2010-01-01');
+        
+        // Check if data is incomplete:
+        // 1. Less than 1 year of data
+        // 2. Data doesn't go back to expected launch date (within 30 days tolerance)
+        const daysOfData = (dataEnd.getTime() - dataStart.getTime()) / (1000 * 60 * 60 * 24);
+        const daysFromExpectedStart = (dataStart.getTime() - expectedStart.getTime()) / (1000 * 60 * 60 * 24);
+        const isIncomplete = daysOfData < 365 || (daysFromExpectedStart > 30 && total_records < 1000);
+
+        if (isIncomplete) {
+          // Mark refresh as attempted
+          localStorage.setItem(refreshKey, Date.now().toString());
+          
+          // Trigger auto-refresh (silently, don't show error if it fails)
+          setIsRefreshingData(true);
+          try {
+            await TradingAPI.refreshData(symbol, true);
+            // Reload price data after refresh
+            await loadBasePriceData();
+          } catch (refreshErr) {
+            // Silently fail - don't block page load
+            console.warn('Auto-refresh failed:', refreshErr);
+          } finally {
+            setIsRefreshingData(false);
+          }
+        }
+      } catch (err) {
+        // Silently fail - don't block page load
+        console.warn('Data completeness check failed:', err);
+      }
+    };
+
+    // Only run on mount, not on every render
+    checkAndRefreshData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [symbol]); // Only re-run if symbol changes
+
   // Handle manual data refresh
   const handleRefreshData = async () => {
     setIsRefreshingData(true);
     setError(null);
     try {
-      // Force refresh from CoinGecko starting from 2010-01-01
-      await TradingAPI.refreshData(symbol, true, '2010-01-01');
+      // Force refresh from Yahoo Finance (will use token launch date automatically)
+      await TradingAPI.refreshData(symbol, true);
       // Reload price data after refresh
       await loadBasePriceData();
       setError(null);
     } catch (err: any) {
       console.error('Failed to refresh data:', err);
-      setError(err?.response?.data?.detail || 'Failed to refresh data from CoinGecko');
+      const errorDetail = err?.response?.data?.detail || 'Failed to refresh data from Yahoo Finance';
+      setError(errorDetail);
     } finally {
       setIsRefreshingData(false);
     }
