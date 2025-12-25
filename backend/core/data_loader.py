@@ -1310,45 +1310,11 @@ def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None) -
         return df
         
     except FileNotFoundError:
-        # File doesn't exist - automatically fetch data
-        logger.info(f"Data file not found for {symbol}, automatically fetching Binance data from 2017...")
-        try:
-            # Clear cache before fetching to ensure fresh data
-            cache_key = f"{symbol}_{file_path}"
-            if cache_key in _dataframe_cache:
-                del _dataframe_cache[cache_key]
-            
-            # Fetch Binance data from 2017-01-01 onwards (default)
-            binance_start = datetime(2017, 1, 1)
-            df = update_crypto_data(symbol=symbol, force=True, start_date=binance_start)
-            
-            # Verify we have at least 1 year of data
-            days_available = (df.index.max() - df.index.min()).days
-            if days_available < 365:
-                logger.warning(f"Only {days_available} days of data fetched. Attempting to fetch more from Binance...")
-                # Try fetching again with Binance directly from 2017
-                try:
-                    df_binance = fetch_crypto_data_from_binance(symbol=symbol, start_date=binance_start, fallback_to_coingecko=False)
-                    if len(df_binance) > len(df):
-                        df = df_binance
-                        save_data_to_csv(df, symbol=symbol)
-                        logger.info(f"Successfully fetched {len(df)} rows from Binance")
-                except Exception as binance_error:
-                    logger.warning(f"Binance fetch failed: {binance_error}. Using available data.")
-            
-            logger.info(f"Successfully fetched and saved {len(df)} rows of {symbol} data")
-            logger.info(f"Date range: {df.index.min()} to {df.index.max()}")
-            days_available = (df.index.max() - df.index.min()).days
-            logger.info(f"Total days available: {days_available} ({days_available/365:.2f} years)")
-            
-            return df
-            
-        except Exception as fetch_error:
-            logger.error(f"Failed to auto-fetch {symbol} data: {fetch_error}")
-            raise ValueError(
-                f"Data file not found for {symbol} and automatic fetch failed: {str(fetch_error)}. "
-                f"Please ensure the symbol is valid and data sources are accessible."
-            )
+        # File doesn't exist - don't auto-fetch to prevent blocking server startup
+        logger.warning(f"⚠️ Data file not found for {symbol}")
+        logger.info(f"   Use /api/data/refresh endpoint or wait for scheduled daily update to fetch data")
+        # Return empty DataFrame instead of blocking on fetch
+        return pd.DataFrame(columns=['Open', 'High', 'Low', 'Close', 'Volume']).set_index(pd.DatetimeIndex([]))
     except Exception as e:
         raise ValueError(f"Error loading {symbol} data: {str(e)}")
 
