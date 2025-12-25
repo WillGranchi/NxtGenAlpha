@@ -950,20 +950,29 @@ def get_token_launch_date(symbol: str) -> datetime:
     return launch_dates.get(symbol, datetime(2010, 1, 1))  # Default to BTC launch date
 
 
-def calculate_historical_range(symbol: str, years: int = 5) -> Tuple[datetime, datetime]:
+def calculate_historical_range(symbol: str, years: int = None) -> Tuple[datetime, datetime]:
     """
-    Calculate historical date range for a token (5 years back or from launch, whichever is later).
+    Calculate historical date range for a token.
+    If years is None, returns from token launch date (or 2010 for BTC) to today.
+    Otherwise, returns years back from today or from launch, whichever is later.
     
     Args:
         symbol (str): Trading pair symbol
-        years (int): Number of years to look back (default 5)
+        years (int, optional): Number of years to look back. If None, fetches all available data from launch.
         
     Returns:
         Tuple[datetime, datetime]: (start_date, end_date)
     """
     end_date = datetime.now()
     launch_date = get_token_launch_date(symbol)
-    start_date = max(launch_date, end_date - timedelta(days=years * 365))
+    
+    if years is None:
+        # Fetch all available data from launch date
+        start_date = launch_date
+    else:
+        # Fetch specified years back or from launch, whichever is later
+        start_date = max(launch_date, end_date - timedelta(days=years * 365))
+    
     return start_date, end_date
 
 
@@ -996,11 +1005,12 @@ def fetch_crypto_data_smart(
     """
     logger = logging.getLogger(__name__)
     
-    # Calculate date range (5 years back or from token launch)
+    # Calculate date range (all available data from token launch by default)
     if end_date is None:
         end_date = datetime.now()
     if start_date is None:
-        start_date, _ = calculate_historical_range(symbol, years=5)
+        # Fetch all available data from launch date (Yahoo Finance has good historical coverage)
+        start_date, _ = calculate_historical_range(symbol, years=None)
     
     df_yahoo = None
     df_coingecko = None
@@ -1201,10 +1211,10 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
     
     logger = logging.getLogger(__name__)
     
-    # Calculate historical range (5 years back or from token launch)
+    # Calculate historical range (all available data from token launch by default)
     if start_date is None:
-        start_date, _ = calculate_historical_range(symbol, years=5)
-        logger.info(f"Using calculated start date: {start_date.strftime('%Y-%m-%d')} (5 years back or token launch)")
+        start_date, _ = calculate_historical_range(symbol, years=None)
+        logger.info(f"Using calculated start date: {start_date.strftime('%Y-%m-%d')} (from token launch - fetching all available data)")
     
     # Check if we need to update (every 24 hours for daily updates)
     if not force and symbol in _last_update_time:
@@ -1375,14 +1385,14 @@ def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None) -
         # Clean and preprocess the data
         df = _clean_data(df)
         
-        # Check if data goes back to 2010-01-01 (earliest CoinGecko data)
+        # Check if data goes back to token launch date (or reasonable earliest date)
         # Also check for invalid future dates (indicates mock/test data)
         data_start = df.index.min()
         data_end = df.index.max()
-        earliest_start_date = datetime(2010, 1, 1)
+        earliest_start_date = get_token_launch_date(symbol)  # Use token launch date instead of hardcoded 2010
         current_date = datetime.now()
         
-        # Check if data is invalid (future dates or doesn't go back to 2010)
+        # Check if data is invalid (future dates or doesn't go back to launch date)
         has_future_dates = data_end > current_date
         missing_historical_data = data_start > earliest_start_date
         
