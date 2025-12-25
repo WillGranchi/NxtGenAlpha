@@ -227,7 +227,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
       },
       yaxis: {
         title: 'BTC Price (USD)',
-        type: 'log',
+        type: 'log' as const,
         color: '#9CA3AF',
         gridcolor: '#374151',
         showgrid: true,
