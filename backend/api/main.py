@@ -285,7 +285,8 @@ async def health_check():
     """
     try:
         from backend.core.data_loader import load_crypto_data
-        df = load_crypto_data()
+        # Load BTC data for health check (default symbol)
+        df = load_crypto_data(symbol="BTCUSDT")
         
         return {
             "status": "healthy",
