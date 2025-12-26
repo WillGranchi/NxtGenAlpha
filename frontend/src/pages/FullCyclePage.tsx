@@ -3,15 +3,18 @@
  * Main page for viewing BTC full cycle indicators with z-scores
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useFullCycle } from '../hooks/useFullCycle';
 import { FullCycleChart } from '../components/fullcycle/FullCycleChart';
 import { FullCycleControls } from '../components/fullcycle/FullCycleControls';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { useMobile } from '../hooks/useMobile';
+import TradingAPI from '../services/api';
 
 const FullCyclePage: React.FC = () => {
   const { isMobile } = useMobile();
+  const location = useLocation();
   
   const {
     availableIndicators,
@@ -43,9 +46,47 @@ const FullCyclePage: React.FC = () => {
     loadPreset,
   } = useFullCycle();
 
+  // Load preset if navigating from My Creations
+  useEffect(() => {
+    const presetId = (location.state as any)?.presetId;
+    if (presetId) {
+      TradingAPI.getFullCyclePreset(presetId)
+        .then((response) => {
+          if (response.success) {
+            loadPreset({
+              indicator_params: response.preset.indicator_params,
+              selected_indicators: response.preset.selected_indicators,
+              start_date: response.preset.start_date,
+              end_date: response.preset.end_date,
+              roc_days: response.preset.roc_days,
+              show_fundamental_average: response.preset.show_fundamental_average,
+              show_technical_average: response.preset.show_technical_average,
+              show_overall_average: response.preset.show_overall_average,
+            });
+          }
+        })
+        .catch((err) => {
+          console.error('Failed to load preset:', err);
+        });
+      // Clear the state to prevent reloading on re-render
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state, loadPreset]);
+
   return (
     <ErrorBoundary>
-      <div className="space-y-6">
+      <div className="min-h-screen bg-bg-primary p-4 md:p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Header */}
+          <div className="text-center mb-6">
+            <h1 className="text-3xl md:text-4xl font-bold text-gradient mb-2">
+              Full Cycle Model
+            </h1>
+            <p className="text-text-secondary">
+              BTC full cycle analysis with fundamental and technical indicators
+            </p>
+          </div>
+
           {/* Error Messages */}
           {indicatorsError && (
             <div className="bg-danger-500/10 border border-danger-500/50 rounded-lg p-4 text-danger-400">
@@ -117,6 +158,7 @@ const FullCyclePage: React.FC = () => {
               loadPreset={loadPreset}
             />
           )}
+        </div>
       </div>
     </ErrorBoundary>
   );

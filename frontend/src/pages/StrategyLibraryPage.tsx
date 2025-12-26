@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { SavedStrategiesTab } from '../components/creations/SavedStrategiesTab';
 import { SavedValuationsTab } from '../components/creations/SavedValuationsTab';
-import FullCyclePage from './FullCyclePage';
+import { SavedFullCycleTab } from '../components/creations/SavedFullCycleTab';
 import { useNavigate } from 'react-router-dom';
 
 const StrategyLibraryPage: React.FC = () => {
@@ -32,7 +32,7 @@ const StrategyLibraryPage: React.FC = () => {
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-text-primary mb-2">My Creations</h1>
-          <p className="text-text-secondary">Manage your saved strategies, valuations, and Full Cycle Model</p>
+          <p className="text-text-secondary">Manage your saved strategies, valuations, and Full Cycle models</p>
         </div>
 
         {/* Tabs */}
@@ -66,28 +66,31 @@ const StrategyLibraryPage: React.FC = () => {
                   : 'border-transparent text-text-secondary hover:text-text-primary'
               }`}
             >
-              Full Cycle Model
+              Saved Full Cycle Models
             </button>
           </div>
         </div>
 
         {/* Tab Content */}
-        {activeTab === 'fullcycle' ? (
-          <FullCyclePage />
-        ) : (
-          <div className="bg-bg-secondary border border-border-default rounded-lg p-6">
-            {activeTab === 'strategies' && (
-              <SavedStrategiesTab
-                onLoadStrategy={handleLoadStrategy}
-              />
-            )}
-            {activeTab === 'valuations' && (
-              <SavedValuationsTab
-                onLoadValuation={handleLoadValuation}
-              />
-            )}
-          </div>
-        )}
+        <div className="bg-bg-secondary border border-border-default rounded-lg p-6">
+          {activeTab === 'strategies' && (
+            <SavedStrategiesTab
+              onLoadStrategy={handleLoadStrategy}
+            />
+          )}
+          {activeTab === 'valuations' && (
+            <SavedValuationsTab
+              onLoadValuation={handleLoadValuation}
+            />
+          )}
+          {activeTab === 'fullcycle' && (
+            <SavedFullCycleTab
+              onLoadPreset={(presetId) => {
+                navigate('/fullcycle', { state: { presetId } });
+              }}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

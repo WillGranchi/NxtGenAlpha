@@ -27,6 +27,7 @@ export const Navigation: React.FC = () => {
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/indicators', label: 'Indicators', icon: TrendingUp },
+    { path: '/fullcycle', label: 'Full Cycle Model', icon: BarChart3 },
     { path: '/valuation', label: 'Valuation', icon: BarChart3 },
     { path: '/library', label: 'My Creations', icon: Library },
     { path: '/settings', label: 'Settings', icon: Settings },
