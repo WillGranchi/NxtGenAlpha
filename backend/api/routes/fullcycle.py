@@ -17,7 +17,7 @@ from backend.core.fullcycle_indicators import (
 )
 from backend.core.database import get_db
 from backend.api.models.db_models import FullCyclePreset
-from backend.api.auth import get_current_user
+from backend.core.auth import get_current_user
 
 router = APIRouter(prefix="/api/fullcycle", tags=["fullcycle"])
 logger = logging.getLogger(__name__)
