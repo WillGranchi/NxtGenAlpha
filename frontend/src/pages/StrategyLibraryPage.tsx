@@ -32,7 +32,7 @@ const StrategyLibraryPage: React.FC = () => {
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-text-primary mb-2">My Creations</h1>
-          <p className="text-text-secondary">Manage your saved strategies and valuations</p>
+          <p className="text-text-secondary">Manage your saved strategies, valuations, and Full Cycle Model</p>
         </div>
 
         {/* Tabs */}

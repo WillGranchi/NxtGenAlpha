@@ -45,18 +45,7 @@ const FullCyclePage: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-bg-primary p-4 md:p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
-          {/* Header */}
-          <div className="text-center mb-6">
-            <h1 className="text-3xl md:text-4xl font-bold text-gradient mb-2">
-              Full Cycle Model
-            </h1>
-            <p className="text-text-secondary">
-              BTC full cycle analysis with fundamental and technical indicators
-            </p>
-          </div>
-
+      <div className="space-y-6">
           {/* Error Messages */}
           {indicatorsError && (
             <div className="bg-danger-500/10 border border-danger-500/50 rounded-lg p-4 text-danger-400">
@@ -128,7 +117,6 @@ const FullCyclePage: React.FC = () => {
               loadPreset={loadPreset}
             />
           )}
-        </div>
       </div>
     </ErrorBoundary>
   );
