@@ -3,7 +3,7 @@
  * Similar to useValuation but optimized for full-cycle analysis with longer timeframes
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import TradingAPI from '../services/api';
 
 export interface FullCycleIndicator {
@@ -58,6 +58,22 @@ export interface UseFullCycleReturn {
   showOverallAverage: boolean;
   setShowOverallAverage: (show: boolean) => void;
   
+  // Indicator parameters
+  indicatorParameters: Record<string, Record<string, number>>;
+  updateIndicatorParameter: (indicatorId: string, paramName: string, value: number) => void;
+  
+  // Preset loading
+  loadPreset: (preset: {
+    indicator_params: Record<string, Record<string, number>>;
+    selected_indicators: string[];
+    start_date?: string;
+    end_date?: string;
+    roc_days: number;
+    show_fundamental_average: boolean;
+    show_technical_average: boolean;
+    show_overall_average: boolean;
+  }) => void;
+  
   // Refresh
   refreshData: () => Promise<void>;
 }
@@ -92,6 +108,12 @@ export const useFullCycle = (): UseFullCycleReturn => {
   const [showTechnicalAverage, setShowTechnicalAverage] = useState<boolean>(true);
   const [showOverallAverage, setShowOverallAverage] = useState<boolean>(true);
   
+  // Indicator parameters (custom params per indicator)
+  const [indicatorParameters, setIndicatorParameters] = useState<Record<string, Record<string, number>>>({});
+  
+  // Debounce timer for parameter updates
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
   // Fetch available indicators
   const fetchAvailableIndicators = useCallback(async () => {
     try {
@@ -125,8 +147,17 @@ export const useFullCycle = (): UseFullCycleReturn => {
       setZscoresLoading(true);
       setZscoresError(null);
       
+      // Build indicator_params object from indicatorParameters state
+      const indicatorParams: Record<string, Record<string, number>> = {};
+      selectedIndicators.forEach((indicatorId) => {
+        if (indicatorParameters[indicatorId] && Object.keys(indicatorParameters[indicatorId]).length > 0) {
+          indicatorParams[indicatorId] = indicatorParameters[indicatorId];
+        }
+      });
+      
       const response = await TradingAPI.calculateFullCycleZScores({
         indicators: selectedIndicators,
+        indicator_params: Object.keys(indicatorParams).length > 0 ? indicatorParams : undefined,
         start_date: startDate || undefined,
         end_date: endDate || undefined,
         roc_days: rocDays,
@@ -143,7 +174,7 @@ export const useFullCycle = (): UseFullCycleReturn => {
     } finally {
       setZscoresLoading(false);
     }
-  }, [selectedIndicators, startDate, endDate, rocDays]);
+  }, [selectedIndicators, indicatorParameters, startDate, endDate, rocDays]);
   
   // Toggle indicator visibility
   const toggleIndicatorVisibility = useCallback((indicatorId: string) => {
@@ -156,6 +187,51 @@ export const useFullCycle = (): UseFullCycleReturn => {
       }
       return newSet;
     });
+  }, []);
+  
+  // Update indicator parameter (debounced)
+  const updateIndicatorParameter = useCallback((indicatorId: string, paramName: string, value: number) => {
+    setIndicatorParameters((prev) => {
+      const newParams = { ...prev };
+      if (!newParams[indicatorId]) {
+        newParams[indicatorId] = {};
+      }
+      newParams[indicatorId] = {
+        ...newParams[indicatorId],
+        [paramName]: value,
+      };
+      return newParams;
+    });
+    
+    // Debounce recalculation
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      calculateZScores();
+    }, 500); // 500ms debounce
+  }, [calculateZScores]);
+  
+  // Load preset configuration
+  const loadPreset = useCallback((preset: {
+    indicator_params: Record<string, Record<string, number>>;
+    selected_indicators: string[];
+    start_date?: string;
+    end_date?: string;
+    roc_days: number;
+    show_fundamental_average: boolean;
+    show_technical_average: boolean;
+    show_overall_average: boolean;
+  }) => {
+    setIndicatorParameters(preset.indicator_params || {});
+    setSelectedIndicators(preset.selected_indicators || []);
+    setVisibleIndicators(new Set(preset.selected_indicators || []));
+    if (preset.start_date) setStartDate(preset.start_date);
+    if (preset.end_date) setEndDate(preset.end_date);
+    setRocDays(preset.roc_days);
+    setShowFundamentalAverage(preset.show_fundamental_average);
+    setShowTechnicalAverage(preset.show_technical_average);
+    setShowOverallAverage(preset.show_overall_average);
   }, []);
   
   // Refresh data
@@ -183,6 +259,15 @@ export const useFullCycle = (): UseFullCycleReturn => {
       calculateZScores();
     }
   }, [selectedIndicators, startDate, endDate, rocDays, calculateZScores]);
+  
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
   
   return {
     // Available indicators
@@ -222,6 +307,13 @@ export const useFullCycle = (): UseFullCycleReturn => {
     setShowTechnicalAverage,
     showOverallAverage,
     setShowOverallAverage,
+    
+    // Indicator parameters
+    indicatorParameters,
+    updateIndicatorParameter,
+    
+    // Preset loading
+    loadPreset,
     
     // Refresh
     refreshData,

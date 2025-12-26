@@ -29,6 +29,7 @@ class User(Base):
     strategies = relationship("Strategy", back_populates="user", cascade="all, delete-orphan")
     custom_indicators = relationship("CustomIndicator", back_populates="user", cascade="all, delete-orphan")
     valuations = relationship("Valuation", back_populates="user", cascade="all, delete-orphan")
+    fullcycle_presets = relationship("FullCyclePreset", back_populates="user", cascade="all, delete-orphan")
 
 
 class Strategy(Base):
@@ -111,4 +112,31 @@ class Valuation(Base):
     
     # Relationships
     user = relationship("User", back_populates="valuations")
+
+
+class FullCyclePreset(Base):
+    """Saved Full Cycle Model preset configuration."""
+    
+    __tablename__ = "fullcycle_presets"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    
+    # Preset configuration stored as JSON
+    indicator_params = Column(JSON, nullable=False)  # {indicator_id: {param_name: value}}
+    selected_indicators = Column(JSON, nullable=False)  # List of indicator IDs
+    start_date = Column(String(20), nullable=True)
+    end_date = Column(String(20), nullable=True)
+    roc_days = Column(Integer, nullable=False, default=7)
+    show_fundamental_average = Column(Boolean, default=True, nullable=False)
+    show_technical_average = Column(Boolean, default=True, nullable=False)
+    show_overall_average = Column(Boolean, default=True, nullable=False)
+    
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    user = relationship("User", back_populates="fullcycle_presets")
 

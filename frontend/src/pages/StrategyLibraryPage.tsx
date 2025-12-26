@@ -6,10 +6,11 @@
 import React, { useState } from 'react';
 import { SavedStrategiesTab } from '../components/creations/SavedStrategiesTab';
 import { SavedValuationsTab } from '../components/creations/SavedValuationsTab';
+import FullCyclePage from './FullCyclePage';
 import { useNavigate } from 'react-router-dom';
 
 const StrategyLibraryPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'strategies' | 'valuations'>('strategies');
+  const [activeTab, setActiveTab] = useState<'strategies' | 'valuations' | 'fullcycle'>('strategies');
   const navigate = useNavigate();
 
   const handleLoadStrategy = (strategyId: number) => {
@@ -57,22 +58,36 @@ const StrategyLibraryPage: React.FC = () => {
             >
               Saved Valuations
             </button>
+            <button
+              onClick={() => setActiveTab('fullcycle')}
+              className={`px-4 py-2 font-medium transition-colors border-b-2 ${
+                activeTab === 'fullcycle'
+                  ? 'border-primary-500 text-primary-400'
+                  : 'border-transparent text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              Full Cycle Model
+            </button>
           </div>
         </div>
 
         {/* Tab Content */}
-        <div className="bg-bg-secondary border border-border-default rounded-lg p-6">
-          {activeTab === 'strategies' && (
-            <SavedStrategiesTab
-              onLoadStrategy={handleLoadStrategy}
-            />
-          )}
-          {activeTab === 'valuations' && (
-            <SavedValuationsTab
-              onLoadValuation={handleLoadValuation}
-            />
-          )}
-        </div>
+        {activeTab === 'fullcycle' ? (
+          <FullCyclePage />
+        ) : (
+          <div className="bg-bg-secondary border border-border-default rounded-lg p-6">
+            {activeTab === 'strategies' && (
+              <SavedStrategiesTab
+                onLoadStrategy={handleLoadStrategy}
+              />
+            )}
+            {activeTab === 'valuations' && (
+              <SavedValuationsTab
+                onLoadValuation={handleLoadValuation}
+              />
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

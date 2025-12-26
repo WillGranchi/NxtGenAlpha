@@ -817,6 +817,98 @@ export class TradingAPI {
     return response.data;
   }
 
+  // Full Cycle Preset CRUD Methods
+
+  /**
+   * Create a new Full Cycle preset.
+   */
+  static async createFullCyclePreset(request: {
+    name: string;
+    description?: string;
+    indicator_params: Record<string, Record<string, any>>;
+    selected_indicators: string[];
+    start_date?: string;
+    end_date?: string;
+    roc_days: number;
+    show_fundamental_average: boolean;
+    show_technical_average: boolean;
+    show_overall_average: boolean;
+  }): Promise<{
+    success: boolean;
+    preset: {
+      id: number;
+      name: string;
+      description?: string;
+      indicator_params: Record<string, Record<string, any>>;
+      selected_indicators: string[];
+      start_date?: string;
+      end_date?: string;
+      roc_days: number;
+      show_fundamental_average: boolean;
+      show_technical_average: boolean;
+      show_overall_average: boolean;
+      created_at: string;
+      updated_at: string;
+    };
+  }> {
+    const response: AxiosResponse<any> = await api.post('/api/fullcycle/presets', request);
+    return response.data;
+  }
+
+  /**
+   * List all Full Cycle presets for the current user.
+   */
+  static async listFullCyclePresets(): Promise<{
+    success: boolean;
+    presets: Array<{
+      id: number;
+      name: string;
+      description?: string;
+      created_at: string;
+      updated_at: string;
+    }>;
+    count: number;
+  }> {
+    const response: AxiosResponse<any> = await api.get('/api/fullcycle/presets');
+    return response.data;
+  }
+
+  /**
+   * Get a specific Full Cycle preset by ID.
+   */
+  static async getFullCyclePreset(presetId: number): Promise<{
+    success: boolean;
+    preset: {
+      id: number;
+      name: string;
+      description?: string;
+      indicator_params: Record<string, Record<string, any>>;
+      selected_indicators: string[];
+      start_date?: string;
+      end_date?: string;
+      roc_days: number;
+      show_fundamental_average: boolean;
+      show_technical_average: boolean;
+      show_overall_average: boolean;
+      created_at: string;
+      updated_at: string;
+    };
+  }> {
+    const response: AxiosResponse<any> = await api.get(`/api/fullcycle/presets/${presetId}`);
+    return response.data;
+  }
+
+  /**
+   * Delete a Full Cycle preset.
+   */
+  static async deleteFullCyclePreset(presetId: number): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    const response: AxiosResponse<any> = await api.delete(`/api/fullcycle/presets/${presetId}`);
+    return response.data;
+  }
+
   // Saved Valuation CRUD Methods
 
   /**

@@ -2,18 +2,22 @@
 Full Cycle API routes for calculating BTC full cycle indicators with z-scores.
 """
 
-from fastapi import APIRouter, HTTPException, Query, Body
+from fastapi import APIRouter, HTTPException, Query, Body, Depends
 from typing import Dict, Any, List, Optional
 import logging
 import pandas as pd
 import numpy as np
 from datetime import datetime
+from sqlalchemy.orm import Session
 
 from backend.core.data_loader import load_crypto_data
 from backend.core.fullcycle_indicators import (
     FULL_CYCLE_INDICATORS,
     get_fullcycle_indicator
 )
+from backend.core.database import get_db
+from backend.api.models.db_models import FullCyclePreset
+from backend.api.auth import get_current_user
 
 router = APIRouter(prefix="/api/fullcycle", tags=["fullcycle"])
 logger = logging.getLogger(__name__)
@@ -229,5 +233,191 @@ async def calculate_fullcycle_zscores(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to calculate z-scores: {str(e)}"
+        )
+
+
+@router.post("/presets")
+async def create_fullcycle_preset(
+    name: str = Body(..., description="Preset name"),
+    description: Optional[str] = Body(default=None, description="Preset description"),
+    indicator_params: Dict[str, Dict[str, Any]] = Body(..., description="Indicator parameters"),
+    selected_indicators: List[str] = Body(..., description="Selected indicator IDs"),
+    start_date: Optional[str] = Body(default=None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Body(default=None, description="End date (YYYY-MM-DD)"),
+    roc_days: int = Body(default=7, description="ROC period in days"),
+    show_fundamental_average: bool = Body(default=True, description="Show fundamental average"),
+    show_technical_average: bool = Body(default=True, description="Show technical average"),
+    show_overall_average: bool = Body(default=True, description="Show overall average"),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Create a new Full Cycle preset.
+    """
+    try:
+        preset = FullCyclePreset(
+            user_id=current_user.id,
+            name=name,
+            description=description,
+            indicator_params=indicator_params,
+            selected_indicators=selected_indicators,
+            start_date=start_date,
+            end_date=end_date,
+            roc_days=roc_days,
+            show_fundamental_average=show_fundamental_average,
+            show_technical_average=show_technical_average,
+            show_overall_average=show_overall_average,
+        )
+        db.add(preset)
+        db.commit()
+        db.refresh(preset)
+        
+        return {
+            "success": True,
+            "preset": {
+                "id": preset.id,
+                "name": preset.name,
+                "description": preset.description,
+                "indicator_params": preset.indicator_params,
+                "selected_indicators": preset.selected_indicators,
+                "start_date": preset.start_date,
+                "end_date": preset.end_date,
+                "roc_days": preset.roc_days,
+                "show_fundamental_average": preset.show_fundamental_average,
+                "show_technical_average": preset.show_technical_average,
+                "show_overall_average": preset.show_overall_average,
+                "created_at": preset.created_at.isoformat(),
+                "updated_at": preset.updated_at.isoformat(),
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error creating full cycle preset: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create preset: {str(e)}"
+        )
+
+
+@router.get("/presets")
+async def list_fullcycle_presets(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    List all Full Cycle presets for the current user.
+    """
+    try:
+        presets = db.query(FullCyclePreset).filter(
+            FullCyclePreset.user_id == current_user.id
+        ).order_by(FullCyclePreset.created_at.desc()).all()
+        
+        return {
+            "success": True,
+            "presets": [
+                {
+                    "id": preset.id,
+                    "name": preset.name,
+                    "description": preset.description,
+                    "created_at": preset.created_at.isoformat(),
+                    "updated_at": preset.updated_at.isoformat(),
+                }
+                for preset in presets
+            ],
+            "count": len(presets)
+        }
+    except Exception as e:
+        logger.error(f"Error listing full cycle presets: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to list presets: {str(e)}"
+        )
+
+
+@router.get("/presets/{preset_id}")
+async def get_fullcycle_preset(
+    preset_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Get a specific Full Cycle preset by ID.
+    """
+    try:
+        preset = db.query(FullCyclePreset).filter(
+            FullCyclePreset.id == preset_id,
+            FullCyclePreset.user_id == current_user.id
+        ).first()
+        
+        if not preset:
+            raise HTTPException(
+                status_code=404,
+                detail="Preset not found"
+            )
+        
+        return {
+            "success": True,
+            "preset": {
+                "id": preset.id,
+                "name": preset.name,
+                "description": preset.description,
+                "indicator_params": preset.indicator_params,
+                "selected_indicators": preset.selected_indicators,
+                "start_date": preset.start_date,
+                "end_date": preset.end_date,
+                "roc_days": preset.roc_days,
+                "show_fundamental_average": preset.show_fundamental_average,
+                "show_technical_average": preset.show_technical_average,
+                "show_overall_average": preset.show_overall_average,
+                "created_at": preset.created_at.isoformat(),
+                "updated_at": preset.updated_at.isoformat(),
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting full cycle preset: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get preset: {str(e)}"
+        )
+
+
+@router.delete("/presets/{preset_id}")
+async def delete_fullcycle_preset(
+    preset_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Delete a Full Cycle preset.
+    """
+    try:
+        preset = db.query(FullCyclePreset).filter(
+            FullCyclePreset.id == preset_id,
+            FullCyclePreset.user_id == current_user.id
+        ).first()
+        
+        if not preset:
+            raise HTTPException(
+                status_code=404,
+                detail="Preset not found"
+            )
+        
+        db.delete(preset)
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "Preset deleted successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting full cycle preset: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete preset: {str(e)}"
         )
 

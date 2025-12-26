@@ -38,6 +38,9 @@ const FullCyclePage: React.FC = () => {
     setShowTechnicalAverage,
     showOverallAverage,
     setShowOverallAverage,
+    indicatorParameters,
+    updateIndicatorParameter,
+    loadPreset,
   } = useFullCycle();
 
   return (
@@ -66,104 +69,65 @@ const FullCyclePage: React.FC = () => {
             </div>
           )}
 
-          {/* Main Content */}
-          <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-4'}`}>
-            {/* Controls Sidebar */}
-            <div className={isMobile ? '' : 'col-span-1'}>
-              {indicatorsLoading ? (
-                <div className="bg-bg-secondary border border-border-default rounded-lg p-12">
-                  <div className="text-center text-text-muted">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mb-4"></div>
-                    <p>Loading indicators...</p>
-                  </div>
+          {/* Chart Area - Full Width */}
+          <div className="w-full">
+            {zscoresLoading ? (
+              <div className="bg-bg-secondary border border-border-default rounded-lg p-12">
+                <div className="text-center text-text-muted">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mb-4"></div>
+                  <p>Calculating z-scores...</p>
                 </div>
-              ) : (
-                <FullCycleControls
-                  availableIndicators={availableIndicators}
-                  selectedIndicators={selectedIndicators}
-                  setSelectedIndicators={setSelectedIndicators}
-                  visibleIndicators={visibleIndicators}
-                  setVisibleIndicators={setVisibleIndicators}
-                  toggleIndicatorVisibility={toggleIndicatorVisibility}
-                  startDate={startDate}
-                  setStartDate={setStartDate}
-                  endDate={endDate}
-                  setEndDate={setEndDate}
-                  rocDays={rocDays}
-                  setRocDays={setRocDays}
-                  showFundamentalAverage={showFundamentalAverage}
-                  setShowFundamentalAverage={setShowFundamentalAverage}
-                  showTechnicalAverage={showTechnicalAverage}
-                  setShowTechnicalAverage={setShowTechnicalAverage}
-                  showOverallAverage={showOverallAverage}
-                  setShowOverallAverage={setShowOverallAverage}
-                  isLoading={zscoresLoading}
-                />
-              )}
-            </div>
+              </div>
+            ) : (
+              <FullCycleChart
+                data={zscoreData}
+                availableIndicators={availableIndicators}
+                selectedIndicators={selectedIndicators}
+                visibleIndicators={visibleIndicators}
+                showFundamentalAverage={showFundamentalAverage}
+                showTechnicalAverage={showTechnicalAverage}
+                showOverallAverage={showOverallAverage}
+                height={isMobile ? 400 : 600}
+              />
+            )}
+          </div>
 
-            {/* Chart Area */}
-            <div className={isMobile ? '' : 'col-span-3'}>
-              <div className="space-y-6">
-                {/* Price Chart with Indicator Overlays */}
-                {zscoresLoading ? (
-                  <div className="bg-bg-secondary border border-border-default rounded-lg p-12">
-                    <div className="text-center text-text-muted">
-                      <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mb-4"></div>
-                      <p>Calculating z-scores...</p>
-                    </div>
-                  </div>
-                ) : (
-                  <FullCycleChart
-                    data={zscoreData}
-                    availableIndicators={availableIndicators}
-                    selectedIndicators={selectedIndicators}
-                    visibleIndicators={visibleIndicators}
-                    showFundamentalAverage={showFundamentalAverage}
-                    showTechnicalAverage={showTechnicalAverage}
-                    showOverallAverage={showOverallAverage}
-                    height={isMobile ? 400 : 600}
-                  />
-                )}
-
-                {/* ROC Display */}
-                {Object.keys(roc).length > 0 && (
-                  <div className="bg-bg-secondary border border-border-default rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-text-primary mb-3">
-                      {rocDays} Day Rate of Change
-                    </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {Object.entries(roc).map(([indicatorId, rocValue]) => {
-                        const indicator = availableIndicators.find((ind) => ind.id === indicatorId);
-                        const name = indicator?.name || indicatorId;
-                        const isPositive = rocValue > 0;
-                        return (
-                          <div
-                            key={indicatorId}
-                            className={`p-3 rounded-lg border ${
-                              isPositive
-                                ? 'bg-magenta-500/10 border-magenta-500/50'
-                                : 'bg-cyan-500/10 border-cyan-500/50'
-                            }`}
-                          >
-                            <div className="text-sm text-text-secondary">{name}</div>
-                            <div
-                              className={`text-lg font-semibold ${
-                                isPositive ? 'text-magenta-400' : 'text-cyan-400'
-                              }`}
-                            >
-                              {rocValue > 0 ? '+' : ''}
-                              {rocValue.toFixed(2)} Z
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+          {/* Controls Section - Below Chart */}
+          {indicatorsLoading ? (
+            <div className="bg-bg-secondary border border-border-default rounded-lg p-12">
+              <div className="text-center text-text-muted">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mb-4"></div>
+                <p>Loading indicators...</p>
               </div>
             </div>
-          </div>
+          ) : (
+            <FullCycleControls
+              availableIndicators={availableIndicators}
+              selectedIndicators={selectedIndicators}
+              setSelectedIndicators={setSelectedIndicators}
+              visibleIndicators={visibleIndicators}
+              setVisibleIndicators={setVisibleIndicators}
+              toggleIndicatorVisibility={toggleIndicatorVisibility}
+              startDate={startDate}
+              setStartDate={setStartDate}
+              endDate={endDate}
+              setEndDate={setEndDate}
+              rocDays={rocDays}
+              setRocDays={setRocDays}
+              showFundamentalAverage={showFundamentalAverage}
+              setShowFundamentalAverage={setShowFundamentalAverage}
+              showTechnicalAverage={showTechnicalAverage}
+              setShowTechnicalAverage={setShowTechnicalAverage}
+              showOverallAverage={showOverallAverage}
+              setShowOverallAverage={setShowOverallAverage}
+              isLoading={zscoresLoading}
+              zscoreData={zscoreData}
+              roc={roc}
+              indicatorParameters={indicatorParameters}
+              updateIndicatorParameter={updateIndicatorParameter}
+              loadPreset={loadPreset}
+            />
+          )}
         </div>
       </div>
     </ErrorBoundary>
