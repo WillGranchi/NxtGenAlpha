@@ -801,6 +801,7 @@ export class TradingAPI {
     roc_days?: number;
     sdca_in?: number;
     sdca_out?: number;
+    force_refresh?: boolean;
   }): Promise<{
     success: boolean;
     data: Array<{

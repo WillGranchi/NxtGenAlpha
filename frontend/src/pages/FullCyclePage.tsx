@@ -48,6 +48,7 @@ const FullCyclePage: React.FC = () => {
     indicatorParameters,
     updateIndicatorParameter,
     loadPreset,
+    refreshData,
   } = useFullCycle();
 
   // Load preset if navigating from My Creations
@@ -168,6 +169,7 @@ const FullCyclePage: React.FC = () => {
               indicatorParameters={indicatorParameters}
               updateIndicatorParameter={updateIndicatorParameter}
               loadPreset={loadPreset}
+              refreshData={refreshData}
             />
           )}
         </div>

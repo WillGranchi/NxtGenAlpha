@@ -76,10 +76,11 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
     });
 
     // Add indicator z-score traces
+    // Add ALL selected indicators to plotData so they appear in tooltips
+    // But only show them if they're explicitly in visibleIndicators
+    // By default, only 'average' should be visible
     let colorIndex = 0;
     selectedIndicators.forEach((indicatorId) => {
-      if (!visibleIndicators.has(indicatorId)) return;
-
       const indicator = availableIndicators.find((ind) => ind.id === indicatorId);
       if (!indicator) return;
 
@@ -120,7 +121,11 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
           color: lineColor,
           width: 1.5,
         },
+        // Hide by default, but include in tooltips (legendonly = hidden but in tooltips)
+        // Only show if explicitly in visibleIndicators
         visible: visibleIndicators.has(indicatorId) ? true : 'legendonly',
+        // Ensure it appears in hover tooltips even when hidden
+        showlegend: false, // Don't clutter legend with hidden indicators
       });
 
       colorIndex++;
@@ -360,6 +365,16 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         b: 60,
       },
       hovermode: 'x unified' as const,
+      // Customize hover tooltip styling
+      hoverlabel: {
+        bgcolor: 'rgba(31, 41, 55, 0.95)', // Dark gray background (gray-800)
+        bordercolor: '#4B5563', // Gray-600 border
+        font: {
+          color: '#F3F4F6', // Light gray text (gray-100)
+          family: 'Inter, system-ui, sans-serif',
+          size: 12,
+        },
+      },
     };
   }, [data, sdcaIn, sdcaOut]);
 
@@ -368,6 +383,14 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
     responsive: true,
     displaylogo: false,
     modeBarButtonsToRemove: ['pan2d', 'lasso2d'] as any,
+    // Custom CSS for hover tooltips
+    toImageButtonOptions: {
+      format: 'png',
+      filename: 'full-cycle-model',
+      height: height,
+      width: 1200,
+      scale: 1,
+    },
   };
 
   if (!chartData || chartData.length === 0) {
@@ -382,6 +405,25 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
 
   return (
     <div className="bg-bg-secondary border border-border-default rounded-lg p-4">
+      {/* Custom CSS for Plotly hover tooltips */}
+      <style>{`
+        .js-plotly-plot .hoverlayer .hovertext {
+          background-color: rgba(31, 41, 55, 0.95) !important;
+          border: 1px solid #4B5563 !important;
+          border-radius: 6px !important;
+          padding: 8px 12px !important;
+          color: #F3F4F6 !important;
+          font-family: 'Inter', system-ui, sans-serif !important;
+          font-size: 12px !important;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2) !important;
+        }
+        .js-plotly-plot .hoverlayer .hovertext .name {
+          color: #F3F4F6 !important;
+        }
+        .js-plotly-plot .hoverlayer .hovertext .nums {
+          color: #D1D5DB !important;
+        }
+      `}</style>
       <Plot
         data={chartData}
         layout={layout}

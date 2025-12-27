@@ -10,7 +10,7 @@ import numpy as np
 from datetime import datetime
 from sqlalchemy.orm import Session
 
-from backend.core.data_loader import load_crypto_data
+from backend.core.data_loader import load_crypto_data, update_crypto_data
 from backend.core.fullcycle_indicators import (
     FULL_CYCLE_INDICATORS,
     get_fullcycle_indicator
@@ -66,7 +66,8 @@ async def calculate_fullcycle_zscores(
     end_date: Optional[str] = Body(default=None, description="End date (YYYY-MM-DD)"),
     roc_days: int = Body(default=7, description="ROC (Rate of Change) period in days"),
     sdca_in: float = Body(default=-2.0, description="SDCA In threshold (oversold, DCA in signal)"),
-    sdca_out: float = Body(default=2.0, description="SDCA Out threshold (overbought, DCA out signal)")
+    sdca_out: float = Body(default=2.0, description="SDCA Out threshold (overbought, DCA out signal)"),
+    force_refresh: bool = Body(default=False, description="Force refresh of price data from API")
 ) -> Dict[str, Any]:
     """
     Calculate z-scores for selected full cycle indicators.
@@ -84,7 +85,27 @@ async def calculate_fullcycle_zscores(
     try:
         # Load BTC data (hardcoded to BTCUSDT)
         symbol = "BTCUSDT"
-        df = load_crypto_data(symbol=symbol)
+        
+        # Force refresh if requested, otherwise use cached data
+        if force_refresh:
+            logger.info(f"Force refreshing {symbol} data from API...")
+            # Update data to ensure we have full historical range
+            # This will fetch from Yahoo Finance/CoinGecko if needed
+            df = update_crypto_data(symbol=symbol, force=True)
+        else:
+            df = load_crypto_data(symbol=symbol)
+        
+        # Determine the actual date range we have
+        actual_start = df.index.min()
+        actual_end = df.index.max()
+        logger.info(f"Loaded data range: {actual_start.strftime('%Y-%m-%d')} to {actual_end.strftime('%Y-%m-%d')}")
+        
+        # If start_date is provided but data doesn't go back that far, use actual start
+        requested_start = pd.to_datetime(start_date) if start_date else None
+        if requested_start and actual_start > requested_start:
+            logger.warning(f"Requested start date {start_date} is before available data. Using actual start: {actual_start.strftime('%Y-%m-%d')}")
+            # Use actual start date instead
+            start_date = actual_start.strftime('%Y-%m-%d')
         
         # Filter by date range if provided
         if start_date:

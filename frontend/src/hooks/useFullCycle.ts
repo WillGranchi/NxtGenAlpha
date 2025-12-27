@@ -175,6 +175,7 @@ export const useFullCycle = (): UseFullCycleReturn => {
         roc_days: rocDays,
         sdca_in: sdcaIn,
         sdca_out: sdcaOut,
+        force_refresh: false, // Default to false, can be set to true by refresh button
       });
       
       if (response.success) {
@@ -253,10 +254,47 @@ export const useFullCycle = (): UseFullCycleReturn => {
     if (preset.sdca_out !== undefined) setSdcaOut(preset.sdca_out);
   }, []);
   
-  // Refresh data
+  // Refresh data (force refresh from API)
   const refreshData = useCallback(async () => {
-    await calculateZScores();
-  }, [calculateZScores]);
+    if (selectedIndicators.length === 0) {
+      return;
+    }
+    
+    try {
+      setZscoresLoading(true);
+      setZscoresError(null);
+      
+      // Build indicator_params object from indicatorParameters state
+      const indicatorParams: Record<string, Record<string, number>> = {};
+      selectedIndicators.forEach((indicatorId: string) => {
+        if (indicatorParameters[indicatorId] && Object.keys(indicatorParameters[indicatorId]).length > 0) {
+          indicatorParams[indicatorId] = indicatorParameters[indicatorId];
+        }
+      });
+      
+      // Force refresh from API
+      const response = await TradingAPI.calculateFullCycleZScores({
+        indicators: selectedIndicators,
+        indicator_params: Object.keys(indicatorParams).length > 0 ? indicatorParams : undefined,
+        start_date: startDate || undefined,
+        end_date: endDate || undefined,
+        roc_days: rocDays,
+        sdca_in: sdcaIn,
+        sdca_out: sdcaOut,
+        force_refresh: true, // Force refresh price data
+      });
+      
+      if (response.success) {
+        setZscoreData(response.data);
+        setRoc(response.roc || {});
+      }
+    } catch (err: any) {
+      console.error('Failed to refresh full cycle z-scores:', err);
+      setZscoresError(err?.response?.data?.detail || err?.message || 'Failed to refresh data');
+    } finally {
+      setZscoresLoading(false);
+    }
+  }, [selectedIndicators, indicatorParameters, startDate, endDate, rocDays, sdcaIn, sdcaOut]);
   
   // Set default end date to today
   useEffect(() => {
