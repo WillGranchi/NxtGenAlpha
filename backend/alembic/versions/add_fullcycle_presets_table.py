@@ -34,6 +34,8 @@ def upgrade() -> None:
         sa.Column('show_fundamental_average', sa.Boolean(), nullable=False, server_default='true'),
         sa.Column('show_technical_average', sa.Boolean(), nullable=False, server_default='true'),
         sa.Column('show_overall_average', sa.Boolean(), nullable=False, server_default='true'),
+        sa.Column('sdca_in', sa.Float(), nullable=False, server_default='-2.0'),
+        sa.Column('sdca_out', sa.Float(), nullable=False, server_default='2.0'),
         sa.Column('created_at', sa.DateTime(), nullable=False),
         sa.Column('updated_at', sa.DateTime(), nullable=False),
         sa.PrimaryKeyConstraint('id'),

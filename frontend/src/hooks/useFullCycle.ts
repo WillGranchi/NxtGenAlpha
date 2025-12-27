@@ -45,6 +45,12 @@ export interface UseFullCycleReturn {
   rocDays: number;
   setRocDays: (days: number) => void;
   
+  // SDCA thresholds
+  sdcaIn: number;
+  setSdcaIn: (value: number) => void;
+  sdcaOut: number;
+  setSdcaOut: (value: number) => void;
+  
   // Indicator visibility
   visibleIndicators: Set<string>;
   setVisibleIndicators: (indicators: Set<string>) => void;
@@ -100,19 +106,23 @@ export const useFullCycle = (): UseFullCycleReturn => {
   // ROC period
   const [rocDays, setRocDays] = useState<number>(7);
   
+  // SDCA thresholds
+  const [sdcaIn, setSdcaIn] = useState<number>(-2.0);
+  const [sdcaOut, setSdcaOut] = useState<number>(2.0);
+  
   // Indicator visibility
-  const [visibleIndicators, setVisibleIndicators] = useState<Set<string>>(new Set());
+  const [visibleIndicators, setVisibleIndicators] = useState<Set<string>>(new Set(['average']));
   
   // Averages visibility
-  const [showFundamentalAverage, setShowFundamentalAverage] = useState<boolean>(true);
-  const [showTechnicalAverage, setShowTechnicalAverage] = useState<boolean>(true);
+  const [showFundamentalAverage, setShowFundamentalAverage] = useState<boolean>(false);
+  const [showTechnicalAverage, setShowTechnicalAverage] = useState<boolean>(false);
   const [showOverallAverage, setShowOverallAverage] = useState<boolean>(true);
   
   // Indicator parameters (custom params per indicator)
   const [indicatorParameters, setIndicatorParameters] = useState<Record<string, Record<string, number>>>({});
   
   // Debounce timer for parameter updates
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Fetch available indicators
   const fetchAvailableIndicators = useCallback(async () => {
@@ -122,10 +132,10 @@ export const useFullCycle = (): UseFullCycleReturn => {
       const response = await TradingAPI.getFullCycleIndicators();
       if (response.success) {
         setAvailableIndicators(response.indicators);
-        // Default select all indicators
+        // Default select all indicators, but only show average
         if (selectedIndicators.length === 0) {
           setSelectedIndicators(response.indicators.map(ind => ind.id));
-          setVisibleIndicators(new Set(response.indicators.map(ind => ind.id)));
+          setVisibleIndicators(new Set(['average']));
         }
       }
     } catch (err: any) {
@@ -149,7 +159,7 @@ export const useFullCycle = (): UseFullCycleReturn => {
       
       // Build indicator_params object from indicatorParameters state
       const indicatorParams: Record<string, Record<string, number>> = {};
-      selectedIndicators.forEach((indicatorId) => {
+      selectedIndicators.forEach((indicatorId: string) => {
         if (indicatorParameters[indicatorId] && Object.keys(indicatorParameters[indicatorId]).length > 0) {
           indicatorParams[indicatorId] = indicatorParameters[indicatorId];
         }
@@ -161,6 +171,8 @@ export const useFullCycle = (): UseFullCycleReturn => {
         start_date: startDate || undefined,
         end_date: endDate || undefined,
         roc_days: rocDays,
+        sdca_in: sdcaIn,
+        sdca_out: sdcaOut,
       });
       
       if (response.success) {
@@ -174,11 +186,11 @@ export const useFullCycle = (): UseFullCycleReturn => {
     } finally {
       setZscoresLoading(false);
     }
-  }, [selectedIndicators, indicatorParameters, startDate, endDate, rocDays]);
+    }, [selectedIndicators, indicatorParameters, startDate, endDate, rocDays, sdcaIn, sdcaOut]);
   
   // Toggle indicator visibility
   const toggleIndicatorVisibility = useCallback((indicatorId: string) => {
-    setVisibleIndicators(prev => {
+    setVisibleIndicators((prev: Set<string>) => {
       const newSet = new Set(prev);
       if (newSet.has(indicatorId)) {
         newSet.delete(indicatorId);
@@ -191,7 +203,7 @@ export const useFullCycle = (): UseFullCycleReturn => {
   
   // Update indicator parameter (debounced)
   const updateIndicatorParameter = useCallback((indicatorId: string, paramName: string, value: number) => {
-    setIndicatorParameters((prev) => {
+    setIndicatorParameters((prev: Record<string, Record<string, number>>) => {
       const newParams = { ...prev };
       if (!newParams[indicatorId]) {
         newParams[indicatorId] = {};
@@ -222,16 +234,21 @@ export const useFullCycle = (): UseFullCycleReturn => {
     show_fundamental_average: boolean;
     show_technical_average: boolean;
     show_overall_average: boolean;
+    sdca_in?: number;
+    sdca_out?: number;
   }) => {
     setIndicatorParameters(preset.indicator_params || {});
     setSelectedIndicators(preset.selected_indicators || []);
-    setVisibleIndicators(new Set(preset.selected_indicators || []));
+    // Only show average by default, or use preset visibility if available
+    setVisibleIndicators(new Set(['average']));
     if (preset.start_date) setStartDate(preset.start_date);
     if (preset.end_date) setEndDate(preset.end_date);
     setRocDays(preset.roc_days);
     setShowFundamentalAverage(preset.show_fundamental_average);
     setShowTechnicalAverage(preset.show_technical_average);
     setShowOverallAverage(preset.show_overall_average);
+    if (preset.sdca_in !== undefined) setSdcaIn(preset.sdca_in);
+    if (preset.sdca_out !== undefined) setSdcaOut(preset.sdca_out);
   }, []);
   
   // Refresh data
@@ -294,6 +311,12 @@ export const useFullCycle = (): UseFullCycleReturn => {
     // ROC period
     rocDays,
     setRocDays,
+    
+    // SDCA thresholds
+    sdcaIn,
+    setSdcaIn,
+    sdcaOut,
+    setSdcaOut,
     
     // Indicator visibility
     visibleIndicators,

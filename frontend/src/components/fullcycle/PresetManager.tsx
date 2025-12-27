@@ -25,6 +25,8 @@ interface PresetManagerProps {
     show_fundamental_average: boolean;
     show_technical_average: boolean;
     show_overall_average: boolean;
+    sdca_in?: number;
+    sdca_out?: number;
   }) => void;
   currentConfig: {
     indicator_params: Record<string, Record<string, number>>;
@@ -35,6 +37,8 @@ interface PresetManagerProps {
     show_fundamental_average: boolean;
     show_technical_average: boolean;
     show_overall_average: boolean;
+    sdca_in?: number;
+    sdca_out?: number;
   };
 }
 
@@ -87,6 +91,8 @@ export const PresetManager: React.FC<PresetManagerProps> = ({
         show_fundamental_average: currentConfig.show_fundamental_average,
         show_technical_average: currentConfig.show_technical_average,
         show_overall_average: currentConfig.show_overall_average,
+        sdca_in: currentConfig.sdca_in,
+        sdca_out: currentConfig.sdca_out,
       });
       
       setShowSaveModal(false);
@@ -115,6 +121,8 @@ export const PresetManager: React.FC<PresetManagerProps> = ({
           show_fundamental_average: response.preset.show_fundamental_average,
           show_technical_average: response.preset.show_technical_average,
           show_overall_average: response.preset.show_overall_average,
+          sdca_in: response.preset.sdca_in,
+          sdca_out: response.preset.sdca_out,
         });
       }
     } catch (err: any) {

@@ -799,6 +799,8 @@ export class TradingAPI {
     start_date?: string;
     end_date?: string;
     roc_days?: number;
+    sdca_in?: number;
+    sdca_out?: number;
   }): Promise<{
     success: boolean;
     data: Array<{
@@ -812,6 +814,8 @@ export class TradingAPI {
       end: string;
     };
     symbol: string;
+    sdca_in: number;
+    sdca_out: number;
   }> {
     const response: AxiosResponse<any> = await api.post('/api/fullcycle/zscores', request);
     return response.data;
@@ -833,6 +837,8 @@ export class TradingAPI {
     show_fundamental_average: boolean;
     show_technical_average: boolean;
     show_overall_average: boolean;
+    sdca_in?: number;
+    sdca_out?: number;
   }): Promise<{
     success: boolean;
     preset: {
@@ -847,6 +853,8 @@ export class TradingAPI {
       show_fundamental_average: boolean;
       show_technical_average: boolean;
       show_overall_average: boolean;
+      sdca_in: number;
+      sdca_out: number;
       created_at: string;
       updated_at: string;
     };
@@ -890,6 +898,8 @@ export class TradingAPI {
       show_fundamental_average: boolean;
       show_technical_average: boolean;
       show_overall_average: boolean;
+      sdca_in: number;
+      sdca_out: number;
       created_at: string;
       updated_at: string;
     };

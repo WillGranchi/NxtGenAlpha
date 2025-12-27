@@ -32,6 +32,10 @@ const FullCyclePage: React.FC = () => {
     setEndDate,
     rocDays,
     setRocDays,
+    sdcaIn,
+    setSdcaIn,
+    sdcaOut,
+    setSdcaOut,
     visibleIndicators,
     setVisibleIndicators,
     toggleIndicatorVisibility,
@@ -62,6 +66,8 @@ const FullCyclePage: React.FC = () => {
               show_fundamental_average: response.preset.show_fundamental_average,
               show_technical_average: response.preset.show_technical_average,
               show_overall_average: response.preset.show_overall_average,
+              sdca_in: response.preset.sdca_in,
+              sdca_out: response.preset.sdca_out,
             });
           }
         })
@@ -117,6 +123,8 @@ const FullCyclePage: React.FC = () => {
                 showFundamentalAverage={showFundamentalAverage}
                 showTechnicalAverage={showTechnicalAverage}
                 showOverallAverage={showOverallAverage}
+                sdcaIn={sdcaIn}
+                sdcaOut={sdcaOut}
                 height={isMobile ? 400 : 600}
               />
             )}
@@ -144,6 +152,10 @@ const FullCyclePage: React.FC = () => {
               setEndDate={setEndDate}
               rocDays={rocDays}
               setRocDays={setRocDays}
+              sdcaIn={sdcaIn}
+              setSdcaIn={setSdcaIn}
+              sdcaOut={sdcaOut}
+              setSdcaOut={setSdcaOut}
               showFundamentalAverage={showFundamentalAverage}
               setShowFundamentalAverage={setShowFundamentalAverage}
               showTechnicalAverage={showTechnicalAverage}

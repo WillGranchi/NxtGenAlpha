@@ -24,6 +24,10 @@ interface FullCycleControlsProps {
   setEndDate: (date: string) => void;
   rocDays: number;
   setRocDays: (days: number) => void;
+  sdcaIn: number;
+  setSdcaIn: (value: number) => void;
+  sdcaOut: number;
+  setSdcaOut: (value: number) => void;
   showFundamentalAverage: boolean;
   setShowFundamentalAverage: (show: boolean) => void;
   showTechnicalAverage: boolean;
@@ -60,6 +64,10 @@ export const FullCycleControls: React.FC<FullCycleControlsProps> = ({
   setEndDate,
   rocDays,
   setRocDays,
+  sdcaIn,
+  setSdcaIn,
+  sdcaOut,
+  setSdcaOut,
   showFundamentalAverage,
   setShowFundamentalAverage,
   showTechnicalAverage,
@@ -111,6 +119,8 @@ export const FullCycleControls: React.FC<FullCycleControlsProps> = ({
           show_fundamental_average: showFundamentalAverage,
           show_technical_average: showTechnicalAverage,
           show_overall_average: showOverallAverage,
+          sdca_in: sdcaIn,
+          sdca_out: sdcaOut,
         }}
       />
 
@@ -127,9 +137,9 @@ export const FullCycleControls: React.FC<FullCycleControlsProps> = ({
         />
       </div>
 
-      {/* Row 2: ROC Period and Averages */}
+      {/* Row 2: ROC Period, SDCA Thresholds, and Averages */}
       <div className="bg-bg-secondary border border-border-default rounded-lg p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* ROC Period */}
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-2">
@@ -144,6 +154,37 @@ export const FullCycleControls: React.FC<FullCycleControlsProps> = ({
               className="w-full px-3 py-2 bg-bg-tertiary border border-border-default rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
               disabled={isLoading}
             />
+          </div>
+
+          {/* SDCA Thresholds */}
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-2">
+              SDCA Thresholds
+            </label>
+            <div className="space-y-2">
+              <div>
+                <label className="block text-xs text-text-muted mb-1">SDCA In (Oversold)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={sdcaIn}
+                  onChange={(e) => setSdcaIn(parseFloat(e.target.value) || -2)}
+                  className="w-full px-3 py-2 bg-bg-tertiary border border-border-default rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                  disabled={isLoading}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-text-muted mb-1">SDCA Out (Overbought)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={sdcaOut}
+                  onChange={(e) => setSdcaOut(parseFloat(e.target.value) || 2)}
+                  className="w-full px-3 py-2 bg-bg-tertiary border border-border-default rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
           </div>
 
           {/* Averages Visibility */}

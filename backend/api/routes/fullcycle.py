@@ -64,7 +64,9 @@ async def calculate_fullcycle_zscores(
     ),
     start_date: Optional[str] = Body(default=None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Body(default=None, description="End date (YYYY-MM-DD)"),
-    roc_days: int = Body(default=7, description="ROC (Rate of Change) period in days")
+    roc_days: int = Body(default=7, description="ROC (Rate of Change) period in days"),
+    sdca_in: float = Body(default=-2.0, description="SDCA In threshold (oversold, DCA in signal)"),
+    sdca_out: float = Body(default=2.0, description="SDCA Out threshold (overbought, DCA out signal)")
 ) -> Dict[str, Any]:
     """
     Calculate z-scores for selected full cycle indicators.
@@ -223,7 +225,9 @@ async def calculate_fullcycle_zscores(
                 "start": dates.min().strftime('%Y-%m-%d'),
                 "end": dates.max().strftime('%Y-%m-%d')
             },
-            "symbol": symbol
+            "symbol": symbol,
+            "sdca_in": sdca_in,
+            "sdca_out": sdca_out
         }
         
     except HTTPException:
@@ -248,6 +252,8 @@ async def create_fullcycle_preset(
     show_fundamental_average: bool = Body(default=True, description="Show fundamental average"),
     show_technical_average: bool = Body(default=True, description="Show technical average"),
     show_overall_average: bool = Body(default=True, description="Show overall average"),
+    sdca_in: float = Body(default=-2.0, description="SDCA In threshold"),
+    sdca_out: float = Body(default=2.0, description="SDCA Out threshold"),
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ) -> Dict[str, Any]:
@@ -267,6 +273,8 @@ async def create_fullcycle_preset(
             show_fundamental_average=show_fundamental_average,
             show_technical_average=show_technical_average,
             show_overall_average=show_overall_average,
+            sdca_in=sdca_in,
+            sdca_out=sdca_out,
         )
         db.add(preset)
         db.commit()
@@ -286,6 +294,8 @@ async def create_fullcycle_preset(
                 "show_fundamental_average": preset.show_fundamental_average,
                 "show_technical_average": preset.show_technical_average,
                 "show_overall_average": preset.show_overall_average,
+                "sdca_in": preset.sdca_in,
+                "sdca_out": preset.sdca_out,
                 "created_at": preset.created_at.isoformat(),
                 "updated_at": preset.updated_at.isoformat(),
             }
@@ -369,6 +379,8 @@ async def get_fullcycle_preset(
                 "show_fundamental_average": preset.show_fundamental_average,
                 "show_technical_average": preset.show_technical_average,
                 "show_overall_average": preset.show_overall_average,
+                "sdca_in": preset.sdca_in,
+                "sdca_out": preset.sdca_out,
                 "created_at": preset.created_at.isoformat(),
                 "updated_at": preset.updated_at.isoformat(),
             }

@@ -15,6 +15,8 @@ interface FullCycleChartProps {
   showFundamentalAverage?: boolean;
   showTechnicalAverage?: boolean;
   showOverallAverage?: boolean;
+  sdcaIn?: number;
+  sdcaOut?: number;
   height?: number;
 }
 
@@ -46,6 +48,8 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
   showFundamentalAverage = true,
   showTechnicalAverage = true,
   showOverallAverage = true,
+  sdcaIn = -2.0,
+  sdcaOut = 2.0,
   height = 600,
 }) => {
   const chartData = useMemo(() => {
@@ -208,10 +212,103 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
     });
 
     return plotData;
-  }, [data, availableIndicators, selectedIndicators, visibleIndicators, showFundamentalAverage, showTechnicalAverage, showOverallAverage]);
+  }, [data, availableIndicators, selectedIndicators, visibleIndicators, showFundamentalAverage, showTechnicalAverage, showOverallAverage, sdcaIn, sdcaOut]);
 
   const layout = useMemo(() => {
     if (!data || data.length === 0) return {};
+
+    // Calculate SDCA highlighting regions based on average z-score
+    // PineScript: bgcolor when Zplot > st (overbought) or Zplot < lt (oversold)
+    const shapes: any[] = [];
+    const dates = data.map((d) => d.date);
+    
+    // Find continuous regions where average z-score is above/below thresholds
+    let inRegionStart: string | null = null;
+    let outRegionStart: string | null = null;
+    
+    for (let i = 0; i < data.length; i++) {
+      const avgZscore = data[i].indicators['average']?.zscore;
+      if (avgZscore === undefined || avgZscore === null) continue;
+      
+      // SDCA In (oversold) - highlight when z-score < sdcaIn
+      if (avgZscore < sdcaIn) {
+        if (inRegionStart === null) {
+          inRegionStart = dates[i];
+        }
+      } else {
+        // End of SDCA In region
+        if (inRegionStart !== null) {
+          shapes.push({
+            type: 'rect',
+            xref: 'x',
+            yref: 'paper',
+            x0: inRegionStart,
+            x1: dates[i],
+            y0: 0,
+            y1: 1,
+            fillcolor: 'rgba(0, 241, 255, 0.15)', // Cyan with transparency
+            line: { width: 0 },
+            layer: 'below',
+          });
+          inRegionStart = null;
+        }
+      }
+      
+      // SDCA Out (overbought) - highlight when z-score > sdcaOut
+      if (avgZscore > sdcaOut) {
+        if (outRegionStart === null) {
+          outRegionStart = dates[i];
+        }
+      } else {
+        // End of SDCA Out region
+        if (outRegionStart !== null) {
+          shapes.push({
+            type: 'rect',
+            xref: 'x',
+            yref: 'paper',
+            x0: outRegionStart,
+            x1: dates[i],
+            y0: 0,
+            y1: 1,
+            fillcolor: 'rgba(255, 1, 154, 0.15)', // Magenta with transparency
+            line: { width: 0 },
+            layer: 'below',
+          });
+          outRegionStart = null;
+        }
+      }
+    }
+    
+    // Handle regions that extend to the end of the data
+    if (inRegionStart !== null) {
+      shapes.push({
+        type: 'rect',
+        xref: 'x',
+        yref: 'paper',
+        x0: inRegionStart,
+        x1: dates[dates.length - 1],
+        y0: 0,
+        y1: 1,
+        fillcolor: 'rgba(0, 241, 255, 0.15)',
+        line: { width: 0 },
+        layer: 'below',
+      });
+    }
+    
+    if (outRegionStart !== null) {
+      shapes.push({
+        type: 'rect',
+        xref: 'x',
+        yref: 'paper',
+        x0: outRegionStart,
+        x1: dates[dates.length - 1],
+        y0: 0,
+        y1: 1,
+        fillcolor: 'rgba(255, 1, 154, 0.15)',
+        line: { width: 0 },
+        layer: 'below',
+      });
+    }
 
     return {
       title: {
@@ -242,6 +339,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         overlaying: 'y' as const,
         range: [-3.5, 3.5],
       },
+      shapes: shapes,
       plot_bgcolor: 'rgba(0, 0, 0, 0)',
       paper_bgcolor: 'rgba(0, 0, 0, 0)',
       font: {
@@ -263,7 +361,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
       },
       hovermode: 'x unified' as const,
     };
-  }, [data]);
+  }, [data, sdcaIn, sdcaOut]);
 
   const config = {
     displayModeBar: true,

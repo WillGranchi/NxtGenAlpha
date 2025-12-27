@@ -133,6 +133,8 @@ class FullCyclePreset(Base):
     show_fundamental_average = Column(Boolean, default=True, nullable=False)
     show_technical_average = Column(Boolean, default=True, nullable=False)
     show_overall_average = Column(Boolean, default=True, nullable=False)
+    sdca_in = Column(Float, nullable=False, default=-2.0)
+    sdca_out = Column(Float, nullable=False, default=2.0)
     
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
