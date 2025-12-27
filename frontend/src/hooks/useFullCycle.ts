@@ -78,6 +78,8 @@ export interface UseFullCycleReturn {
     show_fundamental_average: boolean;
     show_technical_average: boolean;
     show_overall_average: boolean;
+    sdca_in?: number;
+    sdca_out?: number;
   }) => void;
   
   // Refresh
