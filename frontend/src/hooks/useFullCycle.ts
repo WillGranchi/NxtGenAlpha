@@ -30,6 +30,9 @@ export interface UseFullCycleReturn {
   roc: Record<string, number>;
   zscoresLoading: boolean;
   zscoresError: string | null;
+  dataWarnings: string[];
+  indicatorsCalculated: number;
+  indicatorsRequested: number;
   
   // Selection state
   selectedIndicators: string[];
@@ -97,6 +100,9 @@ export const useFullCycle = (): UseFullCycleReturn => {
   const [roc, setRoc] = useState<Record<string, number>>({});
   const [zscoresLoading, setZscoresLoading] = useState(false);
   const [zscoresError, setZscoresError] = useState<string | null>(null);
+  const [dataWarnings, setDataWarnings] = useState<string[]>([]);
+  const [indicatorsCalculated, setIndicatorsCalculated] = useState<number>(0);
+  const [indicatorsRequested, setIndicatorsRequested] = useState<number>(0);
   
   // Selection state
   const [selectedIndicators, setSelectedIndicators] = useState<string[]>([]);
@@ -181,11 +187,18 @@ export const useFullCycle = (): UseFullCycleReturn => {
       if (response.success) {
         setZscoreData(response.data);
         setRoc(response.roc || {});
+        setDataWarnings(response.warnings || []);
+        setIndicatorsCalculated(response.indicators_calculated || 0);
+        setIndicatorsRequested(response.indicators_requested || selectedIndicators.length);
       }
     } catch (err: any) {
       console.error('Failed to calculate full cycle z-scores:', err);
-      setZscoresError(err?.response?.data?.detail || err?.message || 'Failed to calculate z-scores');
+      const errorMsg = err?.response?.data?.detail || err?.message || 'Failed to calculate z-scores';
+      setZscoresError(errorMsg);
       setZscoreData([]);
+      setDataWarnings([]);
+      setIndicatorsCalculated(0);
+      setIndicatorsRequested(selectedIndicators.length);
     } finally {
       setZscoresLoading(false);
     }
@@ -287,10 +300,17 @@ export const useFullCycle = (): UseFullCycleReturn => {
       if (response.success) {
         setZscoreData(response.data);
         setRoc(response.roc || {});
+        setDataWarnings(response.warnings || []);
+        setIndicatorsCalculated(response.indicators_calculated || 0);
+        setIndicatorsRequested(response.indicators_requested || selectedIndicators.length);
       }
     } catch (err: any) {
       console.error('Failed to refresh full cycle z-scores:', err);
-      setZscoresError(err?.response?.data?.detail || err?.message || 'Failed to refresh data');
+      const errorMsg = err?.response?.data?.detail || err?.message || 'Failed to refresh data';
+      setZscoresError(errorMsg);
+      setDataWarnings([]);
+      setIndicatorsCalculated(0);
+      setIndicatorsRequested(selectedIndicators.length);
     } finally {
       setZscoresLoading(false);
     }
@@ -337,6 +357,9 @@ export const useFullCycle = (): UseFullCycleReturn => {
     roc,
     zscoresLoading,
     zscoresError,
+    dataWarnings,
+    indicatorsCalculated,
+    indicatorsRequested,
     
     // Selection state
     selectedIndicators,

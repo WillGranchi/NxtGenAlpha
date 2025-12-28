@@ -817,6 +817,9 @@ export class TradingAPI {
     symbol: string;
     sdca_in: number;
     sdca_out: number;
+    indicators_calculated?: number;
+    indicators_requested?: number;
+    warnings?: string[] | null;
   }> {
     const response: AxiosResponse<any> = await api.post('/api/fullcycle/zscores', request);
     return response.data;

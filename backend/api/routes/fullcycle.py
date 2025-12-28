@@ -122,12 +122,14 @@ async def calculate_fullcycle_zscores(
                 detail="No data available for the specified date range"
             )
         
-        # Calculate z-scores for each selected indicator
+        # Calculate z-scores for each selected indicator with validation
         indicator_values: Dict[str, pd.Series] = {}
+        calculation_errors: Dict[str, str] = {}
         
         for indicator_id in indicators:
             if indicator_id not in FULL_CYCLE_INDICATORS:
                 logger.warning(f"Unknown indicator: {indicator_id}, skipping")
+                calculation_errors[indicator_id] = "Unknown indicator"
                 continue
             
             try:
@@ -136,20 +138,51 @@ async def calculate_fullcycle_zscores(
                     params = indicator_params[indicator_id]
                 
                 zscore_values = get_fullcycle_indicator(df, indicator_id, params)
+                
+                # Validate the calculated values
+                if zscore_values is None or len(zscore_values) == 0:
+                    raise ValueError(f"Indicator {indicator_id} returned empty series")
+                
+                # Check for invalid values (NaN, Inf)
+                invalid_count = (zscore_values.isna() | np.isinf(zscore_values)).sum()
+                if invalid_count > len(zscore_values) * 0.1:  # More than 10% invalid
+                    logger.warning(f"Indicator {indicator_id} has {invalid_count} invalid values out of {len(zscore_values)}")
+                
+                # Replace NaN and Inf with 0
+                zscore_values = zscore_values.replace([np.inf, -np.inf], 0).fillna(0)
+                
+                # Check for reasonable z-score range (-10 to +10)
+                extreme_values = ((zscore_values < -10) | (zscore_values > 10)).sum()
+                if extreme_values > 0:
+                    logger.warning(f"Indicator {indicator_id} has {extreme_values} extreme values outside [-10, 10] range")
+                
+                # Ensure date alignment
+                if len(zscore_values) != len(df):
+                    logger.warning(f"Indicator {indicator_id} length ({len(zscore_values)}) doesn't match data length ({len(df)})")
+                    # Align indices
+                    zscore_values = zscore_values.reindex(df.index, fill_value=0)
+                
                 indicator_values[indicator_id] = zscore_values
+                logger.debug(f"Successfully calculated {indicator_id}: {len(zscore_values)} values, range [{zscore_values.min():.2f}, {zscore_values.max():.2f}]")
+                
             except Exception as e:
-                logger.error(f"Error calculating {indicator_id}: {e}", exc_info=True)
+                error_msg = str(e)
+                logger.error(f"Error calculating {indicator_id}: {error_msg}", exc_info=True)
+                calculation_errors[indicator_id] = error_msg
                 continue
         
         if not indicator_values:
+            error_detail = "No valid indicators were calculated."
+            if calculation_errors:
+                error_detail += f" Errors: {', '.join([f'{k}: {v}' for k, v in calculation_errors.items()])}"
             raise HTTPException(
                 status_code=400,
-                detail="No valid indicators were calculated"
+                detail=error_detail
             )
         
         # Calculate averages
         fundamental_indicators = [
-            'mvrv', 'bitcoin_thermocap', 'nupl', 'cvdd', 'sopr'
+            'mvrv', 'nupl', 'sopr'
         ]
         technical_indicators = [
             'rsi', 'cci', 'multiple_ma', 'sharpe', 'pi_cycle', 'nhpf', 'vwap'
@@ -182,35 +215,69 @@ async def calculate_fullcycle_zscores(
         dates = df.index
         prices = df['Close'].values
         
+        # Validate price data
+        if len(prices) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="No price data available"
+            )
+        
+        # Check for invalid prices
+        invalid_prices = np.isnan(prices) | np.isinf(prices) | (prices <= 0)
+        if invalid_prices.sum() > 0:
+            logger.warning(f"Found {invalid_prices.sum()} invalid price values, replacing with forward fill")
+            prices_series = pd.Series(prices, index=df.index)
+            # Use forward fill then backward fill (pandas 2.0+ compatible)
+            prices_series = prices_series.ffill().bfill()
+            prices = prices_series.values
         response_data = []
         for i, date in enumerate(dates):
+            # Validate price
+            price = float(prices[i])
+            if price <= 0 or np.isnan(price) or np.isinf(price):
+                logger.warning(f"Invalid price at {date}, skipping data point")
+                continue
+            
             data_point: Dict[str, Any] = {
                 'date': date.strftime('%Y-%m-%d'),
-                'price': float(prices[i]),
+                'price': price,
                 'indicators': {}
             }
             
             # Add individual indicator z-scores
             for indicator_id, values in indicator_values.items():
                 if i < len(values):
+                    zscore_val = values.iloc[i]
+                    # Ensure valid numeric value
+                    if pd.isna(zscore_val) or np.isinf(zscore_val):
+                        zscore_val = 0.0
                     data_point['indicators'][indicator_id] = {
-                        'zscore': float(values.iloc[i]) if not pd.isna(values.iloc[i]) else 0.0
+                        'zscore': float(zscore_val)
                     }
             
             # Add averages
             if fundamental_avg is not None and i < len(fundamental_avg):
+                avg_val = fundamental_avg.iloc[i]
+                if pd.isna(avg_val) or np.isinf(avg_val):
+                    avg_val = 0.0
                 data_point['indicators']['fundamental_average'] = {
-                    'zscore': float(fundamental_avg.iloc[i]) if not pd.isna(fundamental_avg.iloc[i]) else 0.0
+                    'zscore': float(avg_val)
                 }
             
             if technical_avg is not None and i < len(technical_avg):
+                avg_val = technical_avg.iloc[i]
+                if pd.isna(avg_val) or np.isinf(avg_val):
+                    avg_val = 0.0
                 data_point['indicators']['technical_average'] = {
-                    'zscore': float(technical_avg.iloc[i]) if not pd.isna(technical_avg.iloc[i]) else 0.0
+                    'zscore': float(avg_val)
                 }
             
             if overall_avg is not None and i < len(overall_avg):
+                avg_val = overall_avg.iloc[i]
+                if pd.isna(avg_val) or np.isinf(avg_val):
+                    avg_val = 0.0
                 data_point['indicators']['average'] = {
-                    'zscore': float(overall_avg.iloc[i]) if not pd.isna(overall_avg.iloc[i]) else 0.0
+                    'zscore': float(avg_val)
                 }
             
             response_data.append(data_point)
@@ -238,6 +305,15 @@ async def calculate_fullcycle_zscores(
             past = overall_avg.iloc[-roc_days-1] if len(overall_avg) > roc_days else overall_avg.iloc[0]
             roc_values['average'] = float(current - past) if not (pd.isna(current) or pd.isna(past)) else 0.0
         
+        # Prepare warnings if any indicators failed
+        warnings = []
+        if calculation_errors:
+            warnings.append(f"Some indicators failed to calculate: {', '.join(calculation_errors.keys())}")
+        
+        # Check data quality
+        if actual_start > pd.to_datetime('2014-01-01'):
+            warnings.append(f"Limited historical data: earliest date is {actual_start.strftime('%Y-%m-%d')}")
+        
         return {
             "success": True,
             "data": response_data,
@@ -248,7 +324,10 @@ async def calculate_fullcycle_zscores(
             },
             "symbol": symbol,
             "sdca_in": sdca_in,
-            "sdca_out": sdca_out
+            "sdca_out": sdca_out,
+            "indicators_calculated": len(indicator_values),
+            "indicators_requested": len(indicators),
+            "warnings": warnings if warnings else None
         }
         
     except HTTPException:

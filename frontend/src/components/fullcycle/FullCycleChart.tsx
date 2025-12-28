@@ -3,7 +3,7 @@
  * Dual Y-axis Plotly chart showing BTC price (log scale) and indicator z-scores with reference lines
  */
 
-import React, { useMemo, memo } from 'react';
+import React, { useMemo, memo, useState, useEffect } from 'react';
 import Plot from 'react-plotly.js';
 import { FullCycleDataPoint, FullCycleIndicator } from '../../hooks/useFullCycle';
 
@@ -52,6 +52,16 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
   sdcaOut = 2.0,
   height = 600,
 }) => {
+  // Log scale state (default to log scale, persist in localStorage)
+  const [useLogScale, setUseLogScale] = useState<boolean>(() => {
+    const saved = localStorage.getItem('fullCycleChart_useLogScale');
+    return saved !== null ? saved === 'true' : true; // Default to log scale
+  });
+
+  // Save preference to localStorage
+  useEffect(() => {
+    localStorage.setItem('fullCycleChart_useLogScale', String(useLogScale));
+  }, [useLogScale]);
   const chartData = useMemo(() => {
     if (!data || data.length === 0) return null;
 
@@ -329,7 +339,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
       },
       yaxis: {
         title: 'BTC Price (USD)',
-        type: 'log' as const,
+        type: (useLogScale ? 'log' : 'linear') as const,
         color: '#9CA3AF',
         gridcolor: '#374151',
         showgrid: true,
@@ -376,7 +386,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         },
       },
     };
-  }, [data, sdcaIn, sdcaOut]);
+  }, [data, sdcaIn, sdcaOut, useLogScale]);
 
   const config = {
     displayModeBar: true,
@@ -404,7 +414,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
   }
 
   return (
-    <div className="bg-bg-secondary border border-border-default rounded-lg p-4">
+    <div className="bg-bg-secondary border border-border-default rounded-lg p-4 relative">
       {/* Custom CSS for Plotly hover tooltips */}
       <style>{`
         .js-plotly-plot .hoverlayer .hovertext {
@@ -424,6 +434,15 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
           color: #D1D5DB !important;
         }
       `}</style>
+      {/* Log Scale Toggle Button - Top Right Corner */}
+      <button
+        onClick={() => setUseLogScale(!useLogScale)}
+        className="absolute top-6 right-6 z-10 px-3 py-1.5 bg-bg-tertiary hover:bg-bg-tertiary/80 border border-border-default rounded-lg text-text-primary text-sm font-medium transition-colors shadow-lg"
+        title={useLogScale ? 'Switch to Linear Scale' : 'Switch to Log Scale'}
+        aria-label={useLogScale ? 'Switch to Linear Scale' : 'Switch to Log Scale'}
+      >
+        {useLogScale ? 'Linear' : 'Log'}
+      </button>
       <Plot
         data={chartData}
         layout={layout}

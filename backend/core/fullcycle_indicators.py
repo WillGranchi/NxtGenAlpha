@@ -14,7 +14,7 @@ from .indicators import (
     stdev, zscore, vwma, calculate_rapr_ratios
 )
 from .fundamental_indicators import (
-    calculate_mvrv, calculate_nupl, calculate_cvdd, calculate_sopr
+    calculate_mvrv, calculate_nupl, calculate_sopr
 )
 
 logger = logging.getLogger(__name__)
@@ -40,45 +40,6 @@ def calculate_mvrv_zscore(df: pd.DataFrame, mvrvlen: int = 19, mvrvmn: float = -
     return mvrv_smoothed.fillna(0)
 
 
-def calculate_bitcoin_thermocap_zscore(df: pd.DataFrame, btlen: int = 365, btmn: float = 0, btcl: float = 2.8) -> pd.Series:
-    """
-    Calculate Bitcoin Thermocap z-score with max/min normalization.
-    
-    Args:
-        df: DataFrame with OHLCV data
-        btlen: MA length (default: 365)
-        btmn: Subjective mean (default: 0)
-        btcl: Subjective scale (default: 2.8)
-        
-    Returns:
-        Pandas Series with Bitcoin Thermocap z-score values
-    """
-    # Stub implementation - requires historical blocks mined data
-    logger.warning("Using stub Bitcoin Thermocap data - requires historical blocks mined data")
-    
-    close = df['Close']
-    dates = df.index
-    
-    # Generate mock thermocap values
-    n = len(dates)
-    trend = np.sin(np.linspace(0, 3 * np.pi, n))
-    noise = np.random.normal(0, 0.1, n)
-    thermocap_log = trend * 0.5 + noise
-    
-    # Calculate MA oscillator
-    ma_osc = thermocap_log / ema(thermocap_log, btlen)
-    
-    # Max/min normalization (simplified)
-    ma_osc_min = ma_osc.rolling(window=btlen * 2, min_periods=1).min()
-    ma_osc_max = ma_osc.rolling(window=btlen * 2, min_periods=1).max()
-    range_val = ma_osc_max - ma_osc_min
-    normalized = pd.Series(0.0, index=dates)
-    normalized[range_val > 0] = ((ma_osc - ma_osc_min) / range_val * 2 - 1)[range_val > 0]
-    
-    nom_osc = normalized * btcl + btmn
-    return nom_osc.fillna(0)
-
-
 def calculate_nupl_zscore(df: pd.DataFrame, nuplma: int = 41, nuplmn: float = -25, nuplscl: float = 20) -> pd.Series:
     """
     Calculate NUPL z-score: ((MC1 - MCR) / MC1 * 100 + nuplmn) / nuplscl, then EMA.
@@ -96,35 +57,6 @@ def calculate_nupl_zscore(df: pd.DataFrame, nuplma: int = 41, nuplmn: float = -2
     nupl_normalized = (nupl_data + nuplmn) / nuplscl
     nupl_smoothed = ema(nupl_normalized, nuplma)
     return nupl_smoothed.fillna(0)
-
-
-def calculate_cvdd_zscore(df: pd.DataFrame, cvddmalen: int = 40, cvddlmn: float = 0.3, cvddscl: float = 2.6) -> pd.Series:
-    """
-    Calculate CVDD z-score using complex calculation with realized cap and total volume.
-    
-    Args:
-        df: DataFrame with OHLCV data
-        cvddmalen: EMA smoothing length (default: 40)
-        cvddlmn: Subjective mean (default: 0.3)
-        cvddscl: Subjective scale (default: 2.6)
-        
-    Returns:
-        Pandas Series with CVDD z-score values
-    """
-    # Stub implementation - requires realized cap and total volume data
-    logger.warning("Using stub CVDD z-score data - requires realized cap and total volume")
-    
-    close = df['Close']
-    dates = df.index
-    
-    # Generate mock CVDD values
-    cvdd_data = calculate_cvdd(df)
-    
-    # Simplified CVDD z-score calculation
-    # In real implementation, would use: (MCRR - TV) / 22000000
-    cvdd_normalized = (cvdd_data / 100 - cvddlmn) * cvddscl
-    cvdd_smoothed = ema(cvdd_normalized, cvddmalen)
-    return cvdd_smoothed.fillna(0)
 
 
 def calculate_sopr_zscore(df: pd.DataFrame, soprmalen: int = 100, soprmn: float = -1.004, soprscl: float = 167) -> pd.Series:
@@ -333,23 +265,11 @@ FULL_CYCLE_INDICATORS = {
         'function': calculate_mvrv_zscore,
         'default_params': {'mvrvlen': 19, 'mvrvmn': -0.8, 'mvrvscl': 2.1}
     },
-    'bitcoin_thermocap': {
-        'name': 'Bitcoin Thermocap',
-        'category': 'fundamental',
-        'function': calculate_bitcoin_thermocap_zscore,
-        'default_params': {'btlen': 365, 'btmn': 0, 'btcl': 2.8}
-    },
     'nupl': {
         'name': 'NUPL',
         'category': 'fundamental',
         'function': calculate_nupl_zscore,
         'default_params': {'nuplma': 41, 'nuplmn': -25, 'nuplscl': 20}
-    },
-    'cvdd': {
-        'name': 'CVDD',
-        'category': 'fundamental',
-        'function': calculate_cvdd_zscore,
-        'default_params': {'cvddmalen': 40, 'cvddlmn': 0.3, 'cvddscl': 2.6}
     },
     'sopr': {
         'name': 'SOPR',
