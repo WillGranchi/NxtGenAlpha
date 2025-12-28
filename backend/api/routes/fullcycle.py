@@ -10,7 +10,7 @@ import numpy as np
 from datetime import datetime
 from sqlalchemy.orm import Session
 
-from backend.core.data_loader import load_crypto_data, update_crypto_data
+from backend.core.data_loader import load_crypto_data, update_crypto_data, fetch_crypto_data_smart
 from backend.core.fullcycle_indicators import (
     FULL_CYCLE_INDICATORS,
     get_fullcycle_indicator
@@ -86,14 +86,38 @@ async def calculate_fullcycle_zscores(
         # Load BTC data (hardcoded to BTCUSDT)
         symbol = "BTCUSDT"
         
-        # Force refresh if requested, otherwise use cached data
+        # Use Yahoo Finance as primary source (same as indicators tab)
+        # Force refresh if requested, otherwise try to use smart fetch with cache
         if force_refresh:
-            logger.info(f"Force refreshing {symbol} data from API...")
-            # Update data to ensure we have full historical range
-            # This will fetch from Yahoo Finance/CoinGecko if needed
-            df = update_crypto_data(symbol=symbol, force=True)
+            logger.info(f"Force refreshing {symbol} data from Yahoo Finance...")
+            # Fetch fresh data from Yahoo Finance (primary) with CoinGecko fallback
+            start_date_dt = pd.to_datetime(start_date) if start_date else None
+            end_date_dt = pd.to_datetime(end_date) if end_date else None
+            df, data_source, quality_metrics = fetch_crypto_data_smart(
+                symbol=symbol,
+                start_date=start_date_dt,
+                end_date=end_date_dt,
+                use_cache=False,  # Force fresh fetch
+                cross_validate=False
+            )
+            logger.info(f"Fetched data from {data_source}, quality score: {quality_metrics.get('quality_score', 'N/A')}")
         else:
-            df = load_crypto_data(symbol=symbol)
+            # Try to use Yahoo Finance with cache, fallback to CSV if needed
+            try:
+                start_date_dt = pd.to_datetime(start_date) if start_date else None
+                end_date_dt = pd.to_datetime(end_date) if end_date else None
+                df, data_source, quality_metrics = fetch_crypto_data_smart(
+                    symbol=symbol,
+                    start_date=start_date_dt,
+                    end_date=end_date_dt,
+                    use_cache=True,  # Use cache if available
+                    cross_validate=False
+                )
+                logger.info(f"Using data from {data_source} (cached if available)")
+            except Exception as e:
+                logger.warning(f"Failed to fetch from Yahoo Finance, falling back to CSV: {e}")
+                # Fallback to CSV if Yahoo Finance fails
+                df = load_crypto_data(symbol=symbol)
         
         # Determine the actual date range we have
         actual_start = df.index.min()
