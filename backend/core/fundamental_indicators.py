@@ -7,11 +7,15 @@ replaced with real data sources in the future.
 
 TODO: Connect to real data sources:
 - MVRV: Market Value to Realized Value ratio (requires on-chain data)
+- Bitcoin Thermocap: Cumulative miner revenue (requires on-chain data)
 - NUPL: Net Unrealized Profit/Loss (requires UTXO data)
 - CVDD: Cumulative Value Days Destroyed (requires on-chain data)
 - NVTS: Network Value to Transactions ratio (requires transaction volume data)
 - SOPR: Spent Output Profit Ratio (requires UTXO data)
 - Realized PnL Momentum: Requires on-chain profit/loss data
+
+Recommended API: Glassnode (https://docs.glassnode.com/basic-api/endpoints/indicators)
+Provides: MVRV, Bitcoin Thermocap, NUPL, CVDD, SOPR
 """
 
 import pandas as pd
@@ -86,6 +90,41 @@ def calculate_nupl(df: pd.DataFrame) -> pd.Series:
     return pd.Series(nupl_values, index=dates, name='NUPL')
 
 
+def calculate_bitcoin_thermocap(df: pd.DataFrame) -> pd.Series:
+    """
+    Calculate Bitcoin Thermocap (Cumulative Miner Revenue).
+    
+    Bitcoin Thermocap is the cumulative sum of all miner revenue since genesis,
+    representing the total value paid to miners over time. It's a long-term
+    valuation indicator that helps identify cycle bottoms.
+    
+    Args:
+        df: DataFrame with OHLCV data and Date index
+        
+    Returns:
+        Pandas Series with Bitcoin Thermocap values (stub - returns mock data)
+        
+    TODO: Replace with real Bitcoin Thermocap calculation from on-chain data.
+    Recommended API: Glassnode (https://docs.glassnode.com/basic-api/endpoints/indicators)
+    Endpoint: /v1/metrics/mining/thermocap
+    """
+    logger.warning("Using stub Bitcoin Thermocap data - replace with real on-chain data source (Glassnode API recommended)")
+    
+    dates = df.index
+    n = len(dates)
+    
+    # Bitcoin Thermocap is cumulative and should trend upward over time
+    # Generate cumulative sum with exponential growth pattern
+    base_growth = np.linspace(1, 10, n)  # Simulate growth over time
+    daily_values = base_growth * np.random.exponential(0.5, n)
+    thermocap_values = np.cumsum(daily_values)
+    
+    # Normalize to reasonable range (in billions)
+    thermocap_values = (thermocap_values - thermocap_values.min()) / (thermocap_values.max() - thermocap_values.min()) * 1000
+    
+    return pd.Series(thermocap_values, index=dates, name='Bitcoin_Thermocap')
+
+
 def calculate_cvdd(df: pd.DataFrame) -> pd.Series:
     """
     Calculate Cumulative Value Days Destroyed (CVDD).
@@ -99,7 +138,9 @@ def calculate_cvdd(df: pd.DataFrame) -> pd.Series:
     Returns:
         Pandas Series with CVDD values (stub - returns mock data)
         
-    TODO: Replace with real CVDD calculation from on-chain data
+    TODO: Replace with real CVDD calculation from on-chain data.
+    Recommended API: Glassnode (https://docs.glassnode.com/basic-api/endpoints/indicators)
+    Endpoint: /v1/metrics/indicators/cvdd
     """
     logger.warning("Using stub CVDD data - replace with real on-chain data source")
     
@@ -245,6 +286,7 @@ def calculate_pi_cycle_top_risk(df: pd.DataFrame) -> pd.Series:
 # Mapping of indicator IDs to calculation functions
 FUNDAMENTAL_INDICATORS = {
     'mvrv': calculate_mvrv,
+    'bitcoin_thermocap': calculate_bitcoin_thermocap,
     'nupl': calculate_nupl,
     'cvdd': calculate_cvdd,
     'nvts': calculate_nvts,

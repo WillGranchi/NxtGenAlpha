@@ -14,7 +14,7 @@ from .indicators import (
     stdev, zscore, vwma, calculate_rapr_ratios
 )
 from .fundamental_indicators import (
-    calculate_mvrv, calculate_nupl, calculate_sopr
+    calculate_mvrv, calculate_bitcoin_thermocap, calculate_nupl, calculate_cvdd, calculate_sopr
 )
 
 logger = logging.getLogger(__name__)
@@ -40,6 +40,29 @@ def calculate_mvrv_zscore(df: pd.DataFrame, mvrvlen: int = 19, mvrvmn: float = -
     return mvrv_smoothed.fillna(0)
 
 
+def calculate_bitcoin_thermocap_zscore(df: pd.DataFrame, thermocaplen: int = 19, thermocapmn: float = -0.8, thermocapscl: float = 2.1) -> pd.Series:
+    """
+    Calculate Bitcoin Thermocap z-score: (log2(THERMOCAP_DATA) + thermocapmn) * thermocapscl, then SMA smoothing.
+    
+    Args:
+        df: DataFrame with OHLCV data
+        thermocaplen: Smoothing length (default: 19)
+        thermocapmn: Subjective mean (default: -0.8)
+        thermocapscl: Subjective scale (default: 2.1)
+        
+    Returns:
+        Pandas Series with Bitcoin Thermocap z-score values
+        
+    Note: Currently uses stub data. Requires Glassnode API for real on-chain data.
+    """
+    logger.warning("Using stub Bitcoin Thermocap data - replace with real on-chain data source (Glassnode API recommended)")
+    thermocap_data = calculate_bitcoin_thermocap(df)
+    thermocap_log = np.log2(thermocap_data.clip(lower=0.1))  # Avoid log(0)
+    thermocap_normalized = (thermocap_log + thermocapmn) * thermocapscl
+    thermocap_smoothed = sma(thermocap_normalized, thermocaplen)
+    return thermocap_smoothed.fillna(0)
+
+
 def calculate_nupl_zscore(df: pd.DataFrame, nuplma: int = 41, nuplmn: float = -25, nuplscl: float = 20) -> pd.Series:
     """
     Calculate NUPL z-score: ((MC1 - MCR) / MC1 * 100 + nuplmn) / nuplscl, then EMA.
@@ -57,6 +80,29 @@ def calculate_nupl_zscore(df: pd.DataFrame, nuplma: int = 41, nuplmn: float = -2
     nupl_normalized = (nupl_data + nuplmn) / nuplscl
     nupl_smoothed = ema(nupl_normalized, nuplma)
     return nupl_smoothed.fillna(0)
+
+
+def calculate_cvdd_zscore(df: pd.DataFrame, cvddlen: int = 19, cvddmn: float = -0.8, cvddscl: float = 2.1) -> pd.Series:
+    """
+    Calculate CVDD z-score: (log2(CVDD_DATA) + cvddmn) * cvddscl, then SMA smoothing.
+    
+    Args:
+        df: DataFrame with OHLCV data
+        cvddlen: Smoothing length (default: 19)
+        cvddmn: Subjective mean (default: -0.8)
+        cvddscl: Subjective scale (default: 2.1)
+        
+    Returns:
+        Pandas Series with CVDD z-score values
+        
+    Note: Currently uses stub data. Requires Glassnode API for real on-chain data.
+    """
+    logger.warning("Using stub CVDD data - replace with real on-chain data source (Glassnode API recommended)")
+    cvdd_data = calculate_cvdd(df)
+    cvdd_log = np.log2(cvdd_data.clip(lower=0.1))  # Avoid log(0)
+    cvdd_normalized = (cvdd_log + cvddmn) * cvddscl
+    cvdd_smoothed = sma(cvdd_normalized, cvddlen)
+    return cvdd_smoothed.fillna(0)
 
 
 def calculate_sopr_zscore(df: pd.DataFrame, soprmalen: int = 100, soprmn: float = -1.004, soprscl: float = 167) -> pd.Series:
@@ -265,11 +311,23 @@ FULL_CYCLE_INDICATORS = {
         'function': calculate_mvrv_zscore,
         'default_params': {'mvrvlen': 19, 'mvrvmn': -0.8, 'mvrvscl': 2.1}
     },
+    'bitcoin_thermocap': {
+        'name': 'Bitcoin Thermocap',
+        'category': 'fundamental',
+        'function': calculate_bitcoin_thermocap_zscore,
+        'default_params': {'thermocaplen': 19, 'thermocapmn': -0.8, 'thermocapscl': 2.1}
+    },
     'nupl': {
         'name': 'NUPL',
         'category': 'fundamental',
         'function': calculate_nupl_zscore,
         'default_params': {'nuplma': 41, 'nuplmn': -25, 'nuplscl': 20}
+    },
+    'cvdd': {
+        'name': 'CVDD',
+        'category': 'fundamental',
+        'function': calculate_cvdd_zscore,
+        'default_params': {'cvddlen': 19, 'cvddmn': -0.8, 'cvddscl': 2.1}
     },
     'sopr': {
         'name': 'SOPR',

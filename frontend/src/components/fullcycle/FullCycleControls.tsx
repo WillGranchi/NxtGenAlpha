@@ -304,7 +304,7 @@ export const FullCycleControls: React.FC<FullCycleControlsProps> = ({
                   const isVisible = visibleIndicators.has(indicator.id);
                   return (
                     <div key={indicator.id} className="space-y-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 border-l-4 border-blue-500 pl-3 py-1 rounded-r">
                         <input
                           type="checkbox"
                           checked={isSelected}
@@ -352,7 +352,7 @@ export const FullCycleControls: React.FC<FullCycleControlsProps> = ({
                   const isVisible = visibleIndicators.has(indicator.id);
                   return (
                     <div key={indicator.id} className="space-y-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 border-l-4 border-orange-500 pl-3 py-1 rounded-r">
                         <input
                           type="checkbox"
                           checked={isSelected}

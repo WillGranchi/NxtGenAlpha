@@ -22,6 +22,22 @@ from backend.core.auth import get_current_user
 router = APIRouter(prefix="/api/fullcycle", tags=["fullcycle"])
 logger = logging.getLogger(__name__)
 
+# Custom indicator display order matching the PDF specification
+INDICATOR_DISPLAY_ORDER = [
+    'mvrv',
+    'bitcoin_thermocap',
+    'nupl',
+    'cvdd',
+    'sopr',
+    'rsi',
+    'cci',
+    'multiple_ma',
+    'sharpe',
+    'pi_cycle',
+    'nhpf',
+    'vwap'
+]
+
 
 @router.get("/indicators")
 async def get_fullcycle_indicators() -> Dict[str, Any]:
@@ -34,13 +50,28 @@ async def get_fullcycle_indicators() -> Dict[str, Any]:
     try:
         indicators = []
         
+        # Build indicator list with custom order
+        ordered_indicators = []
+        unordered_indicators = []
+        
         for indicator_id, info in FULL_CYCLE_INDICATORS.items():
-            indicators.append({
+            indicator_data = {
                 'id': indicator_id,
                 'name': info['name'],
                 'category': info['category'],
                 'default_params': info['default_params']
-            })
+            }
+            
+            if indicator_id in INDICATOR_DISPLAY_ORDER:
+                # Insert in the correct position
+                order_index = INDICATOR_DISPLAY_ORDER.index(indicator_id)
+                ordered_indicators.append((order_index, indicator_data))
+            else:
+                unordered_indicators.append(indicator_data)
+        
+        # Sort by order index and extract indicator data
+        ordered_indicators.sort(key=lambda x: x[0])
+        indicators = [ind[1] for ind in ordered_indicators] + unordered_indicators
         
         return {
             "success": True,
@@ -206,7 +237,7 @@ async def calculate_fullcycle_zscores(
         
         # Calculate averages
         fundamental_indicators = [
-            'mvrv', 'nupl', 'sopr'
+            'mvrv', 'bitcoin_thermocap', 'nupl', 'cvdd', 'sopr'
         ]
         technical_indicators = [
             'rsi', 'cci', 'multiple_ma', 'sharpe', 'pi_cycle', 'nhpf', 'vwap'

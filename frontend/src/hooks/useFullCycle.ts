@@ -89,6 +89,22 @@ export interface UseFullCycleReturn {
   refreshData: () => Promise<void>;
 }
 
+// Custom indicator display order matching the PDF specification
+const INDICATOR_DISPLAY_ORDER = [
+  'mvrv',
+  'bitcoin_thermocap',
+  'nupl',
+  'cvdd',
+  'sopr',
+  'rsi',
+  'cci',
+  'multiple_ma',
+  'sharpe',
+  'pi_cycle',
+  'nhpf',
+  'vwap'
+];
+
 export const useFullCycle = (): UseFullCycleReturn => {
   // Available indicators state
   const [availableIndicators, setAvailableIndicators] = useState<FullCycleIndicator[]>([]);
@@ -139,10 +155,27 @@ export const useFullCycle = (): UseFullCycleReturn => {
       setIndicatorsError(null);
       const response = await TradingAPI.getFullCycleIndicators();
       if (response.success) {
-        setAvailableIndicators(response.indicators);
+        // Sort indicators by custom order
+        const sortedIndicators = [...response.indicators].sort((a, b) => {
+          const indexA = INDICATOR_DISPLAY_ORDER.indexOf(a.id);
+          const indexB = INDICATOR_DISPLAY_ORDER.indexOf(b.id);
+          
+          // If both are in the order list, sort by their position
+          if (indexA !== -1 && indexB !== -1) {
+            return indexA - indexB;
+          }
+          // If only A is in the order list, it comes first
+          if (indexA !== -1) return -1;
+          // If only B is in the order list, it comes first
+          if (indexB !== -1) return 1;
+          // If neither is in the order list, maintain original order
+          return 0;
+        });
+        
+        setAvailableIndicators(sortedIndicators);
         // Default select all indicators, but only show average
         if (selectedIndicators.length === 0) {
-          setSelectedIndicators(response.indicators.map(ind => ind.id));
+          setSelectedIndicators(sortedIndicators.map(ind => ind.id));
           setVisibleIndicators(new Set(['average']));
         }
       }

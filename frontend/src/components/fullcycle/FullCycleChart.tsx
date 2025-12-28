@@ -120,12 +120,16 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
       const avgZscore = zscores.filter(z => z !== null).reduce((sum, z) => sum + (z || 0), 0) / zscores.filter(z => z !== null).length;
       const lineColor = getColorForZscore(avgZscore || 0);
 
+      // Add category prefix for visual distinction
+      const categoryPrefix = indicator.category === 'fundamental' ? '[F] ' : '[T] ';
+      const displayName = `${categoryPrefix}${indicator.name}`;
+      
       plotData.push({
         x: dates,
         y: zscores,
         type: 'scatter',
         mode: 'lines',
-        name: indicator.name,
+        name: displayName,
         yaxis: 'y2',
         line: {
           color: lineColor,
