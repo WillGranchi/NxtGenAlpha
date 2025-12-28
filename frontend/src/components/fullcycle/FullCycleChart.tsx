@@ -325,6 +325,9 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
       });
     }
 
+    // Determine y-axis type
+    const yaxisType: 'log' | 'linear' = useLogScale ? 'log' : 'linear';
+
     return {
       title: {
         text: 'Full Cycle Model',
@@ -339,7 +342,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
       },
       yaxis: {
         title: 'BTC Price (USD)',
-        type: (useLogScale ? 'log' : 'linear') as const,
+        type: yaxisType,
         color: '#9CA3AF',
         gridcolor: '#374151',
         showgrid: true,
@@ -395,7 +398,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
     modeBarButtonsToRemove: ['pan2d', 'lasso2d'] as any,
     // Custom CSS for hover tooltips
     toImageButtonOptions: {
-      format: 'png',
+      format: 'png' as const,
       filename: 'full-cycle-model',
       height: height,
       width: 1200,
