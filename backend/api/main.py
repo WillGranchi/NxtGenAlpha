@@ -121,8 +121,22 @@ async def startup_event():
                     try:
                         logger.info(f"Checking {symbol} data date range on startup...")
                         df = load_crypto_data(symbol=symbol)
+                        
+                        # Check if DataFrame is empty (file doesn't exist)
+                        if df.empty or len(df) == 0:
+                            logger.warning(f"⚠️ Data file not found for {symbol}")
+                            logger.info(f"   Use /api/data/refresh endpoint or wait for scheduled daily update to fetch data")
+                            continue
+                        
                         data_start = df.index.min()
                         data_end = df.index.max()
+                        
+                        # Check for NaT values (empty index)
+                        import pandas as pd
+                        if pd.isna(data_start) or pd.isna(data_end):
+                            logger.warning(f"⚠️ Data file exists for {symbol} but contains no valid dates")
+                            logger.info(f"   Use /api/data/refresh endpoint or wait for scheduled daily update to fetch data")
+                            continue
                         
                         # Get token-specific earliest start date (5 years back or token launch)
                         from backend.core.data_loader import calculate_historical_range
