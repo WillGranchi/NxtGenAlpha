@@ -77,16 +77,26 @@ export const ROCTable: React.FC<ROCTableProps> = ({
     return indicator?.category || 'technical';
   };
 
+  // Type for table row data
+  type TableRowData = {
+    indicatorId: string;
+    name: string;
+    currentZScore: number;
+    rocValue: number;
+    rocPercent: number;
+    sortOrder?: number;
+  };
+
   // Prepare table data with grouping
-  const fundamentalData: typeof tableData = [];
-  const technicalData: typeof tableData = [];
-  const averagesData: typeof tableData = [];
+  const fundamentalData: TableRowData[] = [];
+  const technicalData: TableRowData[] = [];
+  const averagesData: TableRowData[] = [];
 
   Object.entries(roc).forEach(([indicatorId, rocValue]) => {
     const currentZScore = getCurrentZScore(indicatorId);
     const rocPercent = currentZScore !== 0 ? (rocValue / Math.abs(currentZScore)) * 100 : 0;
     
-    const item = {
+    const item: TableRowData = {
       indicatorId,
       name: getIndicatorName(indicatorId),
       currentZScore,
@@ -119,12 +129,12 @@ export const ROCTable: React.FC<ROCTableProps> = ({
   });
 
   // Sort each group
-  fundamentalData.sort((a, b) => (a as any).sortOrder - (b as any).sortOrder);
-  technicalData.sort((a, b) => (a as any).sortOrder - (b as any).sortOrder);
-  averagesData.sort((a, b) => AVERAGE_ORDER.indexOf(a.indicatorId) - AVERAGE_ORDER.indexOf(b.indicatorId));
+  fundamentalData.sort((a: TableRowData, b: TableRowData) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  technicalData.sort((a: TableRowData, b: TableRowData) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  averagesData.sort((a: TableRowData, b: TableRowData) => AVERAGE_ORDER.indexOf(a.indicatorId) - AVERAGE_ORDER.indexOf(b.indicatorId));
 
   // Combine: Fundamental, Technical, Averages
-  const tableData = [...fundamentalData, ...technicalData, ...averagesData];
+  const tableData: TableRowData[] = [...fundamentalData, ...technicalData, ...averagesData];
 
   if (tableData.length === 0) {
     return null;
@@ -164,7 +174,7 @@ export const ROCTable: React.FC<ROCTableProps> = ({
             </tr>
           </thead>
           <tbody>
-            {tableData.map((row, index) => {
+            {tableData.map((row: TableRowData, index: number) => {
               const isPositive = row.rocValue > 0;
               const category = getIndicatorCategory(row.indicatorId);
               const nameColorClass = category === 'fundamental' 

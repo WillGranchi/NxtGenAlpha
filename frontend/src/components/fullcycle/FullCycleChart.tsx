@@ -432,25 +432,28 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
       scale: 1,
     },
     // Enable legend click events
-    doubleClick: 'reset',
+    doubleClick: 'reset' as const,
   };
 
   // Handle legend click to select indicator
-  const handleLegendClick = (event: any) => {
-    if (!onIndicatorSelect) return;
+  const handleLegendClick = (event: any): boolean => {
+    if (!onIndicatorSelect) return false;
     
     const clickedTrace = event.data[event.curveNumber];
-    if (!clickedTrace) return;
+    if (!clickedTrace) return false;
 
     const traceName = clickedTrace.name;
     
     // Map trace names back to indicator IDs
     if (traceName === 'Fundamental Average') {
       onIndicatorSelect(selectedIndicatorId === 'fundamental_average' ? null : 'fundamental_average');
+      return false; // Prevent default legend toggle behavior
     } else if (traceName === 'Technical Average') {
       onIndicatorSelect(selectedIndicatorId === 'technical_average' ? null : 'technical_average');
+      return false;
     } else if (traceName === 'Average') {
       onIndicatorSelect(selectedIndicatorId === 'average' ? null : 'average');
+      return false;
     } else if (traceName.startsWith('[F] ') || traceName.startsWith('[T] ')) {
       // Extract indicator name from display name
       const indicatorName = traceName.replace(/^\[[FT]\] /, '');
@@ -458,8 +461,10 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
       if (indicator) {
         // Toggle selection: if already selected, deselect
         onIndicatorSelect(selectedIndicatorId === indicator.id ? null : indicator.id);
+        return false;
       }
     }
+    return false;
   };
 
   if (!chartData || chartData.length === 0) {
