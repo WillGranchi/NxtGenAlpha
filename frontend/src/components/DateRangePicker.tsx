@@ -49,48 +49,77 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
     }
   };
 
+  // Get today's date in YYYY-MM-DD format for max date
+  const today = new Date().toISOString().split('T')[0];
+  const effectiveMaxDate = maxDate || today;
+  const effectiveMinDate = minDate || '2010-01-01';
+
   return (
     <div className={`space-y-2 ${className}`}>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="w-full">
-          <label htmlFor="start-date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label htmlFor="start-date" className="block text-sm font-medium text-text-secondary mb-2">
             Start Date
           </label>
           <input
             id="start-date"
             type="date"
             value={startDate}
-            min={minDate}
-            max={maxDate || endDate}
+            min={effectiveMinDate}
+            max={effectiveMaxDate || endDate || today}
             onChange={handleStartDateChange}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
-                     bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
-                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-                     disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed"
+            step="1"
+            className="w-full px-3 py-2.5 border border-border-default rounded-lg shadow-sm 
+                     bg-bg-tertiary text-text-primary
+                     focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500
+                     disabled:bg-bg-secondary disabled:cursor-not-allowed
+                     text-base sm:text-sm
+                     touch-manipulation
+                     [&::-webkit-calendar-picker-indicator]:cursor-pointer
+                     [&::-webkit-calendar-picker-indicator]:opacity-60
+                     [&::-webkit-calendar-picker-indicator]:hover:opacity-100
+                     [&::-webkit-calendar-picker-indicator]:transition-opacity"
+            style={{
+              // Ensure calendar popup works well on mobile
+              WebkitAppearance: 'none',
+              appearance: 'none',
+            }}
           />
         </div>
         
         <div className="w-full">
-          <label htmlFor="end-date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label htmlFor="end-date" className="block text-sm font-medium text-text-secondary mb-2">
             End Date
           </label>
           <input
             id="end-date"
             type="date"
             value={endDate}
-            min={minDate || startDate}
-            max={maxDate}
+            min={effectiveMinDate || startDate}
+            max={effectiveMaxDate || today}
             onChange={handleEndDateChange}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
-                     bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
-                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-                     disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed"
+            step="1"
+            className="w-full px-3 py-2.5 border border-border-default rounded-lg shadow-sm 
+                     bg-bg-tertiary text-text-primary
+                     focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500
+                     disabled:bg-bg-secondary disabled:cursor-not-allowed
+                     text-base sm:text-sm
+                     touch-manipulation
+                     [&::-webkit-calendar-picker-indicator]:cursor-pointer
+                     [&::-webkit-calendar-picker-indicator]:opacity-60
+                     [&::-webkit-calendar-picker-indicator]:hover:opacity-100
+                     [&::-webkit-calendar-picker-indicator]:transition-opacity"
+            style={{
+              // Ensure calendar popup works well on mobile
+              WebkitAppearance: 'none',
+              appearance: 'none',
+            }}
           />
         </div>
       </div>
       
       {validationError && (
-        <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+        <p className="text-sm text-red-400 mt-2 bg-red-500/10 border border-red-500/50 rounded-lg p-2">
           {validationError}
         </p>
       )}

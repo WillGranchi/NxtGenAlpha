@@ -73,6 +73,7 @@ const IndicatorsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [settingsExpanded, setSettingsExpanded] = useState<boolean>(false);
   const [isRefreshingData, setIsRefreshingData] = useState(false);
+  const [initialLoadAttempted, setInitialLoadAttempted] = useState<boolean>(false);
   const [useLogScale, setUseLogScale] = useState<boolean>(() => {
     const saved = localStorage.getItem('indicatorsChart_useLogScale');
     return saved !== null ? saved === 'true' : true;
@@ -84,8 +85,21 @@ const IndicatorsPage: React.FC = () => {
   }, [isMobile]);
   
   // Load base price data for default chart display
-  const loadBasePriceData = useCallback(async () => {
+  const loadBasePriceData = useCallback(async (forceRefresh: boolean = false) => {
     try {
+      // If force refresh is requested, refresh data from Yahoo Finance first
+      if (forceRefresh) {
+        setIsRefreshingData(true);
+        try {
+          await TradingAPI.refreshData(symbol, true);
+        } catch (refreshErr) {
+          console.warn('Failed to refresh data:', refreshErr);
+          // Continue to load existing data even if refresh fails
+        } finally {
+          setIsRefreshingData(false);
+        }
+      }
+
       const response = await TradingAPI.getValuationData({
         symbol,
         indicators: [], // No indicators, just price
@@ -111,81 +125,22 @@ const IndicatorsPage: React.FC = () => {
     }
   }, [symbol, startDate, endDate]);
 
+  // Auto-load Yahoo Finance data on initial page load
   useEffect(() => {
-    loadBasePriceData();
-  }, [loadBasePriceData]);
+    if (!initialLoadAttempted) {
+      setInitialLoadAttempted(true);
+      // Automatically refresh and load data on first page load
+      loadBasePriceData(true);
+    }
+  }, []); // Only run once on mount
 
-  // Auto-refresh data on first page load if data is incomplete
+  // Reload data when symbol, startDate, or endDate changes (but don't force refresh)
   useEffect(() => {
-    const checkAndRefreshData = async () => {
-      try {
-        // Check if auto-refresh has been attempted recently (within last hour)
-        const refreshKey = `data_refresh_attempted_${symbol}`;
-        const lastAttempt = localStorage.getItem(refreshKey);
-        if (lastAttempt) {
-          const lastAttemptTime = parseInt(lastAttempt, 10);
-          const hoursSinceAttempt = (Date.now() - lastAttemptTime) / (1000 * 60 * 60);
-          if (hoursSinceAttempt < 1) {
-            // Already attempted within last hour, skip
-            return;
-          }
-        }
+    if (initialLoadAttempted) {
+      loadBasePriceData(false);
+    }
+  }, [symbol, startDate, endDate, initialLoadAttempted, loadBasePriceData]);
 
-        // Check data completeness
-        const dataInfo = await TradingAPI.getDataInfo(symbol);
-        if (!dataInfo.success || !dataInfo.data_info) {
-          return;
-        }
-
-        const { date_range, total_records } = dataInfo.data_info;
-        const dataStart = new Date(date_range.start);
-        const dataEnd = new Date(date_range.end);
-        
-        // Calculate expected start date (token launch dates)
-        const tokenLaunchDates: Record<string, string> = {
-          'BTCUSDT': '2010-01-01',
-          'ETHUSDT': '2015-07-30',
-          'SOLUSDT': '2020-03-16',
-          'SUIUSDT': '2023-05-03',
-          'BNBUSDT': '2017-07-25',
-          'XRPUSDT': '2013-08-04',
-        };
-        const expectedStart = new Date(tokenLaunchDates[symbol] || '2010-01-01');
-        
-        // Check if data is incomplete:
-        // 1. Less than 1 year of data
-        // 2. Data doesn't go back to expected launch date (within 30 days tolerance)
-        const daysOfData = (dataEnd.getTime() - dataStart.getTime()) / (1000 * 60 * 60 * 24);
-        const daysFromExpectedStart = (dataStart.getTime() - expectedStart.getTime()) / (1000 * 60 * 60 * 24);
-        const isIncomplete = daysOfData < 365 || (daysFromExpectedStart > 30 && total_records < 1000);
-
-        if (isIncomplete) {
-          // Mark refresh as attempted
-          localStorage.setItem(refreshKey, Date.now().toString());
-          
-          // Trigger auto-refresh (silently, don't show error if it fails)
-          setIsRefreshingData(true);
-          try {
-            await TradingAPI.refreshData(symbol, true);
-            // Reload price data after refresh
-            await loadBasePriceData();
-          } catch (refreshErr) {
-            // Silently fail - don't block page load
-            console.warn('Auto-refresh failed:', refreshErr);
-          } finally {
-            setIsRefreshingData(false);
-          }
-        }
-      } catch (err) {
-        // Silently fail - don't block page load
-        console.warn('Data completeness check failed:', err);
-      }
-    };
-
-    // Only run on mount, not on every render
-    checkAndRefreshData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [symbol]); // Only re-run if symbol changes
 
   // Handle manual data refresh
   const handleRefreshData = async () => {
@@ -501,10 +456,10 @@ const IndicatorsPage: React.FC = () => {
           )}
 
           {/* Settings Bar (Collapsible) */}
-          <div className="bg-bg-secondary border border-border-default rounded-lg overflow-hidden">
+          <div className="bg-bg-secondary border border-border-default rounded-lg relative z-10">
             <button
               onClick={() => setSettingsExpanded(!settingsExpanded)}
-              className="w-full px-6 py-4 flex items-center justify-between hover:bg-bg-tertiary transition-colors"
+              className="w-full px-6 py-4 flex items-center justify-between hover:bg-bg-tertiary transition-colors rounded-t-lg"
             >
               <div className="flex items-center gap-3">
                 <Settings className="w-5 h-5 text-text-muted" />
@@ -518,7 +473,7 @@ const IndicatorsPage: React.FC = () => {
             </button>
             
             {settingsExpanded && (
-              <div className="border-t border-border-default p-6">
+              <div className="border-t border-border-default p-6 rounded-b-lg">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                   {/* Symbol */}
                   <div>
