@@ -18,6 +18,8 @@ interface FullCycleChartProps {
   sdcaIn?: number;
   sdcaOut?: number;
   height?: number;
+  onIndicatorSelect?: (indicatorId: string | null) => void;
+  selectedIndicatorId?: string | null;
 }
 
 // Color palette for indicator lines
@@ -51,6 +53,8 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
   sdcaIn = -2.0,
   sdcaOut = 2.0,
   height = 600,
+  onIndicatorSelect,
+  selectedIndicatorId = null,
 }) => {
   // Log scale state (default to log scale, persist in localStorage)
   const [useLogScale, setUseLogScale] = useState<boolean>(() => {
@@ -124,6 +128,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
       const categoryPrefix = indicator.category === 'fundamental' ? '[F] ' : '[T] ';
       const displayName = `${categoryPrefix}${indicator.name}`;
       
+      const isSelected = selectedIndicatorId === indicatorId;
       plotData.push({
         x: dates,
         y: zscores,
@@ -133,13 +138,16 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         yaxis: 'y2',
         line: {
           color: lineColor,
-          width: 1.5,
+          width: isSelected ? 3 : 1.5, // Thicker line when selected
         },
         // Hide by default, but include in tooltips (legendonly = hidden but in tooltips)
-        // Only show if explicitly in visibleIndicators
-        visible: visibleIndicators.has(indicatorId) ? true : 'legendonly',
+        // Only show if explicitly in visibleIndicators OR if selected
+        visible: (visibleIndicators.has(indicatorId) || isSelected) ? true : 'legendonly',
         // Ensure it appears in hover tooltips even when hidden
-        showlegend: false, // Don't clutter legend with hidden indicators
+        showlegend: true, // Show in legend for selection
+        legendgroup: 'indicators',
+        // Add selection highlight effect
+        opacity: isSelected ? 1 : (visibleIndicators.has(indicatorId) ? 0.7 : 0.3),
       });
 
       colorIndex++;
@@ -152,6 +160,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         return avg ? avg.zscore : null;
       });
 
+      const isSelected = selectedIndicatorId === 'fundamental_average';
       plotData.push({
         x: dates,
         y: fundamentalZscores,
@@ -161,9 +170,12 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         yaxis: 'y2',
         line: {
           color: MAGENTA,
-          width: 2,
+          width: isSelected ? 4 : 2,
           dash: 'dash',
         },
+        showlegend: true,
+        legendgroup: 'averages',
+        opacity: isSelected ? 1 : 0.8,
       });
     }
 
@@ -174,6 +186,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         return avg ? avg.zscore : null;
       });
 
+      const isSelected = selectedIndicatorId === 'technical_average';
       plotData.push({
         x: dates,
         y: technicalZscores,
@@ -183,9 +196,12 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         yaxis: 'y2',
         line: {
           color: CYAN,
-          width: 2,
+          width: isSelected ? 4 : 2,
           dash: 'dash',
         },
+        showlegend: true,
+        legendgroup: 'averages',
+        opacity: isSelected ? 1 : 0.8,
       });
     }
 
@@ -196,6 +212,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         return avg ? avg.zscore : null;
       });
 
+      const isSelected = selectedIndicatorId === 'average';
       plotData.push({
         x: dates,
         y: overallZscores,
@@ -205,8 +222,11 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         yaxis: 'y2',
         line: {
           color: '#FFFFFF',
-          width: 3,
+          width: isSelected ? 4 : 3,
         },
+        showlegend: true,
+        legendgroup: 'averages',
+        opacity: isSelected ? 1 : 0.9,
       });
     }
 
@@ -231,7 +251,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
     });
 
     return plotData;
-  }, [data, availableIndicators, selectedIndicators, visibleIndicators, showFundamentalAverage, showTechnicalAverage, showOverallAverage, sdcaIn, sdcaOut]);
+  }, [data, availableIndicators, selectedIndicators, visibleIndicators, showFundamentalAverage, showTechnicalAverage, showOverallAverage, sdcaIn, sdcaOut, selectedIndicatorId]);
 
   const layout = useMemo(() => {
     if (!data || data.length === 0) return {};
@@ -408,6 +428,35 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
       width: 1200,
       scale: 1,
     },
+    // Enable legend click events
+    doubleClick: 'reset',
+  };
+
+  // Handle legend click to select indicator
+  const handleLegendClick = (event: any) => {
+    if (!onIndicatorSelect) return;
+    
+    const clickedTrace = event.data[event.curveNumber];
+    if (!clickedTrace) return;
+
+    const traceName = clickedTrace.name;
+    
+    // Map trace names back to indicator IDs
+    if (traceName === 'Fundamental Average') {
+      onIndicatorSelect(selectedIndicatorId === 'fundamental_average' ? null : 'fundamental_average');
+    } else if (traceName === 'Technical Average') {
+      onIndicatorSelect(selectedIndicatorId === 'technical_average' ? null : 'technical_average');
+    } else if (traceName === 'Average') {
+      onIndicatorSelect(selectedIndicatorId === 'average' ? null : 'average');
+    } else if (traceName.startsWith('[F] ') || traceName.startsWith('[T] ')) {
+      // Extract indicator name from display name
+      const indicatorName = traceName.replace(/^\[[FT]\] /, '');
+      const indicator = availableIndicators.find((ind) => ind.name === indicatorName);
+      if (indicator) {
+        // Toggle selection: if already selected, deselect
+        onIndicatorSelect(selectedIndicatorId === indicator.id ? null : indicator.id);
+      }
+    }
   };
 
   if (!chartData || chartData.length === 0) {
@@ -456,6 +505,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         config={config}
         style={{ width: '100%', height: `${height}px` }}
         useResizeHandler={true}
+        onLegendClick={handleLegendClick}
       />
     </div>
   );

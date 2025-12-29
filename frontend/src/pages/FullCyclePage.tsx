@@ -21,6 +21,7 @@ const FullCyclePage: React.FC = () => {
   const location = useLocation();
   const [viewMode, setViewMode] = useState<'chart' | 'heatmap'>('chart');
   const chartRef = useRef<HTMLDivElement>(null);
+  const [selectedIndicatorId, setSelectedIndicatorId] = useState<string | null>(null);
   
   const {
     availableIndicators,
@@ -242,6 +243,27 @@ const FullCyclePage: React.FC = () => {
               </div>
             </div>
 
+            {/* Selected Indicator Display */}
+            {selectedIndicatorId && (
+              <div className="mb-4 bg-primary-500/10 border border-primary-500/30 rounded-lg p-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-text-secondary">Selected:</span>
+                  <span className="text-sm font-semibold text-primary-400">
+                    {selectedIndicatorId === 'fundamental_average' ? 'Fundamental Average' :
+                     selectedIndicatorId === 'technical_average' ? 'Technical Average' :
+                     selectedIndicatorId === 'average' ? 'Overall Average' :
+                     availableIndicators.find(ind => ind.id === selectedIndicatorId)?.name || selectedIndicatorId}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setSelectedIndicatorId(null)}
+                  className="text-xs text-text-secondary hover:text-text-primary px-2 py-1 rounded transition-colors"
+                >
+                  Clear Selection
+                </button>
+              </div>
+            )}
+
             {/* Chart/Heatmap Container - Maintain height during loading */}
             <div className="min-h-[400px] md:min-h-[600px] relative">
               {zscoresLoading ? (
@@ -266,6 +288,8 @@ const FullCyclePage: React.FC = () => {
                         sdcaIn={sdcaIn}
                         sdcaOut={sdcaOut}
                         height={isMobile ? 400 : 600}
+                        selectedIndicatorId={selectedIndicatorId}
+                        onIndicatorSelect={setSelectedIndicatorId}
                       />
                     </div>
                   ) : (
