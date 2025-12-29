@@ -6,6 +6,29 @@
 import React from 'react';
 import { FullCycleIndicator, FullCycleDataPoint } from '../../hooks/useFullCycle';
 
+// Custom indicator display order matching the PDF specification
+const INDICATOR_DISPLAY_ORDER = [
+  'mvrv',
+  'bitcoin_thermocap',
+  'nupl',
+  'cvdd',
+  'sopr',
+  'rsi',
+  'cci',
+  'multiple_ma',
+  'sharpe',
+  'pi_cycle',
+  'nhpf',
+  'vwap'
+];
+
+// Order for averages (should appear at the end)
+const AVERAGE_ORDER = [
+  'fundamental_average',
+  'technical_average',
+  'average'
+];
+
 interface ROCTableProps {
   roc: Record<string, number>;
   zscoreData: FullCycleDataPoint[];
@@ -52,11 +75,30 @@ export const ROCTable: React.FC<ROCTableProps> = ({
       };
     })
     .sort((a, b) => {
-      // Sort by category: averages first, then by name
-      const aIsAverage = a.indicatorId.includes('average');
-      const bIsAverage = b.indicatorId.includes('average');
-      if (aIsAverage && !bIsAverage) return -1;
-      if (!aIsAverage && bIsAverage) return 1;
+      // Check if indicators are averages
+      const aIsAverage = AVERAGE_ORDER.includes(a.indicatorId);
+      const bIsAverage = AVERAGE_ORDER.includes(b.indicatorId);
+      
+      // Averages go at the end, in specific order
+      if (aIsAverage && bIsAverage) {
+        return AVERAGE_ORDER.indexOf(a.indicatorId) - AVERAGE_ORDER.indexOf(b.indicatorId);
+      }
+      if (aIsAverage) return 1; // Averages go to end
+      if (bIsAverage) return -1; // Averages go to end
+      
+      // Regular indicators: sort by custom order
+      const aIndex = INDICATOR_DISPLAY_ORDER.indexOf(a.indicatorId);
+      const bIndex = INDICATOR_DISPLAY_ORDER.indexOf(b.indicatorId);
+      
+      // If both are in the order list, sort by their position
+      if (aIndex !== -1 && bIndex !== -1) {
+        return aIndex - bIndex;
+      }
+      // If only A is in the order list, it comes first
+      if (aIndex !== -1) return -1;
+      // If only B is in the order list, it comes first
+      if (bIndex !== -1) return 1;
+      // If neither is in the order list, maintain original order (by name)
       return a.name.localeCompare(b.name);
     });
 
