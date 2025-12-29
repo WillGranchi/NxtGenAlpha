@@ -145,8 +145,8 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
       });
 
       const isSelected = selectedIndicatorId === 'technical_average';
-      // Visible by default, but completely hidden (not faint) if explicitly hidden via legend click
-      const isVisible = !hiddenAverages.has('technical_average');
+      const isHidden = hiddenAverages.has('technical_average');
+      // Use 'legendonly' when hidden to keep legend item clickable, but fully visible when shown
       plotData.push({
         x: dates,
         y: technicalZscores,
@@ -161,7 +161,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         },
         showlegend: true,
         legendgroup: 'averages',
-        visible: isVisible,
+        visible: isHidden ? ('legendonly' as const) : true,
       });
     }
 
@@ -173,8 +173,8 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
       });
 
       const isSelected = selectedIndicatorId === 'fundamental_average';
-      // Visible by default, but completely hidden (not faint) if explicitly hidden via legend click
-      const isVisible = !hiddenAverages.has('fundamental_average');
+      const isHidden = hiddenAverages.has('fundamental_average');
+      // Use 'legendonly' when hidden to keep legend item clickable, but fully visible when shown
       plotData.push({
         x: dates,
         y: fundamentalZscores,
@@ -189,7 +189,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         },
         showlegend: true,
         legendgroup: 'averages',
-        visible: isVisible,
+        visible: isHidden ? ('legendonly' as const) : true,
       });
     }
 
@@ -201,8 +201,8 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
       });
 
       const isSelected = selectedIndicatorId === 'average';
-      // Visible by default, but completely hidden (not faint) if explicitly hidden via legend click
-      const isVisible = !hiddenAverages.has('average');
+      const isHidden = hiddenAverages.has('average');
+      // Use 'legendonly' when hidden to keep legend item clickable, but fully visible when shown
       plotData.push({
         x: dates,
         y: overallZscores,
@@ -216,7 +216,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         },
         showlegend: true,
         legendgroup: 'averages',
-        visible: isVisible,
+        visible: isHidden ? ('legendonly' as const) : true,
       });
     }
 
@@ -441,10 +441,12 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
   const handleLegendClick = (event: any): boolean => {
     if (!onIndicatorSelect) return false;
     
-    const clickedTrace = event.data[event.curveNumber];
+    // Get the clicked trace - should work even for legendonly traces
+    const clickedTrace = event.data?.[event.curveNumber];
     if (!clickedTrace) return false;
-
+    
     const traceName = clickedTrace.name;
+    if (!traceName) return false;
     
     // Map trace names back to indicator IDs
     if (traceName === 'Fundamental Average') {
@@ -453,11 +455,11 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
       const isCurrentlyHidden = hiddenAverages.has(avgId);
       
       if (isCurrentlySelected) {
-        // Deselect and hide completely
+        // Deselect and hide (set to legendonly)
         onIndicatorSelect(null);
         setHiddenAverages(prev => new Set(prev).add(avgId));
       } else if (isCurrentlyHidden) {
-        // Show and select
+        // Show and select (remove from hidden, make fully visible)
         setHiddenAverages(prev => {
           const newSet = new Set(prev);
           newSet.delete(avgId);
@@ -475,11 +477,11 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
       const isCurrentlyHidden = hiddenAverages.has(avgId);
       
       if (isCurrentlySelected) {
-        // Deselect and hide completely
+        // Deselect and hide (set to legendonly)
         onIndicatorSelect(null);
         setHiddenAverages(prev => new Set(prev).add(avgId));
       } else if (isCurrentlyHidden) {
-        // Show and select
+        // Show and select (remove from hidden, make fully visible)
         setHiddenAverages(prev => {
           const newSet = new Set(prev);
           newSet.delete(avgId);
@@ -497,11 +499,11 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
       const isCurrentlyHidden = hiddenAverages.has(avgId);
       
       if (isCurrentlySelected) {
-        // Deselect and hide completely
+        // Deselect and hide (set to legendonly)
         onIndicatorSelect(null);
         setHiddenAverages(prev => new Set(prev).add(avgId));
       } else if (isCurrentlyHidden) {
-        // Show and select
+        // Show and select (remove from hidden, make fully visible)
         setHiddenAverages(prev => {
           const newSet = new Set(prev);
           newSet.delete(avgId);
@@ -513,7 +515,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         onIndicatorSelect(avgId);
       }
       return false;
-    } else if (traceName.startsWith('[F] ') || traceName.startsWith('[T] ')) {
+    } else if (traceName && (traceName.startsWith('[F] ') || traceName.startsWith('[T] '))) {
       // Extract indicator name from display name
       const indicatorName = traceName.replace(/^\[[FT]\] /, '');
       const indicator = availableIndicators.find((ind) => ind.name === indicatorName);
