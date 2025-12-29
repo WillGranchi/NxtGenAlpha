@@ -151,6 +151,10 @@ export const PriceChart: React.FC<PriceChartProps> = ({
           symbol: 'triangle-up' as const,
           line: { color: '#FFFFFF', width: 1 },
         },
+        hovertemplate: `<b>${indicatorId} Buy Signal</b><br>` +
+          'Date: %{x}<br>' +
+          'Price: $%{y:,.2f}<br>' +
+          '<extra></extra>',
       });
     }
     
@@ -167,6 +171,10 @@ export const PriceChart: React.FC<PriceChartProps> = ({
           symbol: 'triangle-down' as const,
           line: { color: '#FFFFFF', width: 1 },
         },
+        hovertemplate: `<b>${indicatorId} Sell Signal</b><br>` +
+          'Date: %{x}<br>' +
+          'Price: $%{y:,.2f}<br>' +
+          '<extra></extra>',
       });
     }
     });
