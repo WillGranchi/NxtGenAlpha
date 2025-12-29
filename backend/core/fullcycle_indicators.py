@@ -14,7 +14,8 @@ from .indicators import (
     stdev, zscore, vwma, calculate_rapr_ratios
 )
 from .fundamental_indicators import (
-    calculate_mvrv, calculate_bitcoin_thermocap, calculate_nupl, calculate_cvdd, calculate_sopr
+    calculate_mvrv, calculate_bitcoin_thermocap, calculate_nupl, calculate_cvdd, calculate_sopr,
+    calculate_puell_multiple, calculate_reserve_risk, calculate_bitcoin_days_destroyed, calculate_exchange_net_position
 )
 
 logger = logging.getLogger(__name__)
@@ -103,6 +104,98 @@ def calculate_cvdd_zscore(df: pd.DataFrame, cvddlen: int = 19, cvddmn: float = -
     cvdd_normalized = (cvdd_log + cvddmn) * cvddscl
     cvdd_smoothed = sma(cvdd_normalized, cvddlen)
     return cvdd_smoothed.fillna(0)
+
+
+def calculate_puell_multiple_zscore(df: pd.DataFrame, puelllen: int = 365, puellmn: float = -0.5, puellscl: float = 1.5) -> pd.Series:
+    """
+    Calculate Puell Multiple z-score: (log2(PUELL_DATA) + puellmn) * puellscl, then SMA smoothing.
+    
+    Args:
+        df: DataFrame with OHLCV data
+        puelllen: Smoothing length (default: 365)
+        puellmn: Subjective mean (default: -0.5)
+        puellscl: Subjective scale (default: 1.5)
+        
+    Returns:
+        Pandas Series with Puell Multiple z-score values
+        
+    Note: Currently uses stub data. Requires Glassnode API for real on-chain data.
+    """
+    logger.warning("Using stub Puell Multiple data - replace with real on-chain data source (Glassnode API recommended)")
+    puell_data = calculate_puell_multiple(df)
+    puell_log = np.log2(puell_data.clip(lower=0.1))  # Avoid log(0)
+    puell_normalized = (puell_log + puellmn) * puellscl
+    puell_smoothed = sma(puell_normalized, puelllen)
+    return puell_smoothed.fillna(0)
+
+
+def calculate_reserve_risk_zscore(df: pd.DataFrame, reserverisklen: int = 200, reserveriskmn: float = -0.6, reserveriskscl: float = 2.0) -> pd.Series:
+    """
+    Calculate Reserve Risk z-score: (log2(RESERVE_RISK_DATA) + reserveriskmn) * reserveriskscl, then SMA smoothing.
+    
+    Args:
+        df: DataFrame with OHLCV data
+        reserverisklen: Smoothing length (default: 200)
+        reserveriskmn: Subjective mean (default: -0.6)
+        reserveriskscl: Subjective scale (default: 2.0)
+        
+    Returns:
+        Pandas Series with Reserve Risk z-score values
+        
+    Note: Currently uses stub data. Requires Glassnode API for real on-chain data.
+    """
+    logger.warning("Using stub Reserve Risk data - replace with real on-chain data source (Glassnode API recommended)")
+    reserve_risk_data = calculate_reserve_risk(df)
+    reserve_risk_log = np.log2(reserve_risk_data.clip(lower=0.0001))  # Avoid log(0)
+    reserve_risk_normalized = (reserve_risk_log + reserveriskmn) * reserveriskscl
+    reserve_risk_smoothed = sma(reserve_risk_normalized, reserverisklen)
+    return reserve_risk_smoothed.fillna(0)
+
+
+def calculate_bdd_zscore(df: pd.DataFrame, bddlen: int = 30, bddmn: float = -0.4, bddscl: float = 1.8) -> pd.Series:
+    """
+    Calculate Bitcoin Days Destroyed z-score: (log2(BDD_DATA) + bddmn) * bddscl, then SMA smoothing.
+    
+    Args:
+        df: DataFrame with OHLCV data
+        bddlen: Smoothing length (default: 30)
+        bddmn: Subjective mean (default: -0.4)
+        bddscl: Subjective scale (default: 1.8)
+        
+    Returns:
+        Pandas Series with BDD z-score values
+        
+    Note: Currently uses stub data. Requires Glassnode API for real on-chain data.
+    """
+    logger.warning("Using stub Bitcoin Days Destroyed data - replace with real on-chain data source (Glassnode API recommended)")
+    bdd_data = calculate_bitcoin_days_destroyed(df)
+    bdd_log = np.log2(bdd_data.clip(lower=1))  # Avoid log(0)
+    bdd_normalized = (bdd_log + bddmn) * bddscl
+    bdd_smoothed = sma(bdd_normalized, bddlen)
+    return bdd_smoothed.fillna(0)
+
+
+def calculate_exchange_net_position_zscore(df: pd.DataFrame, exchangenetlen: int = 30, exchangenetmn: float = 0, exchangenetscl: float = 1.5) -> pd.Series:
+    """
+    Calculate Exchange Net Position z-score: (EXCHANGE_NET_DATA / scale + mean) * scale, then SMA smoothing.
+    
+    Args:
+        df: DataFrame with OHLCV data
+        exchangenetlen: Smoothing length (default: 30)
+        exchangenetmn: Subjective mean (default: 0)
+        exchangenetscl: Subjective scale (default: 1.5)
+        
+    Returns:
+        Pandas Series with Exchange Net Position z-score values
+        
+    Note: Currently uses stub data. Requires Glassnode/CryptoQuant API for real on-chain data.
+    """
+    logger.warning("Using stub Exchange Net Position data - replace with real on-chain data source (Glassnode/CryptoQuant API recommended)")
+    exchange_net_data = calculate_exchange_net_position(df)
+    # Normalize: divide by a typical scale value (e.g., 10000) to get reasonable range
+    exchange_net_normalized = (exchange_net_data / 10000 + exchangenetmn) * exchangenetscl
+    exchange_net_smoothed = sma(exchange_net_normalized, exchangenetlen)
+    return exchange_net_smoothed.fillna(0)
 
 
 def calculate_sopr_zscore(df: pd.DataFrame, soprmalen: int = 100, soprmn: float = -1.004, soprscl: float = 167) -> pd.Series:
@@ -270,6 +363,35 @@ def calculate_nhpf_zscore(df: pd.DataFrame, lambda_param: int = 300, hpmn: float
     return nhpf.fillna(0)
 
 
+def calculate_mayer_multiple_zscore(df: pd.DataFrame, mayermalen: int = 200, mayermn: float = -0.5, mayerscl: float = 1.5) -> pd.Series:
+    """
+    Calculate Mayer Multiple z-score: (Price / SMA(Price, mayermalen) - 1 + mayermn) * mayerscl.
+    
+    Mayer Multiple is the ratio of current price to 200-day moving average.
+    Values < 0.8 indicate oversold conditions, > 2.4 indicate overbought.
+    
+    Args:
+        df: DataFrame with OHLCV data
+        mayermalen: SMA length (default: 200)
+        mayermn: Subjective mean (default: -0.5)
+        mayerscl: Subjective scale (default: 1.5)
+        
+    Returns:
+        Pandas Series with Mayer Multiple z-score values
+    """
+    close = df['Close']
+    sma_200 = sma(close, mayermalen)
+    
+    # Calculate Mayer Multiple: Price / SMA(200)
+    mayer_multiple = close / sma_200.replace(0, np.nan)
+    
+    # Normalize: (ratio - 1 + mean) * scale
+    # Subtracting 1 centers around 0 (when price = SMA, ratio = 1)
+    mayer_normalized = (mayer_multiple - 1 + mayermn) * mayerscl
+    
+    return mayer_normalized.fillna(0)
+
+
 def calculate_vwap_zscore(df: pd.DataFrame, vwaplen: int = 150, zlen: int = 300) -> pd.Series:
     """
     Calculate VWAP z-score: ((vwapma - mean) / stdev(vwapma, zlen) - 0.6) / 1.2.
@@ -335,6 +457,30 @@ FULL_CYCLE_INDICATORS = {
         'function': calculate_sopr_zscore,
         'default_params': {'soprmalen': 100, 'soprmn': -1.004, 'soprscl': 167}
     },
+    'puell_multiple': {
+        'name': 'Puell Multiple',
+        'category': 'fundamental',
+        'function': calculate_puell_multiple_zscore,
+        'default_params': {'puelllen': 365, 'puellmn': -0.5, 'puellscl': 1.5}
+    },
+    'reserve_risk': {
+        'name': 'Reserve Risk',
+        'category': 'fundamental',
+        'function': calculate_reserve_risk_zscore,
+        'default_params': {'reserverisklen': 200, 'reserveriskmn': -0.6, 'reserveriskscl': 2.0}
+    },
+    'bitcoin_days_destroyed': {
+        'name': 'Bitcoin Days Destroyed',
+        'category': 'fundamental',
+        'function': calculate_bdd_zscore,
+        'default_params': {'bddlen': 30, 'bddmn': -0.4, 'bddscl': 1.8}
+    },
+    'exchange_net_position': {
+        'name': 'Exchange Net Position',
+        'category': 'fundamental',
+        'function': calculate_exchange_net_position_zscore,
+        'default_params': {'exchangenetlen': 30, 'exchangenetmn': 0, 'exchangenetscl': 1.5}
+    },
     'rsi': {
         'name': 'RSI',
         'category': 'technical',
@@ -376,6 +522,12 @@ FULL_CYCLE_INDICATORS = {
         'category': 'technical',
         'function': calculate_vwap_zscore,
         'default_params': {'vwaplen': 150, 'zlen': 300}
+    },
+    'mayer_multiple': {
+        'name': 'Mayer Multiple',
+        'category': 'technical',
+        'function': calculate_mayer_multiple_zscore,
+        'default_params': {'mayermalen': 200, 'mayermn': -0.5, 'mayerscl': 1.5}
     },
 }
 

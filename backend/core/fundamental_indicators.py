@@ -158,6 +158,138 @@ def calculate_cvdd(df: pd.DataFrame) -> pd.Series:
     return pd.Series(cvdd_values, index=dates, name='CVDD')
 
 
+def calculate_puell_multiple(df: pd.DataFrame) -> pd.Series:
+    """
+    Calculate Puell Multiple.
+    
+    Puell Multiple is the ratio of daily coin issuance value (in USD) to the
+    365-day moving average of daily coin issuance value. It's excellent for
+    identifying cycle bottoms when values drop below 0.5.
+    
+    Args:
+        df: DataFrame with OHLCV data and Date index
+        
+    Returns:
+        Pandas Series with Puell Multiple values (stub - returns mock data)
+        
+    TODO: Replace with real Puell Multiple calculation from on-chain data.
+    Recommended API: Glassnode (https://docs.glassnode.com/basic-api/endpoints/indicators)
+    Endpoint: /v1/metrics/indicators/puell_multiple
+    """
+    logger.warning("Using stub Puell Multiple data - replace with real on-chain data source (Glassnode API recommended)")
+    
+    dates = df.index
+    n = len(dates)
+    
+    # Puell Multiple typically ranges from 0.3 to 4.0
+    # Low values (< 0.5) indicate cycle bottoms
+    trend = np.sin(np.linspace(0, 3 * np.pi, n))
+    noise = np.random.normal(0, 0.2, n)
+    puell_values = 1.0 + trend * 0.8 + noise
+    
+    # Ensure values stay in reasonable range
+    puell_values = np.clip(puell_values, 0.3, 4.0)
+    
+    return pd.Series(puell_values, index=dates, name='Puell_Multiple')
+
+
+def calculate_reserve_risk(df: pd.DataFrame) -> pd.Series:
+    """
+    Calculate Reserve Risk.
+    
+    Reserve Risk is a long-term valuation indicator that measures price confidence
+    relative to network security. Low values indicate good buying opportunities.
+    
+    Args:
+        df: DataFrame with OHLCV data and Date index
+        
+    Returns:
+        Pandas Series with Reserve Risk values (stub - returns mock data)
+        
+    TODO: Replace with real Reserve Risk calculation from on-chain data.
+    Recommended API: Glassnode (https://docs.glassnode.com/basic-api/endpoints/indicators)
+    Endpoint: /v1/metrics/indicators/reserve_risk
+    """
+    logger.warning("Using stub Reserve Risk data - replace with real on-chain data source (Glassnode API recommended)")
+    
+    dates = df.index
+    n = len(dates)
+    
+    # Reserve Risk typically ranges from 0.001 to 0.1
+    # Low values indicate undervalued conditions
+    trend = np.sin(np.linspace(0, 2.5 * np.pi, n))
+    noise = np.random.normal(0, 0.01, n)
+    reserve_risk_values = 0.02 + trend * 0.015 + noise
+    
+    # Ensure values stay in reasonable range
+    reserve_risk_values = np.clip(reserve_risk_values, 0.001, 0.1)
+    
+    return pd.Series(reserve_risk_values, index=dates, name='Reserve_Risk')
+
+
+def calculate_bitcoin_days_destroyed(df: pd.DataFrame) -> pd.Series:
+    """
+    Calculate Bitcoin Days Destroyed (BDD).
+    
+    Bitcoin Days Destroyed measures the movement of old coins. High spikes
+    indicate capitulation events, often marking cycle bottoms.
+    
+    Args:
+        df: DataFrame with OHLCV data and Date index
+        
+    Returns:
+        Pandas Series with Bitcoin Days Destroyed values (stub - returns mock data)
+        
+    TODO: Replace with real Bitcoin Days Destroyed calculation from on-chain data.
+    Recommended API: Glassnode (https://docs.glassnode.com/basic-api/endpoints/indicators)
+    Endpoint: /v1/metrics/indicators/bitcoin_days_destroyed
+    """
+    logger.warning("Using stub Bitcoin Days Destroyed data - replace with real on-chain data source (Glassnode API recommended)")
+    
+    dates = df.index
+    n = len(dates)
+    
+    # BDD has spikes during capitulation events
+    # Generate base level with occasional spikes
+    base_level = np.random.exponential(1000000, n)  # Base level in coin-days
+    spikes = np.random.choice([0, 1], size=n, p=[0.95, 0.05])  # 5% chance of spike
+    spike_multiplier = 1 + spikes * np.random.uniform(2, 5, n)
+    bdd_values = base_level * spike_multiplier
+    
+    return pd.Series(bdd_values, index=dates, name='Bitcoin_Days_Destroyed')
+
+
+def calculate_exchange_net_position(df: pd.DataFrame) -> pd.Series:
+    """
+    Calculate Exchange Net Position Change.
+    
+    Measures the net change in exchange balances. Negative values indicate
+    accumulation (bullish), positive values indicate distribution (bearish).
+    
+    Args:
+        df: DataFrame with OHLCV data and Date index
+        
+    Returns:
+        Pandas Series with Exchange Net Position values (stub - returns mock data)
+        
+    TODO: Replace with real Exchange Net Position calculation from on-chain data.
+    Recommended API: Glassnode or CryptoQuant
+    Endpoint: Glassnode /v1/metrics/distribution/exchange_net_position_change
+    """
+    logger.warning("Using stub Exchange Net Position data - replace with real on-chain data source (Glassnode/CryptoQuant API recommended)")
+    
+    dates = df.index
+    n = len(dates)
+    
+    # Exchange net position can be positive (distribution) or negative (accumulation)
+    # Generate oscillating pattern around zero
+    trend = np.sin(np.linspace(0, 4 * np.pi, n))
+    noise = np.random.normal(0, 500, n)
+    exchange_net_values = trend * 2000 + noise
+    
+    return pd.Series(exchange_net_values, index=dates, name='Exchange_Net_Position')
+
+
 def calculate_nvts(df: pd.DataFrame) -> pd.Series:
     """
     Calculate Network Value to Transactions (NVTS) ratio.
@@ -289,6 +421,10 @@ FUNDAMENTAL_INDICATORS = {
     'bitcoin_thermocap': calculate_bitcoin_thermocap,
     'nupl': calculate_nupl,
     'cvdd': calculate_cvdd,
+    'puell_multiple': calculate_puell_multiple,
+    'reserve_risk': calculate_reserve_risk,
+    'bitcoin_days_destroyed': calculate_bitcoin_days_destroyed,
+    'exchange_net_position': calculate_exchange_net_position,
     'nvts': calculate_nvts,
     'sopr': calculate_sopr,
     'realized_pnl_momentum': calculate_realized_pnl_momentum,

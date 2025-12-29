@@ -3,11 +3,15 @@
  * Main page for viewing BTC full cycle indicators with z-scores
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useFullCycle } from '../hooks/useFullCycle';
 import { FullCycleChart } from '../components/fullcycle/FullCycleChart';
 import { FullCycleControls } from '../components/fullcycle/FullCycleControls';
+import { CyclePhaseIndicator } from '../components/fullcycle/CyclePhaseIndicator';
+import { FullCycleHeatmap } from '../components/fullcycle/FullCycleHeatmap';
+import { ExportButton } from '../components/fullcycle/ExportButton';
+import { AlertSettings } from '../components/fullcycle/AlertSettings';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { useMobile } from '../hooks/useMobile';
 import TradingAPI from '../services/api';
@@ -15,6 +19,8 @@ import TradingAPI from '../services/api';
 const FullCyclePage: React.FC = () => {
   const { isMobile } = useMobile();
   const location = useLocation();
+  const [viewMode, setViewMode] = useState<'chart' | 'heatmap'>('chart');
+  const chartRef = useRef<HTMLDivElement>(null);
   
   const {
     availableIndicators,
@@ -128,28 +134,102 @@ const FullCyclePage: React.FC = () => {
             </div>
           )}
           
+          {/* Cycle Phase Indicator */}
+          {zscoreData.length > 0 && (() => {
+            const latest = zscoreData[zscoreData.length - 1];
+            const averageZScore = latest?.indicators['average']?.zscore ?? null;
+            return <CyclePhaseIndicator averageZScore={averageZScore} />;
+          })()}
+
           {/* Data Info */}
-          {zscoreData.length > 0 && (
-            <div className="bg-bg-secondary border border-border-default rounded-lg p-4">
-              <div className="flex flex-wrap items-center gap-4 text-sm text-text-secondary">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-text-primary">Data Range:</span>
-                  <span>{zscoreData[0]?.date} to {zscoreData[zscoreData.length - 1]?.date}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-text-primary">Indicators:</span>
-                  <span>{indicatorsCalculated} of {indicatorsRequested} calculated</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-text-primary">Data Points:</span>
-                  <span>{zscoreData.length.toLocaleString()}</span>
+          {zscoreData.length > 0 && (() => {
+            // Calculate percentile rank of current average z-score
+            const latest = zscoreData[zscoreData.length - 1];
+            const currentAvgZScore = latest?.indicators['average']?.zscore ?? null;
+            
+            // Get all historical average z-scores
+            const allAvgZScores = zscoreData
+              .map(d => d.indicators['average']?.zscore)
+              .filter((z): z is number => z !== null && z !== undefined && !isNaN(z));
+            
+            // Calculate percentile rank
+            let percentileRank: number | null = null;
+            let percentileLabel = '';
+            let percentileColor = 'text-text-secondary';
+            
+            if (currentAvgZScore !== null && allAvgZScores.length > 0) {
+              const sorted = [...allAvgZScores].sort((a, b) => a - b);
+              const rank = sorted.filter(z => z <= currentAvgZScore).length;
+              percentileRank = (rank / sorted.length) * 100;
+              
+              if (percentileRank < 20) {
+                percentileLabel = 'historically oversold';
+                percentileColor = 'text-green-400';
+              } else if (percentileRank > 80) {
+                percentileLabel = 'historically overbought';
+                percentileColor = 'text-red-400';
+              } else {
+                percentileLabel = 'historically neutral';
+                percentileColor = 'text-yellow-400';
+              }
+            }
+            
+            return (
+              <div className="bg-bg-secondary border border-border-default rounded-lg p-4">
+                <div className="flex flex-wrap items-center gap-4 text-sm text-text-secondary">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-text-primary">Data Range:</span>
+                    <span>{zscoreData[0]?.date} to {zscoreData[zscoreData.length - 1]?.date}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-text-primary">Indicators:</span>
+                    <span>{indicatorsCalculated} of {indicatorsRequested} calculated</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-text-primary">Data Points:</span>
+                    <span>{zscoreData.length.toLocaleString()}</span>
+                  </div>
+                  {currentAvgZScore !== null && percentileRank !== null && (
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-text-primary">Average Z-Score:</span>
+                      <span className={percentileColor}>
+                        {currentAvgZScore.toFixed(2)} ({percentileRank.toFixed(1)}th percentile - {percentileLabel})
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
-          {/* Chart Area - Full Width */}
+          {/* Chart/Heatmap Area - Full Width */}
           <div className="w-full">
+            {/* View Toggle */}
+            <div className="flex justify-end mb-4">
+              <div className="bg-bg-secondary border border-border-default rounded-lg p-1 inline-flex">
+                <button
+                  onClick={() => setViewMode('chart')}
+                  className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
+                    viewMode === 'chart'
+                      ? 'bg-primary-500 text-white'
+                      : 'text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  Chart
+                </button>
+                <button
+                  onClick={() => setViewMode('heatmap')}
+                  className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
+                    viewMode === 'heatmap'
+                      ? 'bg-primary-500 text-white'
+                      : 'text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  Heatmap
+                </button>
+              </div>
+            </div>
+
             {zscoresLoading ? (
               <div className="bg-bg-secondary border border-border-default rounded-lg p-12">
                 <div className="text-center text-text-muted">
@@ -157,21 +237,62 @@ const FullCyclePage: React.FC = () => {
                   <p>Calculating z-scores...</p>
                 </div>
               </div>
+            ) : viewMode === 'chart' ? (
+              <div ref={chartRef}>
+                <FullCycleChart
+                  data={zscoreData}
+                  availableIndicators={availableIndicators}
+                  selectedIndicators={selectedIndicators}
+                  visibleIndicators={visibleIndicators}
+                  showFundamentalAverage={showFundamentalAverage}
+                  showTechnicalAverage={showTechnicalAverage}
+                  showOverallAverage={showOverallAverage}
+                  sdcaIn={sdcaIn}
+                  sdcaOut={sdcaOut}
+                  height={isMobile ? 400 : 600}
+                />
+              </div>
             ) : (
-              <FullCycleChart
+              <FullCycleHeatmap
                 data={zscoreData}
                 availableIndicators={availableIndicators}
                 selectedIndicators={selectedIndicators}
-                visibleIndicators={visibleIndicators}
                 showFundamentalAverage={showFundamentalAverage}
                 showTechnicalAverage={showTechnicalAverage}
                 showOverallAverage={showOverallAverage}
-                sdcaIn={sdcaIn}
-                sdcaOut={sdcaOut}
-                height={isMobile ? 400 : 600}
               />
             )}
           </div>
+
+          {/* Export and Alert Section */}
+          {zscoreData.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="flex items-center justify-end">
+                <ExportButton
+                  data={zscoreData}
+                  availableIndicators={availableIndicators}
+                  selectedIndicators={selectedIndicators}
+                  chartRef={chartRef}
+                  viewMode={viewMode}
+                />
+              </div>
+              <div>
+                {(() => {
+                  const latest = zscoreData[zscoreData.length - 1];
+                  const averageZScore = latest?.indicators['average']?.zscore ?? null;
+                  return (
+                    <AlertSettings
+                      averageZScore={averageZScore}
+                      sdcaIn={sdcaIn}
+                      sdcaOut={sdcaOut}
+                      onSdcaInChange={setSdcaIn}
+                      onSdcaOutChange={setSdcaOut}
+                    />
+                  );
+                })()}
+              </div>
+            </div>
+          )}
 
           {/* Controls Section - Below Chart */}
           {indicatorsLoading ? (

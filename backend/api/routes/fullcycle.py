@@ -29,13 +29,18 @@ INDICATOR_DISPLAY_ORDER = [
     'nupl',
     'cvdd',
     'sopr',
+    'puell_multiple',
+    'reserve_risk',
+    'bitcoin_days_destroyed',
+    'exchange_net_position',
     'rsi',
     'cci',
     'multiple_ma',
     'sharpe',
     'pi_cycle',
     'nhpf',
-    'vwap'
+    'vwap',
+    'mayer_multiple'
 ]
 
 
@@ -237,10 +242,11 @@ async def calculate_fullcycle_zscores(
         
         # Calculate averages
         fundamental_indicators = [
-            'mvrv', 'bitcoin_thermocap', 'nupl', 'cvdd', 'sopr'
+            'mvrv', 'bitcoin_thermocap', 'nupl', 'cvdd', 'sopr',
+            'puell_multiple', 'reserve_risk', 'bitcoin_days_destroyed', 'exchange_net_position'
         ]
         technical_indicators = [
-            'rsi', 'cci', 'multiple_ma', 'sharpe', 'pi_cycle', 'nhpf', 'vwap'
+            'rsi', 'cci', 'multiple_ma', 'sharpe', 'pi_cycle', 'nhpf', 'vwap', 'mayer_multiple'
         ]
         
         # Get selected fundamental and technical indicators

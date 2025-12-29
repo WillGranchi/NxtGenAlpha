@@ -96,13 +96,18 @@ const INDICATOR_DISPLAY_ORDER = [
   'nupl',
   'cvdd',
   'sopr',
+  'puell_multiple',
+  'reserve_risk',
+  'bitcoin_days_destroyed',
+  'exchange_net_position',
   'rsi',
   'cci',
   'multiple_ma',
   'sharpe',
   'pi_cycle',
   'nhpf',
-  'vwap'
+  'vwap',
+  'mayer_multiple'
 ];
 
 export const useFullCycle = (): UseFullCycleReturn => {
