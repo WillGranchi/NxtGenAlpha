@@ -12,6 +12,7 @@ import { DateRangePicker } from '../components/DateRangePicker';
 import { TokenSelector } from '../components/TokenSelector';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
+import { PriceChart } from '../components/charts/PriceChart';
 import TradingAPI from '../services/api';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { useMobile } from '../hooks/useMobile';
@@ -72,6 +73,10 @@ const IndicatorsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [settingsExpanded, setSettingsExpanded] = useState<boolean>(false);
   const [isRefreshingData, setIsRefreshingData] = useState(false);
+  const [useLogScale, setUseLogScale] = useState<boolean>(() => {
+    const saved = localStorage.getItem('indicatorsChart_useLogScale');
+    return saved !== null ? saved === 'true' : true;
+  });
   
   // Auto-expand settings on desktop, collapse on mobile
   useEffect(() => {
@@ -367,6 +372,85 @@ const IndicatorsPage: React.FC = () => {
     });
     return names;
   }, [selectedIndicators, availableIndicators]);
+
+  // Prepare chart data - use combined signals if available, otherwise use base price data
+  const chartData = useMemo(() => {
+    const hasCombinedSignals = priceData.length > 0 && combinedSignals.length > 0;
+    
+    if (hasCombinedSignals) {
+      return priceData.map((point, index) => ({
+        Date: point.Date,
+        Price: point.Price,
+        Position: index < combinedSignals.length ? combinedSignals[index] : 0,
+        Portfolio_Value: point.Price,
+        Capital: 0,
+        Shares: 0,
+      }));
+    }
+    
+    // Use base price data when no indicators selected
+    return basePriceData || [];
+  }, [priceData, combinedSignals, basePriceData]);
+
+  // Generate overlay signals for all indicators
+  const overlaySignals = useMemo(() => {
+    if (!priceData || priceData.length === 0) return {};
+
+    const signals: Record<string, { buy: { x: string[]; y: number[] }; sell: { x: string[]; y: number[] } }> = {};
+
+    selectedIndicators.forEach((indicator) => {
+      const indicatorId = indicator.id;
+      const buySignals: { x: string[]; y: number[] } = { x: [], y: [] };
+      const sellSignals: { x: string[]; y: number[] } = { x: [], y: [] };
+
+      for (let i = 1; i < priceData.length; i++) {
+        const prevPosition = priceData[i - 1][`${indicatorId}_Position`] ?? 0;
+        const currentPosition = priceData[i][`${indicatorId}_Position`] ?? 0;
+
+        if (prevPosition === 0 && currentPosition === 1) {
+          buySignals.x.push(priceData[i].Date);
+          buySignals.y.push(priceData[i].Price);
+        } else if (prevPosition === 1 && currentPosition === 0) {
+          sellSignals.x.push(priceData[i].Date);
+          sellSignals.y.push(priceData[i].Price);
+        }
+      }
+
+      signals[indicatorId] = { buy: buySignals, sell: sellSignals };
+    });
+
+    return signals;
+  }, [priceData, selectedIndicators]);
+
+  // Generate combined buy/sell signals
+  const combinedOverlaySignals = useMemo((): Record<string, { buy: { x: string[]; y: number[] }; sell: { x: string[]; y: number[] } }> => {
+    if (!chartData || chartData.length === 0) {
+      return {};
+    }
+
+    const buySignals: { x: string[]; y: number[] } = { x: [], y: [] };
+    const sellSignals: { x: string[]; y: number[] } = { x: [], y: [] };
+
+    for (let i = 1; i < chartData.length; i++) {
+      const prevPosition = chartData[i - 1].Position;
+      const currentPosition = chartData[i].Position;
+
+      if (prevPosition === 0 && currentPosition === 1) {
+        buySignals.x.push(chartData[i].Date);
+        buySignals.y.push(chartData[i].Price);
+      } else if (prevPosition === 1 && currentPosition === 0) {
+        sellSignals.x.push(chartData[i].Date);
+        sellSignals.y.push(chartData[i].Price);
+      }
+    }
+
+    return {
+      Combined: { buy: buySignals, sell: sellSignals },
+    };
+  }, [chartData]);
+
+  const hasResults = !!(combinedResult && combinedSignals.length > 0);
+  const hasPriceData = chartData.length > 0;
   
   return (
     <ErrorBoundary>
@@ -386,6 +470,33 @@ const IndicatorsPage: React.FC = () => {
               <p className="text-red-400 text-sm">
                 {typeof error === 'string' ? error : JSON.stringify(error)}
               </p>
+            </div>
+          )}
+
+          {/* Chart Area - Full Width at Top */}
+          {hasPriceData && (
+            <div className="w-full">
+              {isLoading ? (
+                <div className="bg-bg-secondary border border-border-default rounded-lg p-12">
+                  <div className="text-center text-text-muted">
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mb-4"></div>
+                    <p>Generating signals...</p>
+                  </div>
+                </div>
+              ) : (
+                <PriceChart
+                  data={chartData}
+                  title={hasResults ? "Overall Strategy - Combined Trading Signals" : "BTC Price Chart"}
+                  height={isMobile ? 400 : 600}
+                  overlaySignals={hasResults ? { ...overlaySignals, ...combinedOverlaySignals } : {}}
+                  showOverlayLegend={hasResults}
+                  useLogScale={useLogScale}
+                  onLogScaleToggle={(useLog) => {
+                    setUseLogScale(useLog);
+                    localStorage.setItem('indicatorsChart_useLogScale', String(useLog));
+                  }}
+                />
+              )}
             </div>
           )}
 

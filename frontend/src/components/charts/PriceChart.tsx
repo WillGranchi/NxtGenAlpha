@@ -1,8 +1,9 @@
 /**
  * Price chart component with trading signals and indicators.
+ * Styled to match Full Cycle Model chart design.
  */
 
-import React, { useMemo, memo } from 'react';
+import React, { useMemo, memo, useState, useEffect } from 'react';
 import Plot from 'react-plotly.js';
 import { EquityDataPoint } from '../../services/api';
 
@@ -12,6 +13,8 @@ interface PriceChartProps {
   height?: number;
   overlaySignals?: Record<string, { buy: { x: string[], y: number[] }, sell: { x: string[], y: number[] } }>;
   showOverlayLegend?: boolean;
+  useLogScale?: boolean;
+  onLogScaleToggle?: (useLog: boolean) => void;
 }
 
 export const PriceChart: React.FC<PriceChartProps> = ({
@@ -20,7 +23,33 @@ export const PriceChart: React.FC<PriceChartProps> = ({
   height = 500,
   overlaySignals = {},
   showOverlayLegend = true,
+  useLogScale: externalUseLogScale,
+  onLogScaleToggle,
 }) => {
+  // Log scale state (default to log scale, persist in localStorage)
+  const [internalUseLogScale, setInternalUseLogScale] = useState<boolean>(() => {
+    const saved = localStorage.getItem('priceChart_useLogScale');
+    return saved !== null ? saved === 'true' : true; // Default to log scale
+  });
+
+  // Use external prop if provided, otherwise use internal state
+  const useLogScale = externalUseLogScale !== undefined ? externalUseLogScale : internalUseLogScale;
+
+  // Save preference to localStorage
+  useEffect(() => {
+    if (externalUseLogScale === undefined) {
+      localStorage.setItem('priceChart_useLogScale', String(internalUseLogScale));
+    }
+  }, [internalUseLogScale, externalUseLogScale]);
+
+  const handleLogScaleToggle = () => {
+    const newValue = !useLogScale;
+    if (onLogScaleToggle) {
+      onLogScaleToggle(newValue);
+    } else {
+      setInternalUseLogScale(newValue);
+    }
+  };
   // Memoize data processing
   const chartData = useMemo(() => {
     if (!data || data.length === 0) return null;
@@ -59,11 +88,15 @@ export const PriceChart: React.FC<PriceChartProps> = ({
       y: prices,
       type: 'scatter' as const,
       mode: 'lines' as const,
-      name: 'Bitcoin Price',
+      name: 'BTC Price',
       line: {
-        color: '#1f77b4',
+        color: '#FFFFFF', // White like Full Cycle Model
         width: 2,
       },
+      hovertemplate: '<b>%{fullData.name}</b><br>' +
+        'Date: %{x}<br>' +
+        'Price: $%{y:,.2f}<br>' +
+        '<extra></extra>',
     },
     {
       x: buySignals.x,
@@ -72,10 +105,15 @@ export const PriceChart: React.FC<PriceChartProps> = ({
       mode: 'markers' as const,
       name: 'Combined Buy',
       marker: {
-        color: '#2ca02c',
-        size: 10,
+        color: '#10B981', // Green
+        size: 12,
         symbol: 'triangle-up' as const,
+        line: { color: '#FFFFFF', width: 1 },
       },
+      hovertemplate: '<b>Buy Signal</b><br>' +
+        'Date: %{x}<br>' +
+        'Price: $%{y:,.2f}<br>' +
+        '<extra></extra>',
     },
     {
       x: sellSignals.x,
@@ -84,10 +122,15 @@ export const PriceChart: React.FC<PriceChartProps> = ({
       mode: 'markers' as const,
       name: 'Combined Sell',
       marker: {
-        color: '#d62728',
-        size: 10,
+        color: '#EF4444', // Red
+        size: 12,
         symbol: 'triangle-down' as const,
+        line: { color: '#FFFFFF', width: 1 },
       },
+      hovertemplate: '<b>Sell Signal</b><br>' +
+        'Date: %{x}<br>' +
+        'Price: $%{y:,.2f}<br>' +
+        '<extra></extra>',
     },
   ];
 
@@ -141,56 +184,102 @@ export const PriceChart: React.FC<PriceChartProps> = ({
 
   const { plotData } = chartData;
 
-  // Memoize layout
+  // Memoize layout - match Full Cycle Model styling
   const layout = useMemo(() => {
     const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    const yaxisType: 'log' | 'linear' = useLogScale ? 'log' : 'linear';
+    
     return {
       title: {
         text: title,
-        font: { size: isMobile ? 14 : 16 },
+        font: { color: '#FFFFFF', size: isMobile ? 18 : 24 },
+        x: 0.5,
       },
       xaxis: {
         title: 'Date',
         type: 'date' as const,
+        color: '#9CA3AF',
+        gridcolor: '#374151',
+        showgrid: true,
       },
       yaxis: {
-        title: 'Price ($)',
+        title: 'Price (USD)',
+        type: yaxisType,
         tickformat: '$,.0f',
+        color: '#9CA3AF',
+        gridcolor: '#374151',
+        showgrid: true,
       },
       hovermode: 'x unified' as const,
       showlegend: !isMobile && showOverlayLegend,
       legend: {
-        orientation: 'h' as const,
-        y: -0.2,
+        x: 1.02,
+        y: 1,
+        bgcolor: 'rgba(0, 0, 0, 0)',
+        bordercolor: '#374151',
+        borderwidth: 1,
+        font: { color: '#FFFFFF' },
       },
       margin: {
-        t: isMobile ? 40 : 50,
-        b: isMobile ? 60 : 80,
         l: isMobile ? 50 : 60,
-        r: isMobile ? 10 : 20,
+        r: isMobile ? 10 : 80,
+        t: isMobile ? 50 : 80,
+        b: isMobile ? 60 : 60,
       },
-      height: isMobile ? Math.min(height, 400) : height,
-      font: { size: isMobile ? 10 : 12 },
-      dragmode: 'pan' as const, // Better for mobile
+      plot_bgcolor: 'rgba(0, 0, 0, 0)',
+      paper_bgcolor: 'rgba(0, 0, 0, 0)',
+      font: {
+        color: '#9CA3AF',
+        size: isMobile ? 10 : 12,
+      },
+      dragmode: 'pan' as const,
     };
-  }, [title, height, showOverlayLegend]);
+  }, [title, height, showOverlayLegend, useLogScale]);
 
-  // Memoize config
+  // Memoize config - match Full Cycle Model
   const config = useMemo(() => ({
-    displayModeBar: true,
+    displayModeBar: false, // Hide default mode bar, we'll add custom toggle
     displaylogo: false,
-    modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'] as any,
     responsive: true,
-  }), []);
+    toImageButtonOptions: {
+      format: 'png' as const,
+      filename: 'price-chart',
+      height: height,
+      width: 1200,
+      scale: 2,
+    },
+  }), [height]);
 
   return (
-    <div className="bg-bg-tertiary rounded-lg border border-border-default p-6">
+    <div className="relative bg-bg-tertiary rounded-lg border border-border-default p-6">
+      {/* Log Scale Toggle Button - Top Right */}
+      <button
+        onClick={handleLogScaleToggle}
+        className="absolute top-8 right-8 z-10 bg-bg-secondary hover:bg-bg-tertiary border border-border-default rounded px-3 py-1.5 text-sm text-text-primary transition-colors flex items-center gap-2"
+        title={useLogScale ? 'Switch to Linear Scale' : 'Switch to Log Scale'}
+      >
+        <span>{useLogScale ? 'Linear' : 'Log'}</span>
+      </button>
+      
       <Plot
         data={plotData}
         layout={layout}
         config={config}
         style={{ width: '100%', height: `${height}px` }}
       />
+      
+      {/* Custom CSS for dark tooltips */}
+      <style>{`
+        .js-plotly-plot .plotly .modebar {
+          display: none !important;
+        }
+        .js-plotly-plot .plotly .hoverlayer .hovertext {
+          background-color: rgba(31, 41, 55, 0.95) !important;
+          border: 1px solid #4B5563 !important;
+          color: #F3F4F6 !important;
+          font-family: Inter, system-ui, sans-serif !important;
+        }
+      `}</style>
     </div>
   );
 };
