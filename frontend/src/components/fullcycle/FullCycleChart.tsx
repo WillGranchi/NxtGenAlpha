@@ -62,6 +62,9 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
     return saved !== null ? saved === 'true' : true; // Default to log scale
   });
 
+  // Track which averages have been explicitly hidden via legend click
+  const [hiddenAverages, setHiddenAverages] = useState<Set<string>>(new Set());
+
   // Save preference to localStorage
   useEffect(() => {
     localStorage.setItem('fullCycleChart_useLogScale', String(useLogScale));
@@ -142,6 +145,8 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
       });
 
       const isSelected = selectedIndicatorId === 'technical_average';
+      // Visible by default, but completely hidden (not faint) if explicitly hidden via legend click
+      const isVisible = !hiddenAverages.has('technical_average');
       plotData.push({
         x: dates,
         y: technicalZscores,
@@ -156,7 +161,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         },
         showlegend: true,
         legendgroup: 'averages',
-        visible: true,
+        visible: isVisible,
       });
     }
 
@@ -168,6 +173,8 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
       });
 
       const isSelected = selectedIndicatorId === 'fundamental_average';
+      // Visible by default, but completely hidden (not faint) if explicitly hidden via legend click
+      const isVisible = !hiddenAverages.has('fundamental_average');
       plotData.push({
         x: dates,
         y: fundamentalZscores,
@@ -182,7 +189,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         },
         showlegend: true,
         legendgroup: 'averages',
-        visible: true,
+        visible: isVisible,
       });
     }
 
@@ -194,6 +201,8 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
       });
 
       const isSelected = selectedIndicatorId === 'average';
+      // Visible by default, but completely hidden (not faint) if explicitly hidden via legend click
+      const isVisible = !hiddenAverages.has('average');
       plotData.push({
         x: dates,
         y: overallZscores,
@@ -207,7 +216,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         },
         showlegend: true,
         legendgroup: 'averages',
-        visible: true,
+        visible: isVisible,
       });
     }
 
@@ -247,7 +256,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
     });
 
     return plotData;
-  }, [data, availableIndicators, selectedIndicators, visibleIndicators, showFundamentalAverage, showTechnicalAverage, showOverallAverage, sdcaIn, sdcaOut, selectedIndicatorId]);
+  }, [data, availableIndicators, selectedIndicators, visibleIndicators, showFundamentalAverage, showTechnicalAverage, showOverallAverage, sdcaIn, sdcaOut, selectedIndicatorId, hiddenAverages]);
 
   const layout = useMemo(() => {
     if (!data || data.length === 0) return {};
@@ -439,13 +448,70 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
     
     // Map trace names back to indicator IDs
     if (traceName === 'Fundamental Average') {
-      onIndicatorSelect(selectedIndicatorId === 'fundamental_average' ? null : 'fundamental_average');
+      const avgId = 'fundamental_average';
+      const isCurrentlySelected = selectedIndicatorId === avgId;
+      const isCurrentlyHidden = hiddenAverages.has(avgId);
+      
+      if (isCurrentlySelected) {
+        // Deselect and hide completely
+        onIndicatorSelect(null);
+        setHiddenAverages(prev => new Set(prev).add(avgId));
+      } else if (isCurrentlyHidden) {
+        // Show and select
+        setHiddenAverages(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(avgId);
+          return newSet;
+        });
+        onIndicatorSelect(avgId);
+      } else {
+        // Just select (already visible)
+        onIndicatorSelect(avgId);
+      }
       return false; // Prevent default legend toggle behavior
     } else if (traceName === 'Technical Average') {
-      onIndicatorSelect(selectedIndicatorId === 'technical_average' ? null : 'technical_average');
+      const avgId = 'technical_average';
+      const isCurrentlySelected = selectedIndicatorId === avgId;
+      const isCurrentlyHidden = hiddenAverages.has(avgId);
+      
+      if (isCurrentlySelected) {
+        // Deselect and hide completely
+        onIndicatorSelect(null);
+        setHiddenAverages(prev => new Set(prev).add(avgId));
+      } else if (isCurrentlyHidden) {
+        // Show and select
+        setHiddenAverages(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(avgId);
+          return newSet;
+        });
+        onIndicatorSelect(avgId);
+      } else {
+        // Just select (already visible)
+        onIndicatorSelect(avgId);
+      }
       return false;
     } else if (traceName === 'Average') {
-      onIndicatorSelect(selectedIndicatorId === 'average' ? null : 'average');
+      const avgId = 'average';
+      const isCurrentlySelected = selectedIndicatorId === avgId;
+      const isCurrentlyHidden = hiddenAverages.has(avgId);
+      
+      if (isCurrentlySelected) {
+        // Deselect and hide completely
+        onIndicatorSelect(null);
+        setHiddenAverages(prev => new Set(prev).add(avgId));
+      } else if (isCurrentlyHidden) {
+        // Show and select
+        setHiddenAverages(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(avgId);
+          return newSet;
+        });
+        onIndicatorSelect(avgId);
+      } else {
+        // Just select (already visible)
+        onIndicatorSelect(avgId);
+      }
       return false;
     } else if (traceName.startsWith('[F] ') || traceName.startsWith('[T] ')) {
       // Extract indicator name from display name
