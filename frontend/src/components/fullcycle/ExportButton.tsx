@@ -3,7 +3,7 @@
  * Exports Full Cycle Model data in various formats
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Download, FileText, Image, FileJson, FileSpreadsheet } from 'lucide-react';
 import { FullCycleDataPoint, FullCycleIndicator } from '../../hooks/useFullCycle';
 
@@ -216,73 +216,98 @@ export const ExportButton: React.FC<ExportButtonProps> = ({
     }
   };
 
+  const [showMenu, setShowMenu] = useState(false);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.export-menu-container')) {
+        setShowMenu(false);
+      }
+    };
+
+    if (showMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showMenu]);
+
   return (
-    <div className="relative">
+    <div className="relative export-menu-container">
       <button
-        className="flex items-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex items-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
         disabled={isExporting || !data || data.length === 0}
-        onClick={() => {
-          // Show dropdown menu
-          const menu = document.getElementById('export-menu');
-          if (menu) {
-            menu.classList.toggle('hidden');
-          }
-        }}
+        onClick={() => setShowMenu(!showMenu)}
       >
-        <Download className="w-4 h-4" />
-        {isExporting ? 'Exporting...' : 'Export'}
+        <Download className={`w-4 h-4 ${isExporting ? 'animate-spin' : ''}`} />
+        <span>{isExporting ? 'Exporting...' : 'Export'}</span>
       </button>
 
-      {/* Export Menu */}
-      <div
-        id="export-menu"
-        className="hidden absolute right-0 mt-2 bg-bg-secondary border border-border-default rounded-lg shadow-lg z-50 min-w-[200px]"
-      >
-        <div className="p-2">
-          <button
-            onClick={() => {
-              exportToCSV();
-              document.getElementById('export-menu')?.classList.add('hidden');
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-left text-text-primary hover:bg-bg-tertiary rounded transition-colors"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            Export CSV
-          </button>
-          <button
-            onClick={() => {
-              exportToJSON();
-              document.getElementById('export-menu')?.classList.add('hidden');
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-left text-text-primary hover:bg-bg-tertiary rounded transition-colors"
-          >
-            <FileJson className="w-4 h-4" />
-            Export JSON
-          </button>
-          {viewMode === 'chart' && (
+      {/* Export Menu - Professional Popover */}
+      {showMenu && (
+        <div className="absolute right-0 mt-2 bg-bg-secondary border border-border-default rounded-lg shadow-xl z-50 min-w-[220px] overflow-hidden">
+          <div className="p-2">
+            <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase tracking-wide border-b border-border-default mb-1">
+              Export Format
+            </div>
             <button
               onClick={() => {
-                exportToPNG();
-                document.getElementById('export-menu')?.classList.add('hidden');
+                exportToCSV();
+                setShowMenu(false);
               }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-left text-text-primary hover:bg-bg-tertiary rounded transition-colors"
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-text-primary hover:bg-bg-tertiary rounded transition-colors group"
             >
-              <Image className="w-4 h-4" />
-              Export PNG
+              <FileSpreadsheet className="w-4 h-4 text-text-muted group-hover:text-primary-400 transition-colors" />
+              <div>
+                <div className="text-sm font-medium">CSV</div>
+                <div className="text-xs text-text-muted">Spreadsheet data</div>
+              </div>
             </button>
-          )}
-          <button
-            onClick={() => {
-              exportToPDF();
-              document.getElementById('export-menu')?.classList.add('hidden');
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-left text-text-primary hover:bg-bg-tertiary rounded transition-colors"
-          >
-            <FileText className="w-4 h-4" />
-            Export PDF
-          </button>
+            <button
+              onClick={() => {
+                exportToJSON();
+                setShowMenu(false);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-text-primary hover:bg-bg-tertiary rounded transition-colors group"
+            >
+              <FileJson className="w-4 h-4 text-text-muted group-hover:text-primary-400 transition-colors" />
+              <div>
+                <div className="text-sm font-medium">JSON</div>
+                <div className="text-xs text-text-muted">Structured data</div>
+              </div>
+            </button>
+            {viewMode === 'chart' && (
+              <button
+                onClick={() => {
+                  exportToPNG();
+                  setShowMenu(false);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-text-primary hover:bg-bg-tertiary rounded transition-colors group"
+              >
+                <Image className="w-4 h-4 text-text-muted group-hover:text-primary-400 transition-colors" />
+                <div>
+                  <div className="text-sm font-medium">PNG</div>
+                  <div className="text-xs text-text-muted">Chart image</div>
+                </div>
+              </button>
+            )}
+            <button
+              onClick={() => {
+                exportToPDF();
+                setShowMenu(false);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-text-primary hover:bg-bg-tertiary rounded transition-colors group"
+            >
+              <FileText className="w-4 h-4 text-text-muted group-hover:text-primary-400 transition-colors" />
+              <div>
+                <div className="text-sm font-medium">PDF</div>
+                <div className="text-xs text-text-muted">Formatted report</div>
+              </div>
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

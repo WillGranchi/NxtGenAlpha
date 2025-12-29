@@ -6,20 +6,28 @@
 import React from 'react';
 import { FullCycleIndicator, FullCycleDataPoint } from '../../hooks/useFullCycle';
 
-// Custom indicator display order matching the PDF specification
-const INDICATOR_DISPLAY_ORDER = [
+// Custom indicator display order - Fundamental indicators first, then Technical
+const FUNDAMENTAL_INDICATORS_ORDER = [
   'mvrv',
   'bitcoin_thermocap',
   'nupl',
   'cvdd',
   'sopr',
+  'puell_multiple',
+  'reserve_risk',
+  'bitcoin_days_destroyed',
+  'exchange_net_position',
+];
+
+const TECHNICAL_INDICATORS_ORDER = [
   'rsi',
   'cci',
   'multiple_ma',
   'sharpe',
   'pi_cycle',
   'nhpf',
-  'vwap'
+  'vwap',
+  'mayer_multiple',
 ];
 
 // Order for averages (should appear at the end)
@@ -69,54 +77,71 @@ export const ROCTable: React.FC<ROCTableProps> = ({
     return indicator?.category || 'technical';
   };
 
-  // Prepare table data
-  const tableData = Object.entries(roc)
-    .map(([indicatorId, rocValue]) => {
-      const currentZScore = getCurrentZScore(indicatorId);
-      const rocPercent = currentZScore !== 0 ? (rocValue / Math.abs(currentZScore)) * 100 : 0;
+  // Prepare table data with grouping
+  const fundamentalData: typeof tableData = [];
+  const technicalData: typeof tableData = [];
+  const averagesData: typeof tableData = [];
+
+  Object.entries(roc).forEach(([indicatorId, rocValue]) => {
+    const currentZScore = getCurrentZScore(indicatorId);
+    const rocPercent = currentZScore !== 0 ? (rocValue / Math.abs(currentZScore)) * 100 : 0;
+    
+    const item = {
+      indicatorId,
+      name: getIndicatorName(indicatorId),
+      currentZScore,
+      rocValue,
+      rocPercent,
+    };
+
+    // Check if it's an average
+    if (AVERAGE_ORDER.includes(indicatorId)) {
+      averagesData.push(item);
+    } else {
+      // Check if it's fundamental or technical
+      const fundIndex = FUNDAMENTAL_INDICATORS_ORDER.indexOf(indicatorId);
+      const techIndex = TECHNICAL_INDICATORS_ORDER.indexOf(indicatorId);
       
-      return {
-        indicatorId,
-        name: getIndicatorName(indicatorId),
-        currentZScore,
-        rocValue,
-        rocPercent,
-      };
-    })
-    .sort((a, b) => {
-      // Check if indicators are averages
-      const aIsAverage = AVERAGE_ORDER.includes(a.indicatorId);
-      const bIsAverage = AVERAGE_ORDER.includes(b.indicatorId);
-      
-      // Averages go at the end, in specific order
-      if (aIsAverage && bIsAverage) {
-        return AVERAGE_ORDER.indexOf(a.indicatorId) - AVERAGE_ORDER.indexOf(b.indicatorId);
+      if (fundIndex !== -1) {
+        fundamentalData.push({ ...item, sortOrder: fundIndex });
+      } else if (techIndex !== -1) {
+        technicalData.push({ ...item, sortOrder: techIndex });
+      } else {
+        // Unknown indicator - try to determine by category
+        const category = getIndicatorCategory(indicatorId);
+        if (category === 'fundamental') {
+          fundamentalData.push({ ...item, sortOrder: 999 });
+        } else {
+          technicalData.push({ ...item, sortOrder: 999 });
+        }
       }
-      if (aIsAverage) return 1; // Averages go to end
-      if (bIsAverage) return -1; // Averages go to end
-      
-      // Regular indicators: sort by custom order
-      const aIndex = INDICATOR_DISPLAY_ORDER.indexOf(a.indicatorId);
-      const bIndex = INDICATOR_DISPLAY_ORDER.indexOf(b.indicatorId);
-      
-      // If both are in the order list, sort by their position
-      if (aIndex !== -1 && bIndex !== -1) {
-        return aIndex - bIndex;
-      }
-      // If only A is in the order list, it comes first
-      if (aIndex !== -1) return -1;
-      // If only B is in the order list, it comes first
-      if (bIndex !== -1) return 1;
-      // If neither is in the order list, maintain original order (by name)
-      return a.name.localeCompare(b.name);
-    });
+    }
+  });
+
+  // Sort each group
+  fundamentalData.sort((a, b) => (a as any).sortOrder - (b as any).sortOrder);
+  technicalData.sort((a, b) => (a as any).sortOrder - (b as any).sortOrder);
+  averagesData.sort((a, b) => AVERAGE_ORDER.indexOf(a.indicatorId) - AVERAGE_ORDER.indexOf(b.indicatorId));
+
+  // Combine: Fundamental, Technical, Averages
+  const tableData = [...fundamentalData, ...technicalData, ...averagesData];
 
   if (tableData.length === 0) {
     return null;
   }
 
+  // Determine which group each row belongs to
+  const getRowGroup = (indicatorId: string): 'fundamental' | 'technical' | 'average' => {
+    if (AVERAGE_ORDER.includes(indicatorId)) return 'average';
+    if (FUNDAMENTAL_INDICATORS_ORDER.includes(indicatorId)) return 'fundamental';
+    if (TECHNICAL_INDICATORS_ORDER.includes(indicatorId)) return 'technical';
+    return getIndicatorCategory(indicatorId);
+  };
+
+  let currentGroup: 'fundamental' | 'technical' | 'average' | null = null;
+
   return (
-    <div className="bg-bg-secondary border border-border-default rounded-lg p-4">
+    <div className="bg-bg-secondary border border-border-default rounded-lg p-6">
       <h3 className="text-lg font-semibold text-text-primary mb-4">
         {rocDays} Day Rate of Change
       </h3>
@@ -139,7 +164,7 @@ export const ROCTable: React.FC<ROCTableProps> = ({
             </tr>
           </thead>
           <tbody>
-            {tableData.map((row) => {
+            {tableData.map((row, index) => {
               const isPositive = row.rocValue > 0;
               const category = getIndicatorCategory(row.indicatorId);
               const nameColorClass = category === 'fundamental' 
@@ -148,32 +173,52 @@ export const ROCTable: React.FC<ROCTableProps> = ({
                 ? 'text-orange-500' 
                 : 'text-text-primary';
               
+              const rowGroup = getRowGroup(row.indicatorId);
+              const showGroupHeader = currentGroup !== rowGroup;
+              if (showGroupHeader) {
+                currentGroup = rowGroup;
+              }
+              
               return (
-                <tr
-                  key={row.indicatorId}
-                  className="border-b border-border-default/50 hover:bg-bg-tertiary transition-colors"
-                >
-                  <td className={`py-3 px-4 font-medium ${nameColorClass}`}>{row.name}</td>
-                  <td className="py-3 px-4 text-right text-text-primary">
-                    {row.currentZScore.toFixed(2)}
-                  </td>
-                  <td
-                    className={`py-3 px-4 text-right font-semibold ${
-                      isPositive ? 'text-magenta-400' : 'text-cyan-400'
-                    }`}
-                  >
-                    {row.rocValue > 0 ? '+' : ''}
-                    {row.rocValue.toFixed(2)} Z
-                  </td>
-                  <td
-                    className={`py-3 px-4 text-right font-semibold ${
-                      isPositive ? 'text-magenta-400' : 'text-cyan-400'
-                    }`}
-                  >
-                    {row.rocPercent > 0 ? '+' : ''}
-                    {row.rocPercent.toFixed(1)}%
-                  </td>
-                </tr>
+                <React.Fragment key={row.indicatorId}>
+                  {showGroupHeader && (
+                    <tr>
+                      <td colSpan={4} className="py-3 px-4 bg-bg-tertiary/50 border-t border-b border-border-default">
+                        <span className={`text-xs font-semibold uppercase tracking-wide ${
+                          rowGroup === 'fundamental' ? 'text-blue-400' :
+                          rowGroup === 'technical' ? 'text-orange-400' :
+                          'text-text-primary'
+                        }`}>
+                          {rowGroup === 'fundamental' ? 'Fundamental Indicators' :
+                           rowGroup === 'technical' ? 'Technical Indicators' :
+                           'Averages'}
+                        </span>
+                      </td>
+                    </tr>
+                  )}
+                  <tr className="border-b border-border-default/50 hover:bg-bg-tertiary transition-colors">
+                    <td className={`py-3 px-4 font-medium ${nameColorClass}`}>{row.name}</td>
+                    <td className="py-3 px-4 text-right text-text-primary">
+                      {row.currentZScore.toFixed(2)}
+                    </td>
+                    <td
+                      className={`py-3 px-4 text-right font-semibold ${
+                        isPositive ? 'text-magenta-400' : 'text-cyan-400'
+                      }`}
+                    >
+                      {row.rocValue > 0 ? '+' : ''}
+                      {row.rocValue.toFixed(2)} Z
+                    </td>
+                    <td
+                      className={`py-3 px-4 text-right font-semibold ${
+                        isPositive ? 'text-magenta-400' : 'text-cyan-400'
+                      }`}
+                    >
+                      {row.rocPercent > 0 ? '+' : ''}
+                      {row.rocPercent.toFixed(1)}%
+                    </td>
+                  </tr>
+                </React.Fragment>
               );
             })}
           </tbody>

@@ -79,79 +79,100 @@ export const AlertSettings: React.FC<AlertSettingsProps> = ({
   };
 
   return (
-    <div className="bg-bg-secondary border border-border-default rounded-lg p-4">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-text-primary">Alert Settings</h3>
+    <div className="bg-bg-secondary border border-border-default rounded-lg p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h3 className="text-lg font-semibold text-text-primary mb-1">Alert Settings</h3>
+          <p className="text-xs text-text-muted">Configure notifications for threshold crossings</p>
+        </div>
         <button
           onClick={handleToggleAlerts}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded transition-colors ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 font-medium text-sm ${
             alertsEnabled
-              ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-              : 'bg-bg-tertiary text-text-secondary border border-border-default'
+              ? 'bg-green-500/20 text-green-400 border border-green-500/50 hover:bg-green-500/30'
+              : 'bg-bg-tertiary text-text-secondary border border-border-default hover:bg-bg-tertiary/80'
           }`}
         >
           {alertsEnabled ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
-          <span className="text-sm">{alertsEnabled ? 'Enabled' : 'Disabled'}</span>
+          <span>{alertsEnabled ? 'Enabled' : 'Disabled'}</span>
         </button>
       </div>
 
       {alertsEnabled && (
-        <div className="space-y-4">
-          <div className="text-sm text-text-secondary">
-            Alerts will trigger when the average z-score crosses the SDCA thresholds.
+        <div className="space-y-6">
+          {/* SDCA Thresholds - Prominent Position */}
+          <div>
+            <h4 className="text-sm font-semibold text-text-primary mb-4">SDCA Thresholds</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-2 uppercase tracking-wide">
+                  SDCA In (Oversold)
+                </label>
+                <Input
+                  type="number"
+                  value={sdcaIn}
+                  onChange={(e) => onSdcaInChange(parseFloat(e.target.value) || -2.0)}
+                  step="0.1"
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-2 uppercase tracking-wide">
+                  SDCA Out (Overbought)
+                </label>
+                <Input
+                  type="number"
+                  value={sdcaOut}
+                  onChange={(e) => onSdcaOutChange(parseFloat(e.target.value) || 2.0)}
+                  step="0.1"
+                  className="w-full"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-text-muted mt-3">
+              Alerts trigger when average z-score crosses these thresholds
+            </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
-                SDCA In Threshold (Oversold)
-              </label>
-              <Input
-                type="number"
-                value={sdcaIn}
-                onChange={(e) => onSdcaInChange(parseFloat(e.target.value) || -2.0)}
-                step="0.1"
-                className="w-full"
+          {/* Email Alerts */}
+          <div className="pt-4 border-t border-border-default">
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                id="email-alerts"
+                checked={emailAlerts}
+                onChange={(e) => setEmailAlerts(e.target.checked)}
+                className="w-4 h-4 text-primary-500 rounded focus:ring-primary-500 focus:ring-2"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
-                SDCA Out Threshold (Overbought)
-              </label>
-              <Input
-                type="number"
-                value={sdcaOut}
-                onChange={(e) => onSdcaOutChange(parseFloat(e.target.value) || 2.0)}
-                step="0.1"
-                className="w-full"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="email-alerts"
-              checked={emailAlerts}
-              onChange={(e) => setEmailAlerts(e.target.checked)}
-              className="w-4 h-4 text-primary-500 rounded focus:ring-primary-500"
-            />
-            <label htmlFor="email-alerts" className="text-sm text-text-secondary flex items-center gap-2">
-              <Mail className="w-4 h-4" />
-              Email alerts (requires backend setup)
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4 text-text-muted group-hover:text-text-secondary transition-colors" />
+                <div>
+                  <span className="text-sm font-medium text-text-primary block">Email Alerts</span>
+                  <span className="text-xs text-text-muted">Requires backend setup</span>
+                </div>
+              </div>
             </label>
           </div>
 
+          {/* Last Alert - Subtle Display */}
           {lastAlert && (
-            <div className="flex items-center gap-2 text-sm text-green-400 bg-green-500/10 border border-green-500/30 rounded p-2">
-              <CheckCircle className="w-4 h-4" />
-              <span>Last alert: {lastAlert}</span>
+            <div className="pt-4 border-t border-border-default">
+              <div className="flex items-start gap-3 text-xs">
+                <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <span className="text-text-muted block mb-1">Last Alert</span>
+                  <span className="text-text-secondary">{lastAlert}</span>
+                </div>
+              </div>
             </div>
           )}
 
+          {/* Notification Permission Warning */}
           {'Notification' in window && Notification.permission === 'denied' && (
-            <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded p-2">
-              Browser notifications are blocked. Please enable them in your browser settings.
+            <div className="pt-4 border-t border-border-default">
+              <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                Browser notifications are blocked. Please enable them in your browser settings.
+              </div>
             </div>
           )}
         </div>

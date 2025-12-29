@@ -109,6 +109,34 @@ export const FullCycleControls: React.FC<FullCycleControlsProps> = ({
     setVisibleIndicators(new Set());
   };
 
+  const handleSelectAllFundamental = () => {
+    const fundamentalIds = fundamentalIndicators.map((ind) => ind.id);
+    setSelectedIndicators([...selectedIndicators.filter(id => !fundamentalIds.includes(id)), ...fundamentalIds]);
+    setVisibleIndicators(new Set([...Array.from(visibleIndicators), ...fundamentalIds]));
+  };
+
+  const handleDeselectAllFundamental = () => {
+    const fundamentalIds = fundamentalIndicators.map((ind) => ind.id);
+    setSelectedIndicators(selectedIndicators.filter(id => !fundamentalIds.includes(id)));
+    const newVisible = new Set(visibleIndicators);
+    fundamentalIds.forEach(id => newVisible.delete(id));
+    setVisibleIndicators(newVisible);
+  };
+
+  const handleSelectAllTechnical = () => {
+    const technicalIds = technicalIndicators.map((ind) => ind.id);
+    setSelectedIndicators([...selectedIndicators.filter(id => !technicalIds.includes(id)), ...technicalIds]);
+    setVisibleIndicators(new Set([...Array.from(visibleIndicators), ...technicalIds]));
+  };
+
+  const handleDeselectAllTechnical = () => {
+    const technicalIds = technicalIndicators.map((ind) => ind.id);
+    setSelectedIndicators(selectedIndicators.filter(id => !technicalIds.includes(id)));
+    const newVisible = new Set(visibleIndicators);
+    technicalIds.forEach(id => newVisible.delete(id));
+    setVisibleIndicators(newVisible);
+  };
+
   return (
     <div className="space-y-6 transition-all duration-200">
       {/* Row 0: Preset Manager */}
@@ -303,7 +331,26 @@ export const FullCycleControls: React.FC<FullCycleControlsProps> = ({
           {/* Fundamental Indicators */}
           {fundamentalIndicators.length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold text-text-primary mb-3">Fundamental</h4>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-semibold text-text-primary">Fundamental</h4>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSelectAllFundamental}
+                    className="text-xs text-primary-400 hover:text-primary-300 transition-colors"
+                    disabled={isLoading}
+                  >
+                    Select All
+                  </button>
+                  <span className="text-xs text-text-muted">|</span>
+                  <button
+                    onClick={handleDeselectAllFundamental}
+                    className="text-xs text-primary-400 hover:text-primary-300 transition-colors"
+                    disabled={isLoading}
+                  >
+                    Deselect All
+                  </button>
+                </div>
+              </div>
               <div className="space-y-2">
                 {fundamentalIndicators.map((indicator) => {
                   const isSelected = selectedIndicators.includes(indicator.id);
@@ -353,7 +400,26 @@ export const FullCycleControls: React.FC<FullCycleControlsProps> = ({
           {/* Technical Indicators */}
           {technicalIndicators.length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold text-text-primary mb-3">Technical</h4>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-semibold text-text-primary">Technical</h4>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSelectAllTechnical}
+                    className="text-xs text-primary-400 hover:text-primary-300 transition-colors"
+                    disabled={isLoading}
+                  >
+                    Select All
+                  </button>
+                  <span className="text-xs text-text-muted">|</span>
+                  <button
+                    onClick={handleDeselectAllTechnical}
+                    className="text-xs text-primary-400 hover:text-primary-300 transition-colors"
+                    disabled={isLoading}
+                  >
+                    Deselect All
+                  </button>
+                </div>
+              </div>
               <div className="space-y-2">
                 {technicalIndicators.map((indicator) => {
                   const isSelected = selectedIndicators.includes(indicator.id);

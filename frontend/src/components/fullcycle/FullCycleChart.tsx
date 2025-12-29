@@ -153,59 +153,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
       colorIndex++;
     });
 
-    // Add Fundamental Average
-    if (showFundamentalAverage) {
-      const fundamentalZscores = data.map((d) => {
-        const avg = d.indicators['fundamental_average'];
-        return avg ? avg.zscore : null;
-      });
-
-      const isSelected = selectedIndicatorId === 'fundamental_average';
-      plotData.push({
-        x: dates,
-        y: fundamentalZscores,
-        type: 'scatter',
-        mode: 'lines',
-        name: 'Fundamental Average',
-        yaxis: 'y2',
-        line: {
-          color: MAGENTA,
-          width: isSelected ? 4 : 2,
-          dash: 'dash',
-        },
-        showlegend: true,
-        legendgroup: 'averages',
-        opacity: isSelected ? 1 : 0.8,
-      });
-    }
-
-    // Add Technical Average
-    if (showTechnicalAverage) {
-      const technicalZscores = data.map((d) => {
-        const avg = d.indicators['technical_average'];
-        return avg ? avg.zscore : null;
-      });
-
-      const isSelected = selectedIndicatorId === 'technical_average';
-      plotData.push({
-        x: dates,
-        y: technicalZscores,
-        type: 'scatter',
-        mode: 'lines',
-        name: 'Technical Average',
-        yaxis: 'y2',
-        line: {
-          color: CYAN,
-          width: isSelected ? 4 : 2,
-          dash: 'dash',
-        },
-        showlegend: true,
-        legendgroup: 'averages',
-        opacity: isSelected ? 1 : 0.8,
-      });
-    }
-
-    // Add Overall Average
+    // Add Overall Average first (appears first in legend)
     if (showOverallAverage) {
       const overallZscores = data.map((d) => {
         const avg = d.indicators['average'];
@@ -219,7 +167,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         type: 'scatter',
         mode: 'lines',
         name: 'Average',
-        yaxis: 'y2',
+        yaxis: 'y2', // Use z-score axis
         line: {
           color: '#FFFFFF',
           width: isSelected ? 4 : 3,
@@ -227,6 +175,61 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         showlegend: true,
         legendgroup: 'averages',
         opacity: isSelected ? 1 : 0.9,
+        visible: true, // Visible by default
+      });
+    }
+
+    // Add Fundamental Average (below Overall Average in legend)
+    if (showFundamentalAverage) {
+      const fundamentalZscores = data.map((d) => {
+        const avg = d.indicators['fundamental_average'];
+        return avg ? avg.zscore : null;
+      });
+
+      const isSelected = selectedIndicatorId === 'fundamental_average';
+      plotData.push({
+        x: dates,
+        y: fundamentalZscores,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'Fundamental Average',
+        yaxis: 'y2', // Use z-score axis
+        line: {
+          color: MAGENTA,
+          width: isSelected ? 3 : 2,
+          dash: 'dash',
+        },
+        showlegend: true,
+        legendgroup: 'averages',
+        opacity: isSelected ? 1 : 0.7,
+        visible: true, // Visible by default
+      });
+    }
+
+    // Add Technical Average (below Fundamental Average in legend)
+    if (showTechnicalAverage) {
+      const technicalZscores = data.map((d) => {
+        const avg = d.indicators['technical_average'];
+        return avg ? avg.zscore : null;
+      });
+
+      const isSelected = selectedIndicatorId === 'technical_average';
+      plotData.push({
+        x: dates,
+        y: technicalZscores,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'Technical Average',
+        yaxis: 'y2', // Use z-score axis
+        line: {
+          color: CYAN,
+          width: isSelected ? 3 : 2,
+          dash: 'dash',
+        },
+        showlegend: true,
+        legendgroup: 'averages',
+        opacity: isSelected ? 1 : 0.7,
+        visible: true, // Visible by default
       });
     }
 

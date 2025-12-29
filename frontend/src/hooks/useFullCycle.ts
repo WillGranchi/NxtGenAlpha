@@ -142,9 +142,9 @@ export const useFullCycle = (): UseFullCycleReturn => {
   // Indicator visibility
   const [visibleIndicators, setVisibleIndicators] = useState<Set<string>>(new Set(['average']));
   
-  // Averages visibility
-  const [showFundamentalAverage, setShowFundamentalAverage] = useState<boolean>(false);
-  const [showTechnicalAverage, setShowTechnicalAverage] = useState<boolean>(false);
+  // Averages visibility - all visible by default, but not selected
+  const [showFundamentalAverage, setShowFundamentalAverage] = useState<boolean>(true);
+  const [showTechnicalAverage, setShowTechnicalAverage] = useState<boolean>(true);
   const [showOverallAverage, setShowOverallAverage] = useState<boolean>(true);
   
   // Indicator parameters (custom params per indicator)
