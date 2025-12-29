@@ -3,7 +3,7 @@
  * Exports Full Cycle Model data in various formats
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Download, FileText, Image, FileJson, FileSpreadsheet } from 'lucide-react';
 import { FullCycleDataPoint, FullCycleIndicator } from '../../hooks/useFullCycle';
 
@@ -217,6 +217,36 @@ export const ExportButton: React.FC<ExportButtonProps> = ({
   };
 
   const [showMenu, setShowMenu] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Calculate menu position when it opens
+  useEffect(() => {
+    if (showMenu && buttonRef.current) {
+      const buttonRect = buttonRef.current.getBoundingClientRect();
+      const menuWidth = 220; // min-w-[220px]
+      const spacing = 8; // mt-2 spacing
+      
+      // Position to the right of the button, but ensure it doesn't go off-screen
+      let left = buttonRect.right + spacing;
+      const rightEdge = window.innerWidth - 16; // right-4 = 16px margin
+      
+      // If menu would go off-screen, position it to the left of the button instead
+      if (left + menuWidth > rightEdge) {
+        left = buttonRect.left - menuWidth - spacing;
+        // If still off-screen on the left, position it at the right edge of the viewport
+        if (left < 16) {
+          left = rightEdge - menuWidth;
+        }
+      }
+      
+      setMenuPosition({
+        top: buttonRect.bottom + spacing,
+        left: left,
+      });
+    }
+  }, [showMenu]);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -236,6 +266,7 @@ export const ExportButton: React.FC<ExportButtonProps> = ({
   return (
     <div className="relative export-menu-container">
       <button
+        ref={buttonRef}
         className="flex items-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
         disabled={isExporting || !data || data.length === 0}
         onClick={() => setShowMenu(!showMenu)}
@@ -245,8 +276,15 @@ export const ExportButton: React.FC<ExportButtonProps> = ({
       </button>
 
       {/* Export Menu - Professional Popover */}
-      {showMenu && (
-        <div className="absolute right-0 mt-2 bg-bg-secondary border border-border-default rounded-lg shadow-xl z-50 min-w-[220px] overflow-hidden">
+      {showMenu && menuPosition && (
+        <div
+          ref={menuRef}
+          className="fixed bg-bg-secondary border border-border-default rounded-lg shadow-xl z-[9999] min-w-[220px] overflow-hidden"
+          style={{
+            top: `${menuPosition.top}px`,
+            left: `${menuPosition.left}px`,
+          }}
+        >
           <div className="p-2">
             <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase tracking-wide border-b border-border-default mb-1">
               Export Format
