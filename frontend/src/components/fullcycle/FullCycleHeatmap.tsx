@@ -67,7 +67,7 @@ export const FullCycleHeatmap: React.FC<FullCycleHeatmapProps> = ({
   if (showOverallAverage) allIndicators.push('average');
 
   return (
-    <div className="bg-bg-secondary border border-border-default rounded-lg p-6">
+    <div className="bg-bg-secondary border border-border-default rounded-lg p-6 transition-all duration-200">
       <h3 className="text-lg font-semibold text-text-primary mb-4">Indicator Heatmap</h3>
       <div className="overflow-x-auto">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 min-w-max">

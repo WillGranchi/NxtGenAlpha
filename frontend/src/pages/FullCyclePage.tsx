@@ -91,7 +91,7 @@ const FullCyclePage: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-bg-primary p-4 md:p-6">
+      <div className="min-h-screen bg-bg-primary p-4 md:p-6" style={{ scrollBehavior: 'smooth' }}>
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Header */}
           <div className="text-center mb-6">
@@ -134,15 +134,22 @@ const FullCyclePage: React.FC = () => {
             </div>
           )}
           
-          {/* Cycle Phase Indicator */}
-          {zscoreData.length > 0 && (() => {
-            const latest = zscoreData[zscoreData.length - 1];
-            const averageZScore = latest?.indicators['average']?.zscore ?? null;
-            return <CyclePhaseIndicator averageZScore={averageZScore} />;
-          })()}
+          {/* Cycle Phase Indicator - Always render to maintain layout */}
+          <div className="min-h-[120px]">
+            {zscoreData.length > 0 ? (() => {
+              const latest = zscoreData[zscoreData.length - 1];
+              const averageZScore = latest?.indicators['average']?.zscore ?? null;
+              return <CyclePhaseIndicator averageZScore={averageZScore} />;
+            })() : (
+              <div className="bg-bg-secondary border border-border-default rounded-lg p-4 animate-pulse">
+                <div className="h-20 bg-bg-tertiary rounded"></div>
+              </div>
+            )}
+          </div>
 
-          {/* Data Info */}
-          {zscoreData.length > 0 && (() => {
+          {/* Data Info - Always render to maintain layout */}
+          <div className="min-h-[80px]">
+            {zscoreData.length > 0 ? (() => {
             // Calculate percentile rank of current average z-score
             const latest = zscoreData[zscoreData.length - 1];
             const currentAvgZScore = latest?.indicators['average']?.zscore ?? null;
@@ -200,7 +207,12 @@ const FullCyclePage: React.FC = () => {
                 </div>
               </div>
             );
-          })()}
+            })() : (
+              <div className="bg-bg-secondary border border-border-default rounded-lg p-4 animate-pulse">
+                <div className="h-12 bg-bg-tertiary rounded"></div>
+              </div>
+            )}
+          </div>
 
           {/* Chart/Heatmap Area - Full Width */}
           <div className="w-full">
@@ -209,7 +221,7 @@ const FullCyclePage: React.FC = () => {
               <div className="bg-bg-secondary border border-border-default rounded-lg p-1 inline-flex">
                 <button
                   onClick={() => setViewMode('chart')}
-                  className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
+                  className={`px-4 py-2 rounded text-sm font-medium transition-all duration-200 ${
                     viewMode === 'chart'
                       ? 'bg-primary-500 text-white'
                       : 'text-text-secondary hover:text-text-primary'
@@ -219,7 +231,7 @@ const FullCyclePage: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setViewMode('heatmap')}
-                  className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
+                  className={`px-4 py-2 rounded text-sm font-medium transition-all duration-200 ${
                     viewMode === 'heatmap'
                       ? 'bg-primary-500 text-white'
                       : 'text-text-secondary hover:text-text-primary'
@@ -230,44 +242,51 @@ const FullCyclePage: React.FC = () => {
               </div>
             </div>
 
-            {zscoresLoading ? (
-              <div className="bg-bg-secondary border border-border-default rounded-lg p-12">
-                <div className="text-center text-text-muted">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mb-4"></div>
-                  <p>Calculating z-scores...</p>
+            {/* Chart/Heatmap Container - Maintain height during loading */}
+            <div className="min-h-[400px] md:min-h-[600px] relative">
+              {zscoresLoading ? (
+                <div className="absolute inset-0 bg-bg-secondary border border-border-default rounded-lg flex items-center justify-center">
+                  <div className="text-center text-text-muted">
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mb-4"></div>
+                    <p>Calculating z-scores...</p>
+                  </div>
                 </div>
-              </div>
-            ) : viewMode === 'chart' ? (
-              <div ref={chartRef}>
-                <FullCycleChart
-                  data={zscoreData}
-                  availableIndicators={availableIndicators}
-                  selectedIndicators={selectedIndicators}
-                  visibleIndicators={visibleIndicators}
-                  showFundamentalAverage={showFundamentalAverage}
-                  showTechnicalAverage={showTechnicalAverage}
-                  showOverallAverage={showOverallAverage}
-                  sdcaIn={sdcaIn}
-                  sdcaOut={sdcaOut}
-                  height={isMobile ? 400 : 600}
-                />
-              </div>
-            ) : (
-              <FullCycleHeatmap
-                data={zscoreData}
-                availableIndicators={availableIndicators}
-                selectedIndicators={selectedIndicators}
-                showFundamentalAverage={showFundamentalAverage}
-                showTechnicalAverage={showTechnicalAverage}
-                showOverallAverage={showOverallAverage}
-              />
-            )}
+              ) : (
+                <div className={`transition-opacity duration-300 ${zscoresLoading ? 'opacity-50' : 'opacity-100'}`}>
+                  {viewMode === 'chart' ? (
+                    <div ref={chartRef}>
+                      <FullCycleChart
+                        data={zscoreData}
+                        availableIndicators={availableIndicators}
+                        selectedIndicators={selectedIndicators}
+                        visibleIndicators={visibleIndicators}
+                        showFundamentalAverage={showFundamentalAverage}
+                        showTechnicalAverage={showTechnicalAverage}
+                        showOverallAverage={showOverallAverage}
+                        sdcaIn={sdcaIn}
+                        sdcaOut={sdcaOut}
+                        height={isMobile ? 400 : 600}
+                      />
+                    </div>
+                  ) : (
+                    <FullCycleHeatmap
+                      data={zscoreData}
+                      availableIndicators={availableIndicators}
+                      selectedIndicators={selectedIndicators}
+                      showFundamentalAverage={showFundamentalAverage}
+                      showTechnicalAverage={showTechnicalAverage}
+                      showOverallAverage={showOverallAverage}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Export and Alert Section */}
-          {zscoreData.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="flex items-center justify-end">
+          {/* Export and Alert Section - Always render to maintain layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-[200px]">
+            <div className="flex items-center justify-end">
+              {zscoreData.length > 0 ? (
                 <ExportButton
                   data={zscoreData}
                   availableIndicators={availableIndicators}
@@ -275,66 +294,76 @@ const FullCyclePage: React.FC = () => {
                   chartRef={chartRef}
                   viewMode={viewMode}
                 />
-              </div>
-              <div>
-                {(() => {
-                  const latest = zscoreData[zscoreData.length - 1];
-                  const averageZScore = latest?.indicators['average']?.zscore ?? null;
-                  return (
-                    <AlertSettings
-                      averageZScore={averageZScore}
-                      sdcaIn={sdcaIn}
-                      sdcaOut={sdcaOut}
-                      onSdcaInChange={setSdcaIn}
-                      onSdcaOutChange={setSdcaOut}
-                    />
-                  );
-                })()}
-              </div>
+              ) : (
+                <div className="h-10 w-32 bg-bg-tertiary rounded-lg animate-pulse"></div>
+              )}
             </div>
-          )}
+            <div>
+              {zscoreData.length > 0 ? (() => {
+                const latest = zscoreData[zscoreData.length - 1];
+                const averageZScore = latest?.indicators['average']?.zscore ?? null;
+                return (
+                  <AlertSettings
+                    averageZScore={averageZScore}
+                    sdcaIn={sdcaIn}
+                    sdcaOut={sdcaOut}
+                    onSdcaInChange={setSdcaIn}
+                    onSdcaOutChange={setSdcaOut}
+                  />
+                );
+              })() : (
+                <div className="bg-bg-secondary border border-border-default rounded-lg p-4 animate-pulse">
+                  <div className="h-32 bg-bg-tertiary rounded"></div>
+                </div>
+              )}
+            </div>
+          </div>
 
-          {/* Controls Section - Below Chart */}
-          {indicatorsLoading ? (
-            <div className="bg-bg-secondary border border-border-default rounded-lg p-12">
-              <div className="text-center text-text-muted">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mb-4"></div>
-                <p>Loading indicators...</p>
+          {/* Controls Section - Below Chart - Always render to maintain layout */}
+          <div className="relative min-h-[400px]">
+            {indicatorsLoading ? (
+              <div className="absolute inset-0 bg-bg-secondary border border-border-default rounded-lg flex items-center justify-center">
+                <div className="text-center text-text-muted">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mb-4"></div>
+                  <p>Loading indicators...</p>
+                </div>
               </div>
-            </div>
-          ) : (
-            <FullCycleControls
-              availableIndicators={availableIndicators}
-              selectedIndicators={selectedIndicators}
-              setSelectedIndicators={setSelectedIndicators}
-              visibleIndicators={visibleIndicators}
-              setVisibleIndicators={setVisibleIndicators}
-              toggleIndicatorVisibility={toggleIndicatorVisibility}
-              startDate={startDate}
-              setStartDate={setStartDate}
-              endDate={endDate}
-              setEndDate={setEndDate}
-              rocDays={rocDays}
-              setRocDays={setRocDays}
-              sdcaIn={sdcaIn}
-              setSdcaIn={setSdcaIn}
-              sdcaOut={sdcaOut}
-              setSdcaOut={setSdcaOut}
-              showFundamentalAverage={showFundamentalAverage}
-              setShowFundamentalAverage={setShowFundamentalAverage}
-              showTechnicalAverage={showTechnicalAverage}
-              setShowTechnicalAverage={setShowTechnicalAverage}
-              showOverallAverage={showOverallAverage}
-              setShowOverallAverage={setShowOverallAverage}
-              isLoading={zscoresLoading}
-              zscoreData={zscoreData}
-              roc={roc}
-              indicatorParameters={indicatorParameters}
-              updateIndicatorParameter={updateIndicatorParameter}
-              loadPreset={loadPreset}
-              refreshData={refreshData}
-            />
-          )}
+            ) : (
+              <div className={`transition-opacity duration-300 ${indicatorsLoading ? 'opacity-50' : 'opacity-100'}`}>
+                <FullCycleControls
+                  availableIndicators={availableIndicators}
+                  selectedIndicators={selectedIndicators}
+                  setSelectedIndicators={setSelectedIndicators}
+                  visibleIndicators={visibleIndicators}
+                  setVisibleIndicators={setVisibleIndicators}
+                  toggleIndicatorVisibility={toggleIndicatorVisibility}
+                  startDate={startDate}
+                  setStartDate={setStartDate}
+                  endDate={endDate}
+                  setEndDate={setEndDate}
+                  rocDays={rocDays}
+                  setRocDays={setRocDays}
+                  sdcaIn={sdcaIn}
+                  setSdcaIn={setSdcaIn}
+                  sdcaOut={sdcaOut}
+                  setSdcaOut={setSdcaOut}
+                  showFundamentalAverage={showFundamentalAverage}
+                  setShowFundamentalAverage={setShowFundamentalAverage}
+                  showTechnicalAverage={showTechnicalAverage}
+                  setShowTechnicalAverage={setShowTechnicalAverage}
+                  showOverallAverage={showOverallAverage}
+                  setShowOverallAverage={setShowOverallAverage}
+                  isLoading={zscoresLoading}
+                  zscoreData={zscoreData}
+                  roc={roc}
+                  indicatorParameters={indicatorParameters}
+                  updateIndicatorParameter={updateIndicatorParameter}
+                  loadPreset={loadPreset}
+                  refreshData={refreshData}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </ErrorBoundary>

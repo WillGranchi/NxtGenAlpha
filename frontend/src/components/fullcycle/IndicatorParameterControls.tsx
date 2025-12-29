@@ -102,8 +102,9 @@ export const IndicatorParameterControls: React.FC<IndicatorParameterControlsProp
         )}
       </button>
 
-      {isExpanded && (
-        <div className="p-4 bg-bg-secondary space-y-4">
+      <div className={`transition-all duration-200 overflow-hidden ${isExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+        {isExpanded && (
+          <div className="p-4 bg-bg-secondary space-y-4">
           {lengthParams.length > 0 && (
             <div>
               <h4 className="text-xs font-semibold text-text-secondary uppercase mb-2">
@@ -142,8 +143,9 @@ export const IndicatorParameterControls: React.FC<IndicatorParameterControlsProp
               </div>
             </div>
           )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

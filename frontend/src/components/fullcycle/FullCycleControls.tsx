@@ -110,7 +110,7 @@ export const FullCycleControls: React.FC<FullCycleControlsProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 transition-all duration-200">
       {/* Row 0: Preset Manager */}
       <PresetManager
         onLoadPreset={loadPreset}
@@ -257,16 +257,22 @@ export const FullCycleControls: React.FC<FullCycleControlsProps> = ({
         </div>
       </div>
 
-      {/* Row 3: ROC Table */}
-      {Object.keys(roc).length > 0 && (
-        <ROCTable
-          roc={roc}
-          zscoreData={zscoreData}
-          availableIndicators={availableIndicators}
-          selectedIndicators={selectedIndicators}
-          rocDays={rocDays}
-        />
-      )}
+      {/* Row 3: ROC Table - Always render to maintain layout */}
+      <div className="min-h-[200px]">
+        {Object.keys(roc).length > 0 ? (
+          <ROCTable
+            roc={roc}
+            zscoreData={zscoreData}
+            availableIndicators={availableIndicators}
+            selectedIndicators={selectedIndicators}
+            rocDays={rocDays}
+          />
+        ) : (
+          <div className="bg-bg-secondary border border-border-default rounded-lg p-4 animate-pulse">
+            <div className="h-32 bg-bg-tertiary rounded"></div>
+          </div>
+        )}
+      </div>
 
       {/* Row 4: Indicator Selection and Parameter Controls */}
       <div className="bg-bg-secondary border border-border-default rounded-lg p-6 space-y-6">
@@ -316,7 +322,7 @@ export const FullCycleControls: React.FC<FullCycleControlsProps> = ({
                         {isSelected && (
                           <button
                             onClick={() => toggleIndicatorVisibility(indicator.id)}
-                            className={`text-xs px-2 py-1 rounded ${
+                            className={`text-xs px-2 py-1 rounded transition-all duration-200 ${
                               isVisible
                                 ? 'bg-primary-500/20 text-primary-400'
                                 : 'bg-bg-tertiary text-text-secondary'
@@ -327,14 +333,16 @@ export const FullCycleControls: React.FC<FullCycleControlsProps> = ({
                           </button>
                         )}
                       </div>
-                      {isSelected && (
-                        <IndicatorParameterControls
-                          indicator={indicator}
-                          parameters={indicatorParameters[indicator.id] || {}}
-                          onParameterChange={updateIndicatorParameter}
-                          isLoading={isLoading}
-                        />
-                      )}
+                      <div className={`transition-all duration-200 overflow-hidden ${isSelected ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                        {isSelected && (
+                          <IndicatorParameterControls
+                            indicator={indicator}
+                            parameters={indicatorParameters[indicator.id] || {}}
+                            onParameterChange={updateIndicatorParameter}
+                            isLoading={isLoading}
+                          />
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -364,7 +372,7 @@ export const FullCycleControls: React.FC<FullCycleControlsProps> = ({
                         {isSelected && (
                           <button
                             onClick={() => toggleIndicatorVisibility(indicator.id)}
-                            className={`text-xs px-2 py-1 rounded ${
+                            className={`text-xs px-2 py-1 rounded transition-all duration-200 ${
                               isVisible
                                 ? 'bg-primary-500/20 text-primary-400'
                                 : 'bg-bg-tertiary text-text-secondary'
@@ -375,14 +383,16 @@ export const FullCycleControls: React.FC<FullCycleControlsProps> = ({
                           </button>
                         )}
                       </div>
-                      {isSelected && (
-                        <IndicatorParameterControls
-                          indicator={indicator}
-                          parameters={indicatorParameters[indicator.id] || {}}
-                          onParameterChange={updateIndicatorParameter}
-                          isLoading={isLoading}
-                        />
-                      )}
+                      <div className={`transition-all duration-200 overflow-hidden ${isSelected ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                        {isSelected && (
+                          <IndicatorParameterControls
+                            indicator={indicator}
+                            parameters={indicatorParameters[indicator.id] || {}}
+                            onParameterChange={updateIndicatorParameter}
+                            isLoading={isLoading}
+                          />
+                        )}
+                      </div>
                     </div>
                   );
                 })}

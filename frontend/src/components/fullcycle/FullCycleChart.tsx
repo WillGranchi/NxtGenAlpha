@@ -421,7 +421,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
   }
 
   return (
-    <div className="bg-bg-secondary border border-border-default rounded-lg p-4 relative">
+    <div className="bg-bg-secondary border border-border-default rounded-lg p-4 relative transition-all duration-200">
       {/* Custom CSS for Plotly hover tooltips */}
       <style>{`
         .js-plotly-plot .hoverlayer .hovertext {
