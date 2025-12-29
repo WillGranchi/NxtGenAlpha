@@ -60,6 +60,15 @@ export const ROCTable: React.FC<ROCTableProps> = ({
     return indicator?.name || indicatorId;
   };
 
+  // Get indicator category for color coding
+  const getIndicatorCategory = (indicatorId: string): 'fundamental' | 'technical' | 'average' => {
+    if (indicatorId === 'fundamental_average' || indicatorId === 'technical_average' || indicatorId === 'average') {
+      return 'average';
+    }
+    const indicator = availableIndicators.find((ind) => ind.id === indicatorId);
+    return indicator?.category || 'technical';
+  };
+
   // Prepare table data
   const tableData = Object.entries(roc)
     .map(([indicatorId, rocValue]) => {
@@ -132,12 +141,19 @@ export const ROCTable: React.FC<ROCTableProps> = ({
           <tbody>
             {tableData.map((row) => {
               const isPositive = row.rocValue > 0;
+              const category = getIndicatorCategory(row.indicatorId);
+              const nameColorClass = category === 'fundamental' 
+                ? 'text-blue-500' 
+                : category === 'technical' 
+                ? 'text-orange-500' 
+                : 'text-text-primary';
+              
               return (
                 <tr
                   key={row.indicatorId}
                   className="border-b border-border-default/50 hover:bg-bg-tertiary transition-colors"
                 >
-                  <td className="py-3 px-4 text-text-primary">{row.name}</td>
+                  <td className={`py-3 px-4 font-medium ${nameColorClass}`}>{row.name}</td>
                   <td className="py-3 px-4 text-right text-text-primary">
                     {row.currentZScore.toFixed(2)}
                   </td>
