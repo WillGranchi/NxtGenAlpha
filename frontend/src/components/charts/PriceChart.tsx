@@ -149,6 +149,7 @@ export const PriceChart: React.FC<PriceChartProps> = ({
           color: color,
           size: 8,
           symbol: 'triangle-up' as const,
+          line: { color: '#FFFFFF', width: 1 },
         },
       });
     }
@@ -164,6 +165,7 @@ export const PriceChart: React.FC<PriceChartProps> = ({
           color: color,
           size: 8,
           symbol: 'triangle-down' as const,
+          line: { color: '#FFFFFF', width: 1 },
         },
       });
     }
