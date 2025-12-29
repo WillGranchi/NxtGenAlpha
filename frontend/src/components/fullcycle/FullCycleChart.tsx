@@ -72,28 +72,23 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
     const dates = data.map((d) => d.date);
     const prices = data.map((d) => d.price);
 
-    // Prepare plot data
+    // Prepare plot data - build in specific order for legend
     const plotData: any[] = [];
 
-    // Add BTC price trace (log scale)
-    plotData.push({
-      x: dates,
-      y: prices,
-      type: 'scatter',
-      mode: 'lines',
-      name: 'BTC Price',
-      yaxis: 'y',
-      line: {
-        color: '#FFFFFF',
-        width: 2,
-      },
-    });
+    // Helper function to get color for z-score
+    const getColorForZscore = (zscore: number): string => {
+      const normalized = Math.max(-2, Math.min(2, zscore));
+      const t = (normalized + 2) / 4;
+      const r = Math.round(0 + (255 - 0) * t);
+      const g = Math.round(241 + (1 - 241) * t);
+      const b = Math.round(255 + (154 - 255) * t);
+      return `rgb(${r}, ${g}, ${b})`;
+    };
 
-    // Add indicator z-score traces
-    // Add ALL selected indicators to plotData so they appear in tooltips
-    // But only show them if they're explicitly in visibleIndicators
-    // By default, only 'average' should be visible
-    let colorIndex = 0;
+    // Separate indicators by category
+    const technicalIndicators: any[] = [];
+    const fundamentalIndicators: any[] = [];
+
     selectedIndicators.forEach((indicatorId) => {
       const indicator = availableIndicators.find((ind) => ind.id === indicatorId);
       if (!indicator) return;
@@ -103,110 +98,43 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         return indicatorData ? indicatorData.zscore : null;
       });
 
-      // Get color based on z-score gradient (cyan to magenta)
-      // PineScript: color.from_gradient(zscore, -2, 2, cyan, magenta)
-      const getColorForZscore = (zscore: number): string => {
-        // Normalize z-score to 0-1 range (-2 to +2)
-        const normalized = Math.max(-2, Math.min(2, zscore));
-        const t = (normalized + 2) / 4; // 0 to 1
-        
-        // Interpolate between cyan (#00F1FF) and magenta (#FF019A)
-        // Cyan: rgb(0, 241, 255)
-        // Magenta: rgb(255, 1, 154)
-        const r = Math.round(0 + (255 - 0) * t);
-        const g = Math.round(241 + (1 - 241) * t);
-        const b = Math.round(255 + (154 - 255) * t);
-        
-        return `rgb(${r}, ${g}, ${b})`;
-      };
-
-      // Use average color for the line
       const avgZscore = zscores.filter(z => z !== null).reduce((sum, z) => sum + (z || 0), 0) / zscores.filter(z => z !== null).length;
       const lineColor = getColorForZscore(avgZscore || 0);
-
-      // Add category prefix for visual distinction
       const categoryPrefix = indicator.category === 'fundamental' ? '[F] ' : '[T] ';
       const displayName = `${categoryPrefix}${indicator.name}`;
-      
       const isSelected = selectedIndicatorId === indicatorId;
-      plotData.push({
+      const isVisible = visibleIndicators.has(indicatorId) || isSelected;
+
+      const trace = {
         x: dates,
         y: zscores,
-        type: 'scatter',
-        mode: 'lines',
+        type: 'scatter' as const,
+        mode: 'lines' as const,
         name: displayName,
         yaxis: 'y2',
         line: {
           color: lineColor,
-          width: isSelected ? 3 : 1.5, // Thicker line when selected
+          width: isSelected ? 3 : 1.5,
         },
-        // Hide by default, but include in tooltips (legendonly = hidden but in tooltips)
-        // Only show if explicitly in visibleIndicators OR if selected
-        visible: (visibleIndicators.has(indicatorId) || isSelected) ? true : 'legendonly',
-        // Ensure it appears in hover tooltips even when hidden
-        showlegend: true, // Show in legend for selection
+        visible: isVisible ? true : ('legendonly' as const),
+        showlegend: true,
         legendgroup: 'indicators',
-        // Add selection highlight effect
-        opacity: isSelected ? 1 : (visibleIndicators.has(indicatorId) ? 0.7 : 0.3),
-      });
+      };
 
-      colorIndex++;
+      if (indicator.category === 'technical') {
+        technicalIndicators.push(trace);
+      } else {
+        fundamentalIndicators.push(trace);
+      }
     });
 
-    // Add Overall Average first (appears first in legend)
-    if (showOverallAverage) {
-      const overallZscores = data.map((d) => {
-        const avg = d.indicators['average'];
-        return avg ? avg.zscore : null;
-      });
+    // 1. Add Technical indicators first
+    plotData.push(...technicalIndicators);
 
-      const isSelected = selectedIndicatorId === 'average';
-      plotData.push({
-        x: dates,
-        y: overallZscores,
-        type: 'scatter',
-        mode: 'lines',
-        name: 'Average',
-        yaxis: 'y2', // Use z-score axis
-        line: {
-          color: '#FFFFFF',
-          width: isSelected ? 4 : 3,
-        },
-        showlegend: true,
-        legendgroup: 'averages',
-        opacity: isSelected ? 1 : 0.9,
-        visible: true, // Visible by default
-      });
-    }
+    // 2. Add Fundamental indicators
+    plotData.push(...fundamentalIndicators);
 
-    // Add Fundamental Average (below Overall Average in legend)
-    if (showFundamentalAverage) {
-      const fundamentalZscores = data.map((d) => {
-        const avg = d.indicators['fundamental_average'];
-        return avg ? avg.zscore : null;
-      });
-
-      const isSelected = selectedIndicatorId === 'fundamental_average';
-      plotData.push({
-        x: dates,
-        y: fundamentalZscores,
-        type: 'scatter',
-        mode: 'lines',
-        name: 'Fundamental Average',
-        yaxis: 'y2', // Use z-score axis
-        line: {
-          color: MAGENTA,
-          width: isSelected ? 3 : 2,
-          dash: 'dash',
-        },
-        showlegend: true,
-        legendgroup: 'averages',
-        opacity: isSelected ? 1 : 0.7,
-        visible: true, // Visible by default
-      });
-    }
-
-    // Add Technical Average (below Fundamental Average in legend)
+    // 3. Add Technical Average
     if (showTechnicalAverage) {
       const technicalZscores = data.map((d) => {
         const avg = d.indicators['technical_average'];
@@ -220,7 +148,7 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         type: 'scatter',
         mode: 'lines',
         name: 'Technical Average',
-        yaxis: 'y2', // Use z-score axis
+        yaxis: 'y2',
         line: {
           color: CYAN,
           width: isSelected ? 3 : 2,
@@ -228,12 +156,77 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
         },
         showlegend: true,
         legendgroup: 'averages',
-        opacity: isSelected ? 1 : 0.7,
-        visible: true, // Visible by default
+        visible: true,
       });
     }
 
-    // Add reference lines (horizontal lines at -3, -2, -1, 0, 1, 2, 3)
+    // 4. Add Fundamental Average
+    if (showFundamentalAverage) {
+      const fundamentalZscores = data.map((d) => {
+        const avg = d.indicators['fundamental_average'];
+        return avg ? avg.zscore : null;
+      });
+
+      const isSelected = selectedIndicatorId === 'fundamental_average';
+      plotData.push({
+        x: dates,
+        y: fundamentalZscores,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'Fundamental Average',
+        yaxis: 'y2',
+        line: {
+          color: MAGENTA,
+          width: isSelected ? 3 : 2,
+          dash: 'dash',
+        },
+        showlegend: true,
+        legendgroup: 'averages',
+        visible: true,
+      });
+    }
+
+    // 5. Add Overall Average
+    if (showOverallAverage) {
+      const overallZscores = data.map((d) => {
+        const avg = d.indicators['average'];
+        return avg ? avg.zscore : null;
+      });
+
+      const isSelected = selectedIndicatorId === 'average';
+      plotData.push({
+        x: dates,
+        y: overallZscores,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'Average',
+        yaxis: 'y2',
+        line: {
+          color: '#FFFFFF',
+          width: isSelected ? 4 : 3,
+        },
+        showlegend: true,
+        legendgroup: 'averages',
+        visible: true,
+      });
+    }
+
+    // 6. Add BTC Price last
+    plotData.push({
+      x: dates,
+      y: prices,
+      type: 'scatter',
+      mode: 'lines',
+      name: 'BTC Price',
+      yaxis: 'y',
+      line: {
+        color: '#FFFFFF',
+        width: 2,
+      },
+      showlegend: true,
+    });
+
+    // Add reference lines (horizontal lines at -3, -2, -1, 0, 1, 2, 3) - after all other traces
     const referenceLines = [-3, -2, -1, 0, 1, 2, 3];
     referenceLines.forEach((value) => {
       plotData.push({

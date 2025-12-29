@@ -217,8 +217,20 @@ const FullCyclePage: React.FC = () => {
 
           {/* Chart/Heatmap Area - Full Width */}
           <div className="w-full">
-            {/* View Toggle */}
-            <div className="flex justify-end mb-4">
+            {/* Export Button and View Toggle */}
+            <div className="flex items-center justify-between mb-4">
+              {/* Export Button on the left */}
+              {zscoreData.length > 0 && (
+                <ExportButton
+                  data={zscoreData}
+                  availableIndicators={availableIndicators}
+                  selectedIndicators={selectedIndicators}
+                  chartRef={chartRef}
+                  viewMode={viewMode}
+                />
+              )}
+              
+              {/* View Toggle on the right */}
               <div className="bg-bg-secondary border border-border-default rounded-lg p-1 inline-flex">
                 <button
                   onClick={() => setViewMode('chart')}
@@ -307,23 +319,10 @@ const FullCyclePage: React.FC = () => {
             </div>
           </div>
 
-          {/* Export and Alert Section - Always render to maintain layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-[200px]">
-            <div className="flex items-center justify-end">
-              {zscoreData.length > 0 ? (
-                <ExportButton
-                  data={zscoreData}
-                  availableIndicators={availableIndicators}
-                  selectedIndicators={selectedIndicators}
-                  chartRef={chartRef}
-                  viewMode={viewMode}
-                />
-              ) : (
-                <div className="h-10 w-32 bg-bg-tertiary rounded-lg animate-pulse"></div>
-              )}
-            </div>
-            <div>
-              {zscoreData.length > 0 ? (() => {
+          {/* Alert Settings - Full Width */}
+          {zscoreData.length > 0 && (
+            <div className="min-h-[200px]">
+              {(() => {
                 const latest = zscoreData[zscoreData.length - 1];
                 const averageZScore = latest?.indicators['average']?.zscore ?? null;
                 return (
@@ -335,13 +334,9 @@ const FullCyclePage: React.FC = () => {
                     onSdcaOutChange={setSdcaOut}
                   />
                 );
-              })() : (
-                <div className="bg-bg-secondary border border-border-default rounded-lg p-4 animate-pulse">
-                  <div className="h-32 bg-bg-tertiary rounded"></div>
-                </div>
-              )}
+              })()}
             </div>
-          </div>
+          )}
 
           {/* Controls Section - Below Chart - Always render to maintain layout */}
           <div className="relative min-h-[400px]">
