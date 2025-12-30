@@ -20,10 +20,7 @@ from backend.core.pinescript_indicators import (
     mom_zscore_signal, cci_zscore_signal, chandeMO_zscore_signal, rapr_combined_signal,
     ema_zscore_signal
 )
-from backend.core.fundamental_indicators import (
-    FUNDAMENTAL_INDICATORS,
-    get_fundamental_indicator
-)
+# Removed fundamental indicators import - valuation page now only uses technical indicators from PineScript
 from backend.core.valuation import (
     calculate_indicator_zscore,
     calculate_average_zscore,
@@ -50,29 +47,9 @@ router = APIRouter(prefix="/api/valuation", tags=["valuation"])
 logger = logging.getLogger(__name__)
 
 
-# Define available technical indicators
+# Define available technical indicators (PineScript valuation model)
+# Based on: f_zscore_valuation function and RAPR calculations
 TECHNICAL_INDICATORS = {
-    'rsi': {
-        'name': 'RSI',
-        'description': 'Relative Strength Index - Momentum oscillator measuring speed and magnitude of price changes',
-        'default_params': {'period': 14}
-    },
-    'cci': {
-        'name': 'CCI',
-        'description': 'Commodity Channel Index - Identifies cyclical trends in price movements',
-        'default_params': {'period': 20}
-    },
-    'stochastic': {
-        'name': 'Stochastic',
-        'description': 'Stochastic Oscillator - Compares closing price to price range over a period',
-        'default_params': {'k_period': 14, 'd_period': 3}
-    },
-    'williams_r': {
-        'name': 'Williams %R',
-        'description': 'Williams %R - Momentum indicator measuring overbought/oversold levels',
-        'default_params': {'period': 14}
-    },
-    # Z-Score Indicators
     'rsi_zscore': {
         'name': 'RSI Z-Score',
         'description': 'RSI with z-score normalization',
@@ -118,14 +95,14 @@ TECHNICAL_INDICATORS = {
         'description': 'Chande Momentum Oscillator with z-score normalization',
         'default_params': {'lookback': 14, 'zscore_length': 20}
     },
-    'ema_zscore': {
-        'name': 'EMA Z-Score',
-        'description': 'EMA with z-score normalization',
-        'default_params': {'len': 14, 'src': 0.0, 'lookback': 20, 'threshold_l': 1.0, 'threshold_s': -1.0}
+    'rapr_metrics1': {
+        'name': 'RAPR Metrics 1',
+        'description': 'Average of Sharpe, Sortino, and Omega z-scores from RAPR1',
+        'default_params': {'metric_lookback': 20, 'valuation_lookback': 0}
     },
-    'rapr_combined': {
-        'name': 'RAPR Combined',
-        'description': 'Combined RAPR - averages Sharpe, Omega, and Sortino z-scores from RAPR1 and RAPR2',
+    'rapr_metrics2': {
+        'name': 'RAPR Metrics 2',
+        'description': 'Average of Sharpe, Sortino, and Omega z-scores from RAPR2',
         'default_params': {'metric_lookback': 20, 'valuation_lookback': 0}
     },
 }
@@ -145,22 +122,6 @@ def calculate_technical_indicator(df: pd.DataFrame, indicator_id: str, params: D
     """
     if params is None:
         params = TECHNICAL_INDICATORS.get(indicator_id, {}).get('default_params', {})
-    
-    # Standard indicators (non-z-score)
-    if indicator_id == 'rsi':
-        period = params.get('period', 14)
-        return rsi(df['Close'], period)
-    elif indicator_id == 'cci':
-        period = params.get('period', 20)
-        return cci(df['High'], df['Low'], df['Close'], period)
-    elif indicator_id == 'stochastic':
-        k_period = params.get('k_period', 14)
-        d_period = params.get('d_period', 3)
-        stoch_k, stoch_d = stochastic(df['High'], df['Low'], df['Close'], k_period, d_period)
-        return stoch_k  # Return %K for z-score calculation
-    elif indicator_id == 'williams_r':
-        period = params.get('period', 14)
-        return williams_r(df['High'], df['Low'], df['Close'], period)
     
     # Z-Score indicators - return the z-score values directly
     elif indicator_id == 'rsi_zscore':
@@ -222,22 +183,30 @@ def calculate_technical_indicator(df: pd.DataFrame, indicator_id: str, params: D
         std_dev = ema_val.rolling(window=lookback).std()
         z_score = (ema_val - mean) / std_dev.replace(0, np.nan)
         return z_score
-    elif indicator_id == 'rapr_combined':
+    elif indicator_id == 'rapr_metrics1':
         metric_lookback = params.get('metric_lookback', 20)
         valuation_lookback = params.get('valuation_lookback', 0)
-        from backend.core.pinescript_indicators import rapr_1, rapr_2
+        from backend.core.pinescript_indicators import rapr_1
         rapr1_results = rapr_1(df['Close'], metric_lookback, valuation_lookback)
-        rapr2_results = rapr_2(df['Close'], metric_lookback, valuation_lookback)
-        # Average all 6 z-scores
-        combined_score = (
+        # Average of Sharpe, Sortino, and Omega z-scores from RAPR1 (metrics1)
+        metrics1 = (
             rapr1_results['z_sharpe'].fillna(0) +
             rapr1_results['z_sortino'].fillna(0) +
-            rapr1_results['z_omega'].fillna(0) +
+            rapr1_results['z_omega'].fillna(0)
+        ) / 3
+        return metrics1
+    elif indicator_id == 'rapr_metrics2':
+        metric_lookback = params.get('metric_lookback', 20)
+        valuation_lookback = params.get('valuation_lookback', 0)
+        from backend.core.pinescript_indicators import rapr_2
+        rapr2_results = rapr_2(df['Close'], metric_lookback, valuation_lookback)
+        # Average of Sharpe, Sortino, and Omega z-scores from RAPR2 (metrics2)
+        metrics2 = (
             rapr2_results['z_sharpe'].fillna(0) +
             rapr2_results['z_sortino'].fillna(0) +
             rapr2_results['z_omega'].fillna(0)
-        ) / 6
-        return combined_score
+        ) / 3
+        return metrics2
     else:
         raise ValueError(f"Unknown technical indicator: {indicator_id}")
 
@@ -253,35 +222,13 @@ async def get_valuation_indicators() -> ValuationIndicatorsResponse:
     try:
         indicators = []
         
-        # Add technical indicators
+        # Add technical indicators (PineScript valuation model only)
         for indicator_id, metadata in TECHNICAL_INDICATORS.items():
             indicators.append(ValuationIndicator(
                 id=indicator_id,
                 name=metadata['name'],
                 category='technical',
                 description=metadata['description']
-            ))
-        
-        # Add fundamental indicators
-        for indicator_id in FUNDAMENTAL_INDICATORS.keys():
-            # Format name from ID (e.g., 'pi_cycle_top_risk' -> 'Pi-Cycle Top Risk')
-            name = indicator_id.replace('_', ' ').title()
-            if indicator_id == 'mvrv':
-                name = 'MVRV'
-            elif indicator_id == 'nupl':
-                name = 'NUPL'
-            elif indicator_id == 'cvdd':
-                name = 'CVDD'
-            elif indicator_id == 'nvts':
-                name = 'NVTS'
-            elif indicator_id == 'sopr':
-                name = 'SOPR'
-            
-            indicators.append(ValuationIndicator(
-                id=indicator_id,
-                name=name,
-                category='fundamental',
-                description=f'{name} - On-chain indicator (stub data)'
             ))
         
         return ValuationIndicatorsResponse(
@@ -332,11 +279,9 @@ async def calculate_valuation_zscores(request: ValuationZScoreRequest) -> Valuat
         
         for indicator_id in request.indicators:
             try:
-                # Calculate indicator values
+                # Calculate indicator values (only technical indicators for PineScript valuation model)
                 if indicator_id in TECHNICAL_INDICATORS:
                     indicator_series = calculate_technical_indicator(df, indicator_id)
-                elif indicator_id in FUNDAMENTAL_INDICATORS:
-                    indicator_series = get_fundamental_indicator(df, indicator_id)
                 else:
                     logger.warning(f"Unknown indicator: {indicator_id}")
                     continue
@@ -485,8 +430,6 @@ async def get_valuation_data(
                 try:
                     if indicator_id in TECHNICAL_INDICATORS:
                         indicator_series = calculate_technical_indicator(df, indicator_id)
-                    elif indicator_id in FUNDAMENTAL_INDICATORS:
-                        indicator_series = get_fundamental_indicator(df, indicator_id)
                     else:
                         continue
                     
