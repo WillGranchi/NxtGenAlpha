@@ -7,6 +7,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { IndicatorSelector } from '../components/indicators/IndicatorSelector';
 import { OverallStrategySummation } from '../components/indicators/OverallStrategySummation';
 import { IndividualIndicatorSection } from '../components/indicators/IndividualIndicatorSection';
+import { IndicatorSignalPanel } from '../components/indicators/IndicatorSignalPanel';
 import { VisualConditionBuilder } from '../components/strategy/VisualConditionBuilder';
 import { DateRangePicker } from '../components/DateRangePicker';
 import { TokenSelector } from '../components/TokenSelector';
@@ -262,14 +263,50 @@ const IndicatorsPage: React.FC = () => {
       
       // Extract price data from equity curve
       const equityCurve = backtestResponse.combined_result.equity_curve || [];
-      const formattedPriceData = equityCurve.map((point: EquityDataPoint) => ({
-        Date: point.Date,
-        Price: point.Price || point.Portfolio_Value || 0,
-        Position: point.Position || 0,
-        Portfolio_Value: point.Portfolio_Value || 0,
-        Capital: point.Capital || 0,
-        Shares: point.Shares || 0,
-      }));
+      const individualResults = backtestResponse.individual_results || {};
+      
+      // Create a map of dates to data points
+      const dateToDataPoint: Record<string, any> = {};
+      
+      equityCurve.forEach((point: EquityDataPoint) => {
+        const dateStr = point.Date;
+        dateToDataPoint[dateStr] = {
+          Date: dateStr,
+          Price: point.Price || point.Portfolio_Value || 0,
+          Position: point.Position || 0,
+          Portfolio_Value: point.Portfolio_Value || 0,
+          Capital: point.Capital || 0,
+          Shares: point.Shares || 0,
+        };
+        
+        // Preserve any additional fields from the combined result
+        Object.keys(point).forEach((key) => {
+          if (!dateToDataPoint[dateStr].hasOwnProperty(key)) {
+            dateToDataPoint[dateStr][key] = (point as any)[key];
+          }
+        });
+      });
+      
+      // Add per-indicator positions from individual results
+      selectedIndicators.forEach((indicator) => {
+        const indicatorId = indicator.id;
+        const individualResult = individualResults[indicatorId];
+        
+        if (individualResult && individualResult.equity_curve) {
+          individualResult.equity_curve.forEach((point: EquityDataPoint) => {
+            const dateStr = point.Date;
+            if (dateToDataPoint[dateStr]) {
+              // Add per-indicator position
+              dateToDataPoint[dateStr][`${indicatorId}_Position`] = point.Position || 0;
+            }
+          });
+        }
+      });
+      
+      // Convert map back to array
+      const formattedPriceData = Object.values(dateToDataPoint).sort((a: any, b: any) => 
+        a.Date.localeCompare(b.Date)
+      );
       
       setPriceData(formattedPriceData);
         
@@ -281,7 +318,7 @@ const IndicatorsPage: React.FC = () => {
       setCombinedSignals(signals);
       
       // Set individual results (if available)
-      setIndividualResults(backtestResponse.individual_results || {});
+      setIndividualResults(individualResults);
       
       // Generate agreement stats from combined result
       // Note: This is simplified - the original logic used majority voting
@@ -430,7 +467,7 @@ const IndicatorsPage: React.FC = () => {
 
           {/* Chart Area - Full Width at Top */}
           {hasPriceData && (
-            <div className="w-full">
+            <div className="w-full space-y-4">
               {isLoading ? (
                 <div className="bg-bg-secondary border border-border-default rounded-lg p-12">
                   <div className="text-center text-text-muted">
@@ -439,18 +476,32 @@ const IndicatorsPage: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                <PriceChart
-                  data={chartData}
-                  title={hasResults ? "Overall Strategy - Combined Trading Signals" : "BTC Price Chart"}
-                  height={isMobile ? 400 : 600}
-                  overlaySignals={hasResults ? { ...overlaySignals, ...combinedOverlaySignals } : {}}
-                  showOverlayLegend={hasResults}
-                  useLogScale={useLogScale}
-                  onLogScaleToggle={(useLog) => {
-                    setUseLogScale(useLog);
-                    localStorage.setItem('indicatorsChart_useLogScale', String(useLog));
-                  }}
-                />
+                <>
+                  <PriceChart
+                    data={chartData}
+                    title={hasResults ? "Overall Strategy - Combined Trading Signals" : "BTC Price Chart"}
+                    height={isMobile ? 400 : 600}
+                    overlaySignals={hasResults ? { ...overlaySignals, ...combinedOverlaySignals } : {}}
+                    showOverlayLegend={hasResults}
+                    useLogScale={useLogScale}
+                    onLogScaleToggle={(useLog) => {
+                      setUseLogScale(useLog);
+                      localStorage.setItem('indicatorsChart_useLogScale', String(useLog));
+                    }}
+                  />
+                  
+                  {/* Indicator Signal Panel - Show when indicators are selected and signals are generated */}
+                  {selectedIndicators.length > 0 && hasResults && priceData.length > 0 && (
+                    <IndicatorSignalPanel
+                      indicators={selectedIndicators.map((ind) => ({
+                        id: ind.id,
+                        name: availableIndicators?.[ind.id]?.name || ind.id,
+                      }))}
+                      priceData={priceData}
+                      height={isMobile ? 150 : 200}
+                    />
+                  )}
+                </>
               )}
             </div>
           )}
