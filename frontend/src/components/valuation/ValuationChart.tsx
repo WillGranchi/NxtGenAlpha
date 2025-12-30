@@ -49,7 +49,7 @@ export const ValuationChart: React.FC<ValuationChartProps> = memo(({
     // Prepare plot data
     const plotData: any[] = [];
 
-    // Price line (right Y-axis, log scale)
+    // Price line (right Y-axis, log scale) - Match Full Cycle Model style
     plotData.push({
       x: dates,
       y: prices,
@@ -58,9 +58,8 @@ export const ValuationChart: React.FC<ValuationChartProps> = memo(({
       name: 'BTC Price',
       yaxis: 'y2',
       line: {
-        color: '#3B82F6',
+        color: '#FFFFFF', // White like Full Cycle Model
         width: 2,
-        dash: 'dash',
       },
       hovertemplate: '<b>%{fullData.name}</b><br>' +
         'Date: %{x}<br>' +
@@ -310,55 +309,68 @@ export const ValuationChart: React.FC<ValuationChartProps> = memo(({
     return {
       title: {
         text: 'BTC Price + Z-Score Valuation',
-        font: { size: isMobile ? 14 : 16, color: '#E5E7EB' },
+        font: { color: '#FFFFFF', size: isMobile ? 18 : 24 },
+        x: 0.5,
       },
       xaxis: {
         title: 'Date',
         type: 'date' as const,
+        color: '#9CA3AF',
         gridcolor: '#374151',
-        gridwidth: 1,
+        showgrid: true,
       },
       yaxis: {
         title: 'Z-Score',
         side: 'left' as const,
         position: 0,
-        range: [-3, 3],
+        range: [-3.5, 3.5],
+        color: '#9CA3AF',
         gridcolor: '#374151',
-        gridwidth: 1,
-        tickfont: { color: '#E5E7EB' },
-        titlefont: { color: '#E5E7EB' },
+        showgrid: true,
       },
       yaxis2: {
-        title: 'BTC Price (Log Scale)',
+        title: 'BTC Price (USD)',
         side: 'right' as const,
         position: 1,
         type: 'log' as const,
         range: [Math.log10(minPrice), Math.log10(maxPrice)],
         overlaying: 'y' as const,
+        color: '#9CA3AF',
         gridcolor: '#374151',
-        gridwidth: 1,
-        tickfont: { color: '#E5E7EB' },
-        titlefont: { color: '#E5E7EB' },
+        showgrid: true,
       },
       hovermode: 'x unified' as const,
+      hoverlabel: {
+        bgcolor: 'rgba(31, 41, 55, 0.95)',
+        bordercolor: '#4B5563',
+        font: {
+          color: '#F3F4F6',
+          family: 'Inter, system-ui, sans-serif',
+          size: 12,
+        },
+      },
       showlegend: true,
       legend: {
-        orientation: 'h' as const,
-        y: -0.2,
-        font: { color: '#E5E7EB' },
-        bgcolor: 'rgba(0,0,0,0)',
+        x: 1.02,
+        y: 1,
+        bgcolor: 'rgba(0, 0, 0, 0)',
+        bordercolor: '#374151',
+        borderwidth: 1,
+        font: { color: '#FFFFFF' },
       },
       margin: {
-        t: isMobile ? 40 : 50,
-        b: isMobile ? 60 : 80,
         l: isMobile ? 50 : 60,
-        r: isMobile ? 50 : 60,
+        r: isMobile ? 80 : 80,
+        t: isMobile ? 50 : 80,
+        b: isMobile ? 60 : 60,
       },
-      height: isMobile ? Math.min(height, 400) : height,
-      font: { size: isMobile ? 10 : 12 },
+      plot_bgcolor: 'rgba(0, 0, 0, 0)',
+      paper_bgcolor: 'rgba(0, 0, 0, 0)',
+      font: {
+        color: '#9CA3AF',
+        size: isMobile ? 10 : 12,
+      },
       dragmode: 'pan' as const,
-      plot_bgcolor: 'rgba(0,0,0,0)',
-      paper_bgcolor: 'rgba(0,0,0,0)',
     };
   }, [height, minPrice, maxPrice]);
 
@@ -373,12 +385,32 @@ export const ValuationChart: React.FC<ValuationChartProps> = memo(({
   );
 
   return (
-    <div className="bg-bg-tertiary rounded-lg border border-border-default p-6">
+    <div className="bg-bg-secondary border border-border-default rounded-lg p-4 relative">
+      {/* Custom CSS for Plotly hover tooltips */}
+      <style>{`
+        .js-plotly-plot .hoverlayer .hovertext {
+          background-color: rgba(31, 41, 55, 0.95) !important;
+          border: 1px solid #4B5563 !important;
+          border-radius: 6px !important;
+          padding: 8px 12px !important;
+          color: #F3F4F6 !important;
+          font-family: 'Inter', system-ui, sans-serif !important;
+          font-size: 12px !important;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2) !important;
+        }
+        .js-plotly-plot .hoverlayer .hovertext .name {
+          color: #F3F4F6 !important;
+        }
+        .js-plotly-plot .hoverlayer .hovertext .nums {
+          color: #D1D5DB !important;
+        }
+      `}</style>
       <Plot
         data={plotData}
         layout={layout}
         config={config}
         style={{ width: '100%', height: `${height}px` }}
+        useResizeHandler={true}
       />
     </div>
   );

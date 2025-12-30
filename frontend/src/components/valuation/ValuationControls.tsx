@@ -444,13 +444,14 @@ export const ValuationControls: React.FC<ValuationControlsProps> = ({
                   <div className="p-2 space-y-1">
                     {indicators.map((indicator) => {
                       const isSelected = selectedIndicators.includes(indicator.id);
+                      const borderColor = category === 'fundamental' ? 'border-blue-500' : 'border-orange-500';
                       return (
                         <label
                           key={indicator.id}
-                          className={`flex items-start gap-3 p-2 rounded cursor-pointer transition-colors ${
+                          className={`flex items-start gap-3 p-2 rounded cursor-pointer transition-colors border-l-4 ${
                             isSelected
-                              ? 'bg-primary-500/10 hover:bg-primary-500/20'
-                              : 'hover:bg-bg-elevated'
+                              ? `bg-primary-500/10 hover:bg-primary-500/20 ${borderColor}`
+                              : `hover:bg-bg-elevated ${borderColor}`
                           }`}
                         >
                           <input

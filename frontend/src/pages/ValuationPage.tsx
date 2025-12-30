@@ -3,18 +3,19 @@
  * Main page for viewing mean-reverting indicators with z-scores
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useValuation } from '../hooks/useValuation';
 import { ValuationControls } from '../components/valuation/ValuationControls';
 import { ValuationChart } from '../components/valuation/ValuationChart';
 import { ValuationTable } from '../components/valuation/ValuationTable';
 import { SaveValuationModal } from '../components/valuation/SaveValuationModal';
+import { PriceChart } from '../components/charts/PriceChart';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { useMobile } from '../hooks/useMobile';
 import { useAuth } from '../hooks/useAuth';
 import TradingAPI from '../services/api';
 import { Button } from '../components/ui/Button';
-import { Save, Loader2, ChevronDown } from 'lucide-react';
+import { Save, Loader2, ChevronDown, ChevronUp, Settings } from 'lucide-react';
 
 const ValuationPage: React.FC = () => {
   const { isMobile } = useMobile();
@@ -33,6 +34,22 @@ const ValuationPage: React.FC = () => {
     updated_at: string;
   }>>([]);
   const [loadingValuations, setLoadingValuations] = useState(false);
+  const [settingsExpanded, setSettingsExpanded] = useState<boolean>(false);
+  const [useLogScale, setUseLogScale] = useState<boolean>(() => {
+    const saved = localStorage.getItem('valuationChart_useLogScale');
+    return saved !== null ? saved === 'true' : true;
+  });
+  
+  // Price data for the top chart
+  const [priceData, setPriceData] = useState<Array<{
+    Date: string;
+    Price: number;
+    Position: number;
+    Portfolio_Value: number;
+    Capital: number;
+    Shares: number;
+  }>>([]);
+  const [priceDataLoading, setPriceDataLoading] = useState(false);
 
   const {
     availableIndicators,
@@ -82,6 +99,44 @@ const ValuationPage: React.FC = () => {
       setBandIndicatorId(selectedIndicators[0]);
     }
   }, [showAverage, selectedIndicators, bandIndicatorId]);
+
+  // Auto-expand settings on desktop, collapse on mobile
+  useEffect(() => {
+    setSettingsExpanded(!isMobile);
+  }, [isMobile]);
+
+  // Load price data for the top chart
+  const loadPriceData = useCallback(async () => {
+    setPriceDataLoading(true);
+    try {
+      const response = await TradingAPI.getValuationData({
+        symbol,
+        indicators: [], // No indicators, just price
+        start_date: startDate || undefined,
+        end_date: endDate || undefined,
+      });
+      
+      if (response.success && response.data) {
+        const formattedData = response.data.map((d) => ({
+          Date: d.date,
+          Price: d.price,
+          Position: 0, // No signals
+          Portfolio_Value: d.price,
+          Capital: 0,
+          Shares: 0,
+        }));
+        setPriceData(formattedData);
+      }
+    } catch (err) {
+      console.error('Failed to load price data:', err);
+    } finally {
+      setPriceDataLoading(false);
+    }
+  }, [symbol, startDate, endDate]);
+
+  useEffect(() => {
+    loadPriceData();
+  }, [loadPriceData]);
 
   // Load saved valuations
   useEffect(() => {
@@ -243,128 +298,168 @@ const ValuationPage: React.FC = () => {
             </div>
           )}
 
-          {/* View Mode Toggle (Mobile) */}
-          {isMobile && (
-            <div className="flex gap-2 bg-bg-secondary border border-border-default rounded-lg p-2">
+          {/* Price Chart - Full Width at Top */}
+          {priceData.length > 0 && (
+            <div className="w-full">
+              {priceDataLoading ? (
+                <div className="bg-bg-secondary border border-border-default rounded-lg p-12">
+                  <div className="text-center text-text-muted">
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mb-4"></div>
+                    <p>Loading price data...</p>
+                  </div>
+                </div>
+              ) : (
+                <PriceChart
+                  data={priceData}
+                  title={`${symbol} Price Chart`}
+                  height={isMobile ? 400 : 600}
+                  useLogScale={useLogScale}
+                  onLogScaleToggle={(useLog) => {
+                    setUseLogScale(useLog);
+                    localStorage.setItem('valuationChart_useLogScale', String(useLog));
+                  }}
+                />
+              )}
+            </div>
+          )}
+
+          {/* Settings Bar (Collapsible) */}
+          <div className="bg-bg-secondary border border-border-default rounded-lg relative z-10">
+            <button
+              onClick={() => setSettingsExpanded(!settingsExpanded)}
+              className="w-full px-6 py-4 flex items-center justify-between hover:bg-bg-tertiary transition-colors rounded-t-lg"
+            >
+              <div className="flex items-center gap-3">
+                <Settings className="w-5 h-5 text-text-muted" />
+                <h3 className="text-lg font-semibold text-text-primary">Settings</h3>
+              </div>
+              {settingsExpanded ? (
+                <ChevronUp className="w-5 h-5 text-text-muted" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-text-muted" />
+              )}
+            </button>
+            
+            {settingsExpanded && (
+              <div className="border-t border-border-default p-6 rounded-b-lg">
+                <ValuationControls
+                  availableIndicators={availableIndicators}
+                  selectedIndicators={selectedIndicators}
+                  onIndicatorsChange={setSelectedIndicators}
+                  zscoreMethod={zscoreMethod}
+                  onZscoreMethodChange={setZscoreMethod}
+                  rollingWindow={rollingWindow}
+                  onRollingWindowChange={setRollingWindow}
+                  showAverage={showAverage}
+                  onShowAverageChange={setShowAverage}
+                  averageWindow={averageWindow}
+                  onAverageWindowChange={setAverageWindow}
+                  overboughtThreshold={overboughtThreshold}
+                  onOverboughtThresholdChange={setOverboughtThreshold}
+                  oversoldThreshold={oversoldThreshold}
+                  onOversoldThresholdChange={setOversoldThreshold}
+                  startDate={startDate}
+                  onStartDateChange={setStartDate}
+                  endDate={endDate}
+                  onEndDateChange={setEndDate}
+                  timeframe={timeframe}
+                  onTimeframeChange={setTimeframe}
+                  bandIndicatorId={bandIndicatorId}
+                  onBandIndicatorChange={setBandIndicatorId}
+                  symbol={symbol}
+                  onSymbolChange={setSymbol}
+                  isLoading={indicatorsLoading || zscoresLoading}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* View Mode Toggle */}
+          <div className="flex items-center justify-between">
+            <div className="bg-bg-secondary border border-border-default rounded-lg p-1 inline-flex">
               <button
                 onClick={() => setViewMode('chart')}
-                className={`flex-1 py-2 px-4 rounded text-sm font-medium transition-colors ${
+                className={`px-4 py-2 rounded text-sm font-medium transition-all duration-200 ${
                   viewMode === 'chart'
                     ? 'bg-primary-500 text-white'
-                    : 'bg-transparent text-text-secondary hover:text-text-primary'
+                    : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
                 Chart
               </button>
               <button
                 onClick={() => setViewMode('table')}
-                className={`flex-1 py-2 px-4 rounded text-sm font-medium transition-colors ${
+                className={`px-4 py-2 rounded text-sm font-medium transition-all duration-200 ${
                   viewMode === 'table'
                     ? 'bg-primary-500 text-white'
-                    : 'bg-transparent text-text-secondary hover:text-text-primary'
+                    : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
                 Table
               </button>
               <button
                 onClick={() => setViewMode('both')}
-                className={`flex-1 py-2 px-4 rounded text-sm font-medium transition-colors ${
+                className={`px-4 py-2 rounded text-sm font-medium transition-all duration-200 ${
                   viewMode === 'both'
                     ? 'bg-primary-500 text-white'
-                    : 'bg-transparent text-text-secondary hover:text-text-primary'
+                    : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
                 Both
               </button>
             </div>
-          )}
+          </div>
 
-          <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-4'}`}>
-            {/* Controls Sidebar */}
-            <div className={isMobile ? '' : 'lg:col-span-1'}>
-              <ValuationControls
-                availableIndicators={availableIndicators}
-                selectedIndicators={selectedIndicators}
-                onIndicatorsChange={setSelectedIndicators}
-                zscoreMethod={zscoreMethod}
-                onZscoreMethodChange={setZscoreMethod}
-                rollingWindow={rollingWindow}
-                onRollingWindowChange={setRollingWindow}
-                showAverage={showAverage}
-                onShowAverageChange={setShowAverage}
-                averageWindow={averageWindow}
-                onAverageWindowChange={setAverageWindow}
-                overboughtThreshold={overboughtThreshold}
-                onOverboughtThresholdChange={setOverboughtThreshold}
-                oversoldThreshold={oversoldThreshold}
-                onOversoldThresholdChange={setOversoldThreshold}
-                startDate={startDate}
-                onStartDateChange={setStartDate}
-                endDate={endDate}
-                onEndDateChange={setEndDate}
-                timeframe={timeframe}
-                onTimeframeChange={setTimeframe}
-                bandIndicatorId={bandIndicatorId}
-                onBandIndicatorChange={setBandIndicatorId}
-                symbol={symbol}
-                onSymbolChange={setSymbol}
-                isLoading={indicatorsLoading || zscoresLoading}
-              />
-            </div>
-
-            {/* Main Content Area */}
-            <div className={isMobile ? '' : 'lg:col-span-3'}>
-              <div className="space-y-6">
-                {/* Chart View */}
-                {(viewMode === 'chart' || viewMode === 'both') && (
-                  <div>
-                    {zscoresLoading ? (
-                      <div className="bg-bg-secondary border border-border-default rounded-lg p-12">
-                        <div className="text-center text-text-muted">
-                          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mb-4"></div>
-                          <p>Calculating z-scores...</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <ValuationChart
-                        data={zscoreData}
-                        availableIndicators={availableIndicators}
-                        selectedIndicators={selectedIndicators}
-                        showAverage={showAverage}
-                        bandIndicatorId={bandIndicatorId}
-                        overboughtThreshold={overboughtThreshold}
-                        oversoldThreshold={oversoldThreshold}
-                        height={isMobile ? 400 : 600}
-                      />
-                    )}
+          {/* Z-Score Chart/Table Content */}
+          <div className="space-y-6">
+            {/* Chart View */}
+            {(viewMode === 'chart' || viewMode === 'both') && (
+              <div>
+                {zscoresLoading ? (
+                  <div className="bg-bg-secondary border border-border-default rounded-lg p-12">
+                    <div className="text-center text-text-muted">
+                      <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mb-4"></div>
+                      <p>Calculating z-scores...</p>
+                    </div>
                   </div>
-                )}
-
-                {/* Table View */}
-                {(viewMode === 'table' || viewMode === 'both') && (
-                  <div>
-                    {zscoresLoading ? (
-                      <div className="bg-bg-secondary border border-border-default rounded-lg p-12">
-                        <div className="text-center text-text-muted">
-                          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mb-4"></div>
-                          <p>Calculating z-scores...</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <ValuationTable
-                        data={zscoreData}
-                        averages={averages}
-                        availableIndicators={availableIndicators}
-                        selectedIndicators={selectedIndicators}
-                        showAverage={showAverage}
-                        overboughtThreshold={overboughtThreshold}
-                        oversoldThreshold={oversoldThreshold}
-                      />
-                    )}
-                  </div>
+                ) : (
+                  <ValuationChart
+                    data={zscoreData}
+                    availableIndicators={availableIndicators}
+                    selectedIndicators={selectedIndicators}
+                    showAverage={showAverage}
+                    bandIndicatorId={bandIndicatorId}
+                    overboughtThreshold={overboughtThreshold}
+                    oversoldThreshold={oversoldThreshold}
+                    height={isMobile ? 400 : 600}
+                  />
                 )}
               </div>
-            </div>
+            )}
+
+            {/* Table View */}
+            {(viewMode === 'table' || viewMode === 'both') && (
+              <div>
+                {zscoresLoading ? (
+                  <div className="bg-bg-secondary border border-border-default rounded-lg p-12">
+                    <div className="text-center text-text-muted">
+                      <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mb-4"></div>
+                      <p>Calculating z-scores...</p>
+                    </div>
+                  </div>
+                ) : (
+                  <ValuationTable
+                    data={zscoreData}
+                    averages={averages}
+                    availableIndicators={availableIndicators}
+                    selectedIndicators={selectedIndicators}
+                    showAverage={showAverage}
+                    overboughtThreshold={overboughtThreshold}
+                    oversoldThreshold={oversoldThreshold}
+                  />
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
