@@ -130,7 +130,7 @@ export const IndicatorSignalPanel: React.FC<IndicatorSignalPanelProps> = ({
         color: '#9CA3AF',
         gridcolor: '#374151',
         showgrid: true,
-        tickmode: 'array',
+        tickmode: 'array' as const,
         tickvals: indicators.map((_, index) => index + 1),
         ticktext: indicators.map((ind, index) => `${index + 1}. ${ind.name}`),
         range: [0.5, indicators.length + 0.5],
