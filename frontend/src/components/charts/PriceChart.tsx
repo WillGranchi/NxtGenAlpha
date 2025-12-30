@@ -59,19 +59,22 @@ export const PriceChart: React.FC<PriceChartProps> = ({
     const prices = data.map(d => d.Price);
     
     // Find buy and sell signals
+    // Buy signals: transitions to Long (1) from Neutral (0) or Short (-1)
+    // Sell signals: transitions to Neutral (0) or Short (-1) from Long (1)
     const buySignals: { x: string[], y: number[] } = { x: [], y: [] };
     const sellSignals: { x: string[], y: number[] } = { x: [], y: [] };
     
     for (let i = 1; i < data.length; i++) {
-      const prevPosition = data[i - 1].Position;
-      const currentPosition = data[i].Position;
+      const prevPosition = data[i - 1].Position ?? 0;
+      const currentPosition = data[i].Position ?? 0;
       
-      if (prevPosition === 0 && currentPosition === 1) {
-        // Buy signal
+      // Buy signal: transition to Long (1) from Neutral (0) or Short (-1)
+      if (prevPosition !== 1 && currentPosition === 1) {
         buySignals.x.push(dates[i]);
         buySignals.y.push(prices[i]);
-      } else if (prevPosition === 1 && currentPosition === 0) {
-        // Sell signal
+      }
+      // Sell signal: transition from Long (1) to Neutral (0) or Short (-1)
+      else if (prevPosition === 1 && currentPosition !== 1) {
         sellSignals.x.push(dates[i]);
         sellSignals.y.push(prices[i]);
       }
@@ -221,6 +224,15 @@ export const PriceChart: React.FC<PriceChartProps> = ({
         showgrid: true,
       },
       hovermode: 'x unified' as const,
+      hoverlabel: {
+        bgcolor: 'rgba(31, 41, 55, 0.95)',
+        bordercolor: '#4B5563',
+        font: {
+          color: '#F3F4F6',
+          family: 'Inter, system-ui, sans-serif',
+          size: 12,
+        },
+      },
       showlegend: !isMobile && showOverlayLegend,
       legend: {
         x: 1.02,
@@ -283,11 +295,21 @@ export const PriceChart: React.FC<PriceChartProps> = ({
         .js-plotly-plot .plotly .modebar {
           display: none !important;
         }
-        .js-plotly-plot .plotly .hoverlayer .hovertext {
+        .js-plotly-plot .hoverlayer .hovertext {
           background-color: rgba(31, 41, 55, 0.95) !important;
           border: 1px solid #4B5563 !important;
+          border-radius: 6px !important;
+          padding: 8px 12px !important;
           color: #F3F4F6 !important;
-          font-family: Inter, system-ui, sans-serif !important;
+          font-family: 'Inter', system-ui, sans-serif !important;
+          font-size: 12px !important;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2) !important;
+        }
+        .js-plotly-plot .hoverlayer .hovertext .name {
+          color: #F3F4F6 !important;
+        }
+        .js-plotly-plot .hoverlayer .hovertext .nums {
+          color: #D1D5DB !important;
         }
       `}</style>
     </div>
