@@ -4,10 +4,11 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { ChevronDown, ChevronUp, Search } from 'lucide-react';
+import { ChevronDown, ChevronUp, Search, RefreshCw } from 'lucide-react';
 import { DateRangePicker } from '../DateRangePicker';
 import { TokenSelector } from '../TokenSelector';
 import { Input } from '../ui/Input';
+import { Button } from '../ui/Button';
 import { ValuationIndicator } from '../../hooks/useValuation';
 
 interface ValuationControlsProps {
@@ -37,6 +38,8 @@ interface ValuationControlsProps {
   symbol: string;
   onSymbolChange: (symbol: string) => void;
   isLoading?: boolean;
+  onRefreshData?: () => Promise<void>;
+  isRefreshingData?: boolean;
 }
 
 export const ValuationControls: React.FC<ValuationControlsProps> = ({
@@ -66,6 +69,8 @@ export const ValuationControls: React.FC<ValuationControlsProps> = ({
   symbol,
   onSymbolChange,
   isLoading = false,
+  onRefreshData,
+  isRefreshingData = false,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
@@ -220,9 +225,23 @@ export const ValuationControls: React.FC<ValuationControlsProps> = ({
 
       {/* Date Range */}
       <div>
-        <label className="block text-sm font-medium text-text-secondary mb-2">
-          Date Range
-        </label>
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-sm font-medium text-text-secondary">
+            Date Range
+          </label>
+          {onRefreshData && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onRefreshData}
+              disabled={isRefreshingData}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshingData ? 'animate-spin' : ''}`} />
+              {isRefreshingData ? 'Refreshing...' : 'Refresh Data'}
+            </Button>
+          )}
+        </div>
         <DateRangePicker
           startDate={startDate}
           endDate={endDate}

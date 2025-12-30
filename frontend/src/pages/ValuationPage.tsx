@@ -15,7 +15,7 @@ import { useMobile } from '../hooks/useMobile';
 import { useAuth } from '../hooks/useAuth';
 import TradingAPI from '../services/api';
 import { Button } from '../components/ui/Button';
-import { Save, Loader2, ChevronDown, ChevronUp, Settings } from 'lucide-react';
+import { Save, Loader2, ChevronDown, ChevronUp, Settings, RefreshCw } from 'lucide-react';
 
 const ValuationPage: React.FC = () => {
   const { isMobile } = useMobile();
@@ -105,10 +105,22 @@ const ValuationPage: React.FC = () => {
     setSettingsExpanded(!isMobile);
   }, [isMobile]);
 
+  const [initialLoadAttempted, setInitialLoadAttempted] = useState<boolean>(false);
+
   // Load price data for the top chart
-  const loadPriceData = useCallback(async () => {
+  const loadPriceData = useCallback(async (forceRefresh: boolean = false) => {
     setPriceDataLoading(true);
     try {
+      // If force refresh is requested, refresh data from Yahoo Finance first
+      if (forceRefresh) {
+        try {
+          await TradingAPI.refreshData(symbol, true);
+        } catch (refreshErr) {
+          console.warn('Failed to refresh data:', refreshErr);
+          // Continue to load existing data even if refresh fails
+        }
+      }
+
       const response = await TradingAPI.getValuationData({
         symbol,
         indicators: [], // No indicators, just price
@@ -134,9 +146,21 @@ const ValuationPage: React.FC = () => {
     }
   }, [symbol, startDate, endDate]);
 
+  // Auto-load Yahoo Finance data on initial page load
   useEffect(() => {
-    loadPriceData();
-  }, [loadPriceData]);
+    if (!initialLoadAttempted) {
+      setInitialLoadAttempted(true);
+      // Automatically refresh and load data on first page load
+      loadPriceData(true);
+    }
+  }, []); // Only run once on mount
+
+  // Reload data when symbol, startDate, or endDate changes (but don't force refresh)
+  useEffect(() => {
+    if (initialLoadAttempted) {
+      loadPriceData(false);
+    }
+  }, [symbol, startDate, endDate, initialLoadAttempted, loadPriceData]);
 
   // Load saved valuations
   useEffect(() => {
@@ -214,6 +238,21 @@ const ValuationPage: React.FC = () => {
       alert(`Valuation "${valuation.name}" loaded successfully!`);
     } catch (err: any) {
       alert(err.response?.data?.detail || 'Failed to load valuation');
+    }
+  };
+
+  // Handle manual data refresh
+  const handleRefreshData = async () => {
+    setPriceDataLoading(true);
+    try {
+      // Force refresh from Yahoo Finance
+      await TradingAPI.refreshData(symbol, true);
+      // Reload price data after refresh
+      await loadPriceData(false);
+    } catch (err: any) {
+      console.error('Failed to refresh data:', err);
+    } finally {
+      setPriceDataLoading(false);
     }
   };
 
@@ -369,6 +408,8 @@ const ValuationPage: React.FC = () => {
                   symbol={symbol}
                   onSymbolChange={setSymbol}
                   isLoading={indicatorsLoading || zscoresLoading}
+                  onRefreshData={handleRefreshData}
+                  isRefreshingData={priceDataLoading}
                 />
               </div>
             )}
