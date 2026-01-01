@@ -186,7 +186,7 @@ def calculate_technical_indicator(df: pd.DataFrame, indicator_id: str, params: D
     elif indicator_id == 'rapr_metrics1':
         metric_lookback = params.get('metric_lookback', 20)
         valuation_lookback = params.get('valuation_lookback', 0)
-        from backend.core.pinescript_indicators import rapr_1
+        from backend.core.indicators import rapr_1
         rapr1_results = rapr_1(df['Close'], metric_lookback, valuation_lookback)
         # Average of Sharpe, Sortino, and Omega z-scores from RAPR1 (metrics1)
         metrics1 = (
@@ -198,7 +198,7 @@ def calculate_technical_indicator(df: pd.DataFrame, indicator_id: str, params: D
     elif indicator_id == 'rapr_metrics2':
         metric_lookback = params.get('metric_lookback', 20)
         valuation_lookback = params.get('valuation_lookback', 0)
-        from backend.core.pinescript_indicators import rapr_2
+        from backend.core.indicators import rapr_2
         rapr2_results = rapr_2(df['Close'], metric_lookback, valuation_lookback)
         # Average of Sharpe, Sortino, and Omega z-scores from RAPR2 (metrics2)
         metrics2 = (
@@ -274,6 +274,7 @@ async def calculate_valuation_zscores(request: ValuationZScoreRequest) -> Valuat
             )
         
         # Calculate indicators and z-scores
+        # Note: All indicators in TECHNICAL_INDICATORS already return z-scores (PineScript f_zscore_valuation model)
         indicator_values = {}
         indicator_zscores = {}
         
@@ -289,18 +290,16 @@ async def calculate_valuation_zscores(request: ValuationZScoreRequest) -> Valuat
                 # Ensure index alignment
                 indicator_series = indicator_series.reindex(df.index)
                 
-                # Calculate z-score
-                zscore_series = calculate_indicator_zscore(
-                    indicator_series,
-                    method=request.zscore_method,
-                    window=request.rolling_window
-                )
+                # All indicators already return z-scores, so use them directly
+                # No need to recalculate z-scores on top of z-scores
+                zscore_series = indicator_series
                 
                 indicator_values[indicator_id] = indicator_series
                 indicator_zscores[indicator_id] = zscore_series
                 
             except Exception as e:
                 logger.error(f"Error calculating indicator {indicator_id}: {e}", exc_info=True)
+                logger.error(f"Error details: {str(e)}", exc_info=True)
                 continue
         
         if not indicator_zscores:
