@@ -192,13 +192,13 @@ class CoinGlassClient:
         # Map symbol to CoinGlass format
         coinglass_symbol = self._map_symbol_to_coinglass(symbol)
         
-        # Try different possible endpoint paths
-        # CoinGlass API v4 might use different endpoint structures
+        # Try different possible endpoint paths based on CoinGlass API v4 documentation
+        # According to docs: Futures > Trading Market > Price History (OHLC)
         endpoints_to_try = [
-            "/api/futures/trading-market/price-history-ohlc",
-            "/api/futures/trading-market/price-ohlc-history", 
-            "/api/spots/trading-market/price-ohlc-history",
-            "/api/futures/trading-market/coins-markets"  # Alternative endpoint
+            "/api/futures/trading-market/price-history-ohlc",  # Most likely based on docs structure
+            "/api/futures/trading-market/price-ohlc-history",
+            "/api/spots/trading-market/price-ohlc-history",  # Spot market alternative
+            "/api/futures/trading-market/pairs-markets",  # Alternative: pairs markets endpoint
         ]
         
         params = {
@@ -546,10 +546,25 @@ class CoinGlassClient:
         """
         try:
             # Try to get supported coins list (should be a simple endpoint)
-            endpoint = "/api/futures/trading-market/supported-coins"
-            data = self._make_request(endpoint, {})
-            logger.info(f"CoinGlass API connection test successful")
-            return True
+            endpoints_to_try = [
+                "/api/futures/trading-market/supported-coins",
+                "/api/futures/supported-coins",
+                "/api/spots/trading-market/supported-coins"
+            ]
+            
+            for endpoint in endpoints_to_try:
+                try:
+                    logger.debug(f"Testing CoinGlass connection with endpoint: {endpoint}")
+                    data = self._make_request(endpoint, {})
+                    logger.info(f"CoinGlass API connection test successful using endpoint: {endpoint}")
+                    logger.debug(f"Test response: {str(data)[:200]}")
+                    return True
+                except Exception as e:
+                    logger.debug(f"Endpoint {endpoint} failed: {e}")
+                    continue
+            
+            logger.error("CoinGlass API connection test failed for all endpoints")
+            return False
         except Exception as e:
             logger.error(f"CoinGlass API connection test failed: {e}")
             return False

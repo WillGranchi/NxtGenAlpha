@@ -240,6 +240,60 @@ async def refresh_data(
         )
 
 
+@router.get("/test-coinglass")
+async def test_coinglass_connection() -> Dict[str, Any]:
+    """
+    Test CoinGlass API connection and endpoint availability.
+    
+    Returns:
+        Dict: Connection test results
+    """
+    try:
+        from backend.core.coinglass_client import get_coinglass_client
+        
+        client = get_coinglass_client()
+        
+        # Test connection
+        connection_ok = client.test_connection()
+        
+        # Try to fetch a small amount of data
+        test_data = None
+        test_error = None
+        try:
+            from datetime import datetime, timedelta
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=7)  # Just 7 days for testing
+            
+            test_data = client.get_price_history(
+                symbol="BTCUSDT",
+                start_date=start_date,
+                end_date=end_date,
+                interval="1d"
+            )
+        except Exception as e:
+            test_error = str(e)
+            logger.error(f"CoinGlass data fetch test failed: {e}", exc_info=True)
+        
+        return {
+            "success": True,
+            "connection_test": connection_ok,
+            "api_key_configured": bool(client.api_key),
+            "api_key_preview": client.api_key[:8] + "..." if client.api_key else "Not set",
+            "base_url": client.base_url,
+            "test_data_fetch": {
+                "success": test_data is not None and not test_data.empty,
+                "records": len(test_data) if test_data is not None else 0,
+                "error": test_error
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error testing CoinGlass connection: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to test CoinGlass connection: {str(e)}"
+        )
+
+
 @router.get("/status")
 async def get_data_status(symbol: Optional[str] = Query(default="BTCUSDT", description="Cryptocurrency symbol")) -> Dict[str, Any]:
     """
