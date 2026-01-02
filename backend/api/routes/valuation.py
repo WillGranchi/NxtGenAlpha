@@ -255,8 +255,29 @@ async def calculate_valuation_zscores(request: ValuationZScoreRequest) -> Valuat
         ValuationZScoreResponse: Time series data with z-scores
     """
     try:
+        # Validate request
+        if not request.indicators or len(request.indicators) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="At least one indicator must be selected"
+            )
+        
+        # Validate that all requested indicators are available
+        invalid_indicators = [ind for ind in request.indicators if ind not in TECHNICAL_INDICATORS]
+        if invalid_indicators:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid indicators: {invalid_indicators}. Available indicators: {list(TECHNICAL_INDICATORS.keys())}"
+            )
+        
         # Load price data
         df = load_crypto_data(symbol=request.symbol)
+        
+        if df is None or len(df) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"No price data available for symbol {request.symbol}"
+            )
         
         # Filter by date range if provided
         if request.start_date:
@@ -273,6 +294,8 @@ async def calculate_valuation_zscores(request: ValuationZScoreRequest) -> Valuat
                 detail="No data available for the specified date range"
             )
         
+        logger.info(f"Processing {len(request.indicators)} indicators for {len(df)} data points")
+        
         # Calculate indicators and z-scores
         # Note: All indicators in TECHNICAL_INDICATORS already return z-scores (PineScript f_zscore_valuation model)
         indicator_values = {}
@@ -284,11 +307,19 @@ async def calculate_valuation_zscores(request: ValuationZScoreRequest) -> Valuat
                 if indicator_id in TECHNICAL_INDICATORS:
                     indicator_series = calculate_technical_indicator(df, indicator_id)
                 else:
-                    logger.warning(f"Unknown indicator: {indicator_id}")
+                    logger.warning(f"Unknown indicator: {indicator_id}, skipping")
+                    continue
+                
+                # Validate the calculated series
+                if indicator_series is None or len(indicator_series) == 0:
+                    logger.warning(f"Indicator {indicator_id} returned empty series, skipping")
                     continue
                 
                 # Ensure index alignment
                 indicator_series = indicator_series.reindex(df.index)
+                
+                # Replace Inf and NaN with 0
+                indicator_series = indicator_series.replace([np.inf, -np.inf], 0).fillna(0)
                 
                 # All indicators already return z-scores, so use them directly
                 # No need to recalculate z-scores on top of z-scores
@@ -297,15 +328,20 @@ async def calculate_valuation_zscores(request: ValuationZScoreRequest) -> Valuat
                 indicator_values[indicator_id] = indicator_series
                 indicator_zscores[indicator_id] = zscore_series
                 
+                logger.info(f"Successfully calculated indicator {indicator_id}: {len(indicator_series)} values")
+                
             except Exception as e:
                 logger.error(f"Error calculating indicator {indicator_id}: {e}", exc_info=True)
-                logger.error(f"Error details: {str(e)}", exc_info=True)
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
                 continue
         
         if not indicator_zscores:
+            error_msg = f"No valid indicators could be calculated. Requested indicators: {request.indicators}. Available indicators: {list(TECHNICAL_INDICATORS.keys())}"
+            logger.error(error_msg)
             raise HTTPException(
                 status_code=400,
-                detail="No valid indicators could be calculated"
+                detail=error_msg
             )
         
         # Calculate average z-score if requested
@@ -358,6 +394,14 @@ async def calculate_valuation_zscores(request: ValuationZScoreRequest) -> Valuat
                     price=price,
                     indicators=indicators_dict
                 ))
+        
+        if not data_points:
+            error_msg = f"No data points could be generated. This might be due to all values being NaN or invalid date range."
+            logger.error(error_msg)
+            raise HTTPException(
+                status_code=400,
+                detail=error_msg
+            )
         
         # Calculate averages
         averages = calculate_average_zscore(indicator_zscores)
