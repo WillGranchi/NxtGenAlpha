@@ -18,7 +18,10 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 # CoinGlass API Configuration
+# Base URL: According to docs, V4 uses open-api-v4.coinglass.com
+# But some endpoints might use open-api.coinglass.com - try both
 COINGLASS_BASE_URL = "https://open-api-v4.coinglass.com"
+COINGLASS_BASE_URL_ALT = "https://open-api.coinglass.com"  # Alternative base URL
 COINGLASS_API_KEY = os.getenv("COINGLASS_API_KEY", "0e38a988ab2641aab8b4dd265eef9f62")
 
 # Rate limiting: Hobbyist tier = 30 requests/minute
@@ -129,9 +132,17 @@ class CoinGlassClient:
                     error_msg = f"CoinGlass API error {response.status_code}"
                     try:
                         error_data = response.json()
-                        error_msg += f": {error_data.get('message', 'Unknown error')}"
+                        error_msg += f": {error_data.get('message', error_data.get('error', 'Unknown error'))}"
+                        # Log full error response for debugging
+                        logger.error(f"CoinGlass API error response: {error_data}")
                     except:
-                        error_msg += f": {response.text[:200]}"
+                        error_text = response.text[:500]
+                        error_msg += f": {error_text}"
+                        logger.error(f"CoinGlass API error response (non-JSON): {error_text}")
+                    
+                    # Log request details for debugging
+                    logger.error(f"CoinGlass API request failed - URL: {url}, Params: {params}, Status: {response.status_code}")
+                    logger.error(f"Response headers: {dict(response.headers)}")
                     
                     if attempt < max_retries:
                         wait_time = retry_delay * (2 ** attempt)
@@ -194,11 +205,13 @@ class CoinGlassClient:
         
         # Try different possible endpoint paths based on CoinGlass API v4 documentation
         # According to docs: Futures > Trading Market > Price History (OHLC)
+        # Note: CoinGlass API v4 endpoints may vary - trying multiple variations
         endpoints_to_try = [
-            "/api/futures/trading-market/price-history-ohlc",  # Most likely based on docs structure
+            "/api/futures/trading-market/price-history-ohlc",  # Based on docs structure
             "/api/futures/trading-market/price-ohlc-history",
+            "/api/futures/trading-market/pairs-markets",  # Pairs markets might have price data
             "/api/spots/trading-market/price-ohlc-history",  # Spot market alternative
-            "/api/futures/trading-market/pairs-markets",  # Alternative: pairs markets endpoint
+            "/api/futures/coins-markets",  # Alternative endpoint
         ]
         
         params = {
@@ -216,28 +229,44 @@ class CoinGlassClient:
         # Try each endpoint until one works
         data = None
         last_error = None
+        successful_endpoint = None
+        
         for endpoint in endpoints_to_try:
             try:
-                logger.debug(f"Trying CoinGlass endpoint: {endpoint}")
+                logger.info(f"Trying CoinGlass endpoint: {endpoint} with symbol={coinglass_symbol}")
                 data = self._make_request(endpoint, params)
-                logger.info(f"Successfully fetched data from CoinGlass endpoint: {endpoint}")
+                logger.info(f"✓ Successfully fetched data from CoinGlass endpoint: {endpoint}")
+                successful_endpoint = endpoint
                 break
             except Exception as e:
-                logger.debug(f"Endpoint {endpoint} failed: {e}")
+                error_str = str(e)
+                logger.warning(f"✗ Endpoint {endpoint} failed: {error_str}")
                 last_error = e
+                # If it's a 404, try next endpoint
+                # If it's a 400, might be parameter issue - log it but continue
+                if "404" in error_str or "not found" in error_str.lower():
+                    logger.debug(f"Endpoint {endpoint} not found (404), trying next...")
+                elif "400" in error_str:
+                    logger.warning(f"Endpoint {endpoint} returned 400 (bad request) - might be parameter issue")
                 continue
         
         if data is None:
-            error_msg = f"All CoinGlass endpoints failed. Last error: {last_error}"
+            error_msg = f"All CoinGlass endpoints failed for {symbol} (coinglass_symbol={coinglass_symbol}). Last error: {last_error}"
             logger.error(error_msg)
+            logger.error(f"Tried endpoints: {endpoints_to_try}")
+            logger.error(f"Request params were: {params}")
             raise Exception(error_msg)
+        
+        logger.info(f"Using successful CoinGlass endpoint: {successful_endpoint}")
         
         try:
             # Log the response structure for debugging
-            logger.debug(f"CoinGlass API response keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
-            logger.debug(f"CoinGlass API response type: {type(data)}")
+            logger.info(f"CoinGlass API response received - Type: {type(data)}")
             if isinstance(data, dict):
-                logger.debug(f"CoinGlass API response sample: {str(data)[:1000]}")
+                logger.info(f"CoinGlass API response keys: {list(data.keys())}")
+                logger.info(f"CoinGlass API response sample: {str(data)[:500]}")
+            else:
+                logger.info(f"CoinGlass API response (non-dict): {str(data)[:500]}")
             
             # Parse response - CoinGlass might return data in different formats
             # Try different possible response structures
@@ -246,18 +275,28 @@ class CoinGlassClient:
                 # Try "data" key first (most common)
                 if "data" in data:
                     records = data.get("data", [])
+                    logger.info(f"Found 'data' key with {len(records) if isinstance(records, list) else 'non-list'} items")
                 # Try "result" key
                 elif "result" in data:
                     result = data.get("result")
                     if isinstance(result, list):
                         records = result
+                        logger.info(f"Found 'result' key as list with {len(records)} items")
                     elif isinstance(result, dict) and "data" in result:
                         records = result.get("data", [])
+                        logger.info(f"Found 'result.data' with {len(records) if isinstance(records, list) else 'non-list'} items")
                 # Try direct list in "result"
                 elif isinstance(data.get("result"), list):
                     records = data.get("result", [])
+                    logger.info(f"Found 'result' as direct list with {len(records)} items")
+                # Check for success/error indicators
+                if "success" in data and not data.get("success"):
+                    error_msg = data.get("message", "Unknown error")
+                    logger.error(f"CoinGlass API returned success=false: {error_msg}")
+                    raise Exception(f"CoinGlass API error: {error_msg}")
             elif isinstance(data, list):
                 records = data
+                logger.info(f"Response is direct list with {len(records)} items")
             
             if not records:
                 logger.warning(f"No price data returned from CoinGlass for {symbol} (coinglass_symbol={coinglass_symbol})")
