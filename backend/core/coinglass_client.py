@@ -204,14 +204,15 @@ class CoinGlassClient:
         coinglass_symbol = self._map_symbol_to_coinglass(symbol)
         
         # Try different possible endpoint paths based on CoinGlass API v4 documentation
-        # According to docs: Futures > Trading Market > Price History (OHLC)
-        # Note: CoinGlass API v4 endpoints may vary - trying multiple variations
+        # According to docs:
+        # - Futures > Trading Market > Price History (OHLC) -> /api/futures/trading-market/price-history-ohlc
+        # - Spots > Trading market > Price OHLC History -> /api/spot/trading-market/price-ohlc-history
+        # Note: "spot" (singular) not "spots" (plural) for spot endpoints
         endpoints_to_try = [
-            "/api/futures/trading-market/price-history-ohlc",  # Based on docs structure
-            "/api/futures/trading-market/price-ohlc-history",
+            "/api/futures/trading-market/price-history-ohlc",  # Futures price history (from docs)
+            "/api/spot/trading-market/price-ohlc-history",  # Spot price history (from docs)
+            "/api/futures/trading-market/price-ohlc-history",  # Alternative futures format
             "/api/futures/trading-market/pairs-markets",  # Pairs markets might have price data
-            "/api/spots/trading-market/price-ohlc-history",  # Spot market alternative
-            "/api/futures/coins-markets",  # Alternative endpoint
         ]
         
         params = {
@@ -268,15 +269,22 @@ class CoinGlassClient:
             else:
                 logger.info(f"CoinGlass API response (non-dict): {str(data)[:500]}")
             
-            # Parse response - CoinGlass might return data in different formats
-            # Try different possible response structures
-            records = None
+            # Parse response - CoinGlass API v4 uses {"code": "0", "msg": "success", "data": [...]} format
+            # Check for error codes first
             if isinstance(data, dict):
-                # Try "data" key first (most common)
+                code = data.get("code")
+                msg = data.get("msg", "")
+                
+                # CoinGlass uses "0" for success, other codes indicate errors
+                if code != "0" and code != 0:
+                    error_msg = f"CoinGlass API error (code={code}): {msg}"
+                    logger.error(error_msg)
+                    raise Exception(error_msg)
+                
+                # Extract data from response
                 if "data" in data:
                     records = data.get("data", [])
                     logger.info(f"Found 'data' key with {len(records) if isinstance(records, list) else 'non-list'} items")
-                # Try "result" key
                 elif "result" in data:
                     result = data.get("result")
                     if isinstance(result, list):
@@ -285,18 +293,15 @@ class CoinGlassClient:
                     elif isinstance(result, dict) and "data" in result:
                         records = result.get("data", [])
                         logger.info(f"Found 'result.data' with {len(records) if isinstance(records, list) else 'non-list'} items")
-                # Try direct list in "result"
-                elif isinstance(data.get("result"), list):
-                    records = data.get("result", [])
-                    logger.info(f"Found 'result' as direct list with {len(records)} items")
-                # Check for success/error indicators
-                if "success" in data and not data.get("success"):
-                    error_msg = data.get("message", "Unknown error")
-                    logger.error(f"CoinGlass API returned success=false: {error_msg}")
-                    raise Exception(f"CoinGlass API error: {error_msg}")
+                else:
+                    # No data found in response
+                    logger.warning(f"CoinGlass response has no 'data' or 'result' key. Available keys: {list(data.keys())}")
+                    records = None
             elif isinstance(data, list):
                 records = data
                 logger.info(f"Response is direct list with {len(records)} items")
+            else:
+                records = None
             
             if not records:
                 logger.warning(f"No price data returned from CoinGlass for {symbol} (coinglass_symbol={coinglass_symbol})")
@@ -585,10 +590,12 @@ class CoinGlassClient:
         """
         try:
             # Try to get supported coins list (should be a simple endpoint)
+            # Based on docs: /api/spot/supported-coins and /api/futures/supported-coins
             endpoints_to_try = [
                 "/api/futures/trading-market/supported-coins",
                 "/api/futures/supported-coins",
-                "/api/spots/trading-market/supported-coins"
+                "/api/spot/supported-coins",  # Note: "spot" not "spots"
+                "/api/spot/trading-market/supported-coins"
             ]
             
             for endpoint in endpoints_to_try:
