@@ -61,12 +61,14 @@ CORS_ORIGINS=https://nxtgenalpha.com
 ENVIRONMENT=production
 COOKIE_SECURE=true
 COOKIE_SAMESITE=lax
+COINGLASS_API_KEY=0e38a988ab2641aab8b4dd265eef9f62
 ```
 
 **Important Notes:**
 - Replace `${{Postgres.DATABASE_URL}}` with the actual DATABASE_URL from Step 2, OR use Railway's variable reference: `${{Postgres.DATABASE_URL}}`
 - Replace `your-production-client-id-here` and `your-production-client-secret-here` with your actual Google OAuth credentials
-- Mark `JWT_SECRET_KEY` and `GOOGLE_CLIENT_SECRET` as "Secret" (click the eye icon)
+- Mark `JWT_SECRET_KEY`, `GOOGLE_CLIENT_SECRET`, and `COINGLASS_API_KEY` as "Secret" (click the eye icon)
+- `COINGLASS_API_KEY` is required for CoinGlass API V4 data fetching (hobbyist tier: 30 requests/minute)
 
 #### 3.3 Verify Start Command
 
