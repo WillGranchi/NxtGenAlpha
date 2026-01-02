@@ -23,6 +23,7 @@ try:
 except ImportError:
     YFINANCE_AVAILABLE = False
 from .data_quality import validate_data_quality, cross_validate_sources, calculate_quality_score
+from .coinglass_client import get_coinglass_client
 
 
 # Global variable to track last update time per symbol
@@ -649,6 +650,156 @@ def get_yahoo_finance_ticker(symbol: str) -> Optional[str]:
     return symbol_to_yahoo.get(symbol)
 
 
+def fetch_crypto_data_from_coinglass(
+    symbol: str = "BTCUSDT",
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None
+) -> pd.DataFrame:
+    """
+    Fetch cryptocurrency historical data from CoinGlass API.
+    
+    Args:
+        symbol: Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
+        start_date: Start date for historical data (defaults to 5 years back or token launch)
+        end_date: End date (defaults to today)
+        
+    Returns:
+        DataFrame with OHLCV data (Open, High, Low, Close, Volume)
+        
+    Raises:
+        Exception: If API request fails
+    """
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Default date range
+        if end_date is None:
+            end_date = datetime.now()
+        if start_date is None:
+            # Default to 5 years back or token launch date
+            start_date, _ = calculate_historical_range(symbol, years=5)
+        
+        logger.info(f"Fetching {symbol} data from CoinGlass from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}...")
+        
+        # Get CoinGlass client
+        client = get_coinglass_client()
+        
+        # Fetch price history
+        df = client.get_price_history(
+            symbol=symbol,
+            start_date=start_date,
+            end_date=end_date,
+            interval="1d"
+        )
+        
+        if df.empty:
+            raise ValueError(f"No data returned from CoinGlass for {symbol}")
+        
+        # Ensure we have required columns
+        required_columns = ["Open", "High", "Low", "Close", "Volume"]
+        for col in required_columns:
+            if col not in df.columns:
+                if col == "Volume":
+                    df[col] = 0.0
+                else:
+                    # Use Close as fallback for missing OHLC
+                    df[col] = df.get("Close", 0.0)
+        
+        # Validate data quality
+        if len(df) == 0:
+            raise ValueError(f"Empty DataFrame returned from CoinGlass for {symbol}")
+        
+        # Remove any invalid values
+        df = df.replace([np.inf, -np.inf], np.nan)
+        df = df.ffill().bfill()
+        
+        # Ensure dates are in correct format
+        if not isinstance(df.index, pd.DatetimeIndex):
+            df.index = pd.to_datetime(df.index)
+        
+        # Remove timezone if present
+        if df.index.tz is not None:
+            df.index = df.index.tz_localize(None)
+        
+        # Filter to requested date range
+        df = df[(df.index >= start_date) & (df.index <= end_date)]
+        
+        # Sort by date
+        df.sort_index(inplace=True)
+        
+        # Remove duplicates
+        df = df[~df.index.duplicated(keep='last')]
+        
+        logger.info(f"Successfully fetched {len(df)} rows from CoinGlass ({df.index.min()} to {df.index.max()})")
+        
+        return df
+        
+    except Exception as e:
+        logger.error(f"Error fetching {symbol} data from CoinGlass: {e}", exc_info=True)
+        raise Exception(f"Failed to fetch {symbol} data from CoinGlass: {str(e)}")
+
+
+def fetch_coinglass_additional_metrics(
+    symbol: str = "BTCUSDT",
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None
+) -> Dict[str, pd.Series]:
+    """
+    Fetch additional metrics from CoinGlass API (funding rates, open interest, etc.).
+    
+    Args:
+        symbol: Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
+        start_date: Start date for historical data
+        end_date: End date (defaults to today)
+        
+    Returns:
+        Dictionary mapping metric names to pandas Series with date index
+    """
+    logger = logging.getLogger(__name__)
+    
+    if end_date is None:
+        end_date = datetime.now()
+    if start_date is None:
+        start_date, _ = calculate_historical_range(symbol, years=5)
+    
+    metrics = {}
+    
+    try:
+        client = get_coinglass_client()
+        
+        # Fetch funding rate
+        logger.info(f"Fetching funding rate data from CoinGlass for {symbol}...")
+        funding_rate = client.get_funding_rate_history(symbol, start_date, end_date)
+        if not funding_rate.empty:
+            metrics["FundingRate"] = funding_rate
+        
+        # Fetch open interest
+        logger.info(f"Fetching open interest data from CoinGlass for {symbol}...")
+        open_interest = client.get_open_interest_history(symbol, start_date, end_date)
+        if not open_interest.empty:
+            metrics["OpenInterest"] = open_interest
+        
+        # Fetch long/short ratio
+        logger.info(f"Fetching long/short ratio data from CoinGlass for {symbol}...")
+        long_short_ratio = client.get_long_short_ratio(symbol, start_date, end_date)
+        if not long_short_ratio.empty:
+            metrics["LongShortRatio"] = long_short_ratio
+        
+        # Fetch liquidation data
+        logger.info(f"Fetching liquidation data from CoinGlass for {symbol}...")
+        liquidation = client.get_liquidation_history(symbol, start_date, end_date)
+        if not liquidation.empty:
+            metrics["LiquidationVolume"] = liquidation
+        
+        logger.info(f"Successfully fetched {len(metrics)} additional metrics from CoinGlass for {symbol}")
+        
+    except Exception as e:
+        logger.warning(f"Error fetching additional metrics from CoinGlass: {e}")
+        # Return empty dict on error - don't fail the whole operation
+    
+    return metrics
+
+
 def fetch_crypto_data_from_yahoo_finance(
     symbol: str = "BTCUSDT",
     start_date: Optional[datetime] = None,
@@ -987,17 +1138,19 @@ def fetch_crypto_data_smart(
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
     use_cache: bool = True,
-    cross_validate: bool = True
+    cross_validate: bool = True,
+    include_additional_metrics: bool = False
 ) -> Tuple[pd.DataFrame, str, Dict]:
     """
-    Smart data fetching strategy that uses Yahoo Finance as primary source.
+    Smart data fetching strategy that uses CoinGlass as primary source.
     
     Priority:
-    1. Fetch data from Yahoo Finance (primary source - free, reliable, good coverage)
-    2. Fallback to CoinGecko if Yahoo Finance fails
-    3. Cross-validate with CryptoCompare (optional, for quality assurance)
-    4. Merge, deduplicate, and validate quality
-    5. Cache result
+    1. Fetch data from CoinGlass (primary source - comprehensive market data)
+    2. Fallback to Yahoo Finance if CoinGlass fails
+    3. Fallback to CoinGecko if Yahoo Finance fails
+    4. Cross-validate with CryptoCompare (optional, for quality assurance)
+    5. Merge, deduplicate, and validate quality
+    6. Cache result
     
     Args:
         symbol: Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
@@ -1005,6 +1158,7 @@ def fetch_crypto_data_smart(
         end_date: End date (defaults to today)
         use_cache: Whether to use cached data if fresh
         cross_validate: Whether to cross-validate with CryptoCompare
+        include_additional_metrics: Whether to fetch additional metrics (funding rates, OI, etc.)
         
     Returns:
         Tuple[pd.DataFrame, str, Dict]: DataFrame, data_source, quality_metrics
@@ -1015,31 +1169,63 @@ def fetch_crypto_data_smart(
     if end_date is None:
         end_date = datetime.now()
     if start_date is None:
-        # Fetch all available data from launch date (Yahoo Finance has good historical coverage)
+        # Fetch all available data from launch date
         start_date, _ = calculate_historical_range(symbol, years=None)
     
+    df_coinglass = None
     df_yahoo = None
     df_coingecko = None
     df_cryptocompare = None
     
     sources_used = []
     
-    # Step 1: Try Yahoo Finance first (primary source - easiest and most reliable)
+    # Step 1: Try CoinGlass first (primary source - comprehensive market data)
     try:
-        logger.info(f"Fetching {symbol} data from Yahoo Finance ({start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')})...")
-        df_yahoo = fetch_crypto_data_from_yahoo_finance(
+        logger.info(f"Fetching {symbol} data from CoinGlass ({start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')})...")
+        df_coinglass = fetch_crypto_data_from_coinglass(
             symbol=symbol,
             start_date=start_date,
             end_date=end_date
         )
-        if not df_yahoo.empty:
-            sources_used.append("yahoo_finance")
-            logger.info(f"Successfully fetched {len(df_yahoo)} days from Yahoo Finance")
+        if not df_coinglass.empty:
+            sources_used.append("coinglass")
+            logger.info(f"Successfully fetched {len(df_coinglass)} days from CoinGlass")
+            
+            # Fetch additional metrics if requested
+            if include_additional_metrics:
+                try:
+                    additional_metrics = fetch_coinglass_additional_metrics(
+                        symbol=symbol,
+                        start_date=start_date,
+                        end_date=end_date
+                    )
+                    # Merge additional metrics into DataFrame
+                    for metric_name, metric_series in additional_metrics.items():
+                        if not metric_series.empty:
+                            df_coinglass[metric_name] = metric_series
+                            logger.info(f"Added {metric_name} metric to DataFrame")
+                except Exception as e:
+                    logger.warning(f"Failed to fetch additional metrics from CoinGlass: {e}")
     except Exception as e:
-        logger.warning(f"Yahoo Finance fetch failed: {e}, will try CoinGecko")
+        logger.warning(f"CoinGlass fetch failed: {e}, will try Yahoo Finance")
     
-    # Step 2: Fallback to CoinGecko if Yahoo Finance failed
-    if df_yahoo is None or df_yahoo.empty:
+    # Step 2: Fallback to Yahoo Finance if CoinGlass failed
+    if df_coinglass is None or df_coinglass.empty:
+        try:
+            logger.info(f"Fetching {symbol} data from Yahoo Finance ({start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')})...")
+            df_yahoo = fetch_crypto_data_from_yahoo_finance(
+                symbol=symbol,
+                start_date=start_date,
+                end_date=end_date
+            )
+            if not df_yahoo.empty:
+                sources_used.append("yahoo_finance")
+                logger.info(f"Successfully fetched {len(df_yahoo)} days from Yahoo Finance")
+        except Exception as e:
+            logger.warning(f"Yahoo Finance fetch failed: {e}, will try CoinGecko")
+    
+    # Step 3: Fallback to CoinGecko if both CoinGlass and Yahoo Finance failed
+    if (df_coinglass is None or df_coinglass.empty) and (df_yahoo is None or df_yahoo.empty):
         try:
             logger.info(f"Fetching {symbol} data from CoinGecko ({start_date.strftime('%Y-%m-%d')} onwards)...")
             df_coingecko = fetch_crypto_data_from_coingecko(
@@ -1053,7 +1239,7 @@ def fetch_crypto_data_smart(
         except Exception as e:
             logger.warning(f"CoinGecko fetch failed: {e}")
     
-    # Step 3: Cross-validate with CryptoCompare (optional, for quality)
+    # Step 4: Cross-validate with CryptoCompare (optional, for quality)
     days_needed = (end_date - start_date).days
     if cross_validate and days_needed <= 2000:  # CryptoCompare can fetch up to 2000 days
         try:
@@ -1069,19 +1255,21 @@ def fetch_crypto_data_smart(
         except Exception as e:
             logger.debug(f"CryptoCompare validation skipped: {e}")
     
-    # Step 4: Use Yahoo Finance data if available, otherwise CoinGecko
-    if df_yahoo is not None and not df_yahoo.empty:
+    # Step 5: Use CoinGlass data if available, otherwise Yahoo Finance, then CoinGecko
+    if df_coinglass is not None and not df_coinglass.empty:
+        df_merged = df_coinglass
+    elif df_yahoo is not None and not df_yahoo.empty:
         df_merged = df_yahoo
     elif df_coingecko is not None and not df_coingecko.empty:
         df_merged = df_coingecko
     else:
         # All sources failed
-        raise Exception(f"Failed to fetch {symbol} data from any source (Yahoo Finance or CoinGecko)")
+        raise Exception(f"Failed to fetch {symbol} data from any source (CoinGlass, Yahoo Finance, or CoinGecko)")
     
     # Filter to requested date range
     df_merged = df_merged[(df_merged.index >= start_date) & (df_merged.index <= end_date)]
     
-    # Step 5: Cross-validate quality if CryptoCompare data available
+    # Step 6: Cross-validate quality if CryptoCompare data available
     quality_metrics = validate_data_quality(df_merged, symbol)
     
     if df_cryptocompare is not None and not df_cryptocompare.empty:
@@ -1101,7 +1289,9 @@ def fetch_crypto_data_smart(
         )
     
     # Determine primary source name
-    if "yahoo_finance" in sources_used:
+    if "coinglass" in sources_used:
+        primary_source = "coinglass"
+    elif "yahoo_finance" in sources_used:
         primary_source = "yahoo_finance"
     elif "coingecko" in sources_used:
         primary_source = "coingecko"
@@ -1198,17 +1388,17 @@ def fetch_crypto_data_hybrid(symbol: str = "BTCUSDT", days: int = 1825, start_da
         raise Exception(f"Failed to fetch {symbol} data from CoinGecko: {str(e)}")
 
 
-def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int = 1825, start_date: Optional[datetime] = None) -> pd.DataFrame:
+def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int = 1825, start_date: Optional[datetime] = None, include_additional_metrics: bool = False) -> pd.DataFrame:
     """
-    Update cryptocurrency data using smart multi-source fetching (Binance + CoinGecko + CryptoCompare)
-    with quality validation. Saves to CSV and caches locally.
-    Checks if data is fresh (updated within last 24 hours) before fetching.
+    Update cryptocurrency data using CoinGlass API (primary) with Yahoo Finance/CoinGecko fallback.
+    Saves to CSV and caches locally. Checks if data is fresh (updated within last 24 hours) before fetching.
     
     Args:
         symbol (str): Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
         force (bool): Force update even if data is fresh
         days (int): Number of days of historical data to fetch (default 1825 = 5 years, ignored if start_date provided)
         start_date (datetime, optional): Specific start date to fetch from (defaults to 5 years back or token launch)
+        include_additional_metrics (bool): Whether to fetch additional metrics (funding rates, OI, etc.) from CoinGlass
         
     Returns:
         pd.DataFrame: Updated DataFrame with quality metrics
@@ -1246,13 +1436,14 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
         fetch_days = (end_date - start_date).days
         logger.info(f"Fetching {symbol} data using smart multi-source strategy from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')} ({fetch_days} days)...")
         
-        # Use smart fetching strategy (Binance + CoinGecko + CryptoCompare with quality validation)
+        # Use smart fetching strategy (CoinGlass primary, with Yahoo/CoinGecko fallback)
         df, data_source, quality_metrics = fetch_crypto_data_smart(
             symbol=symbol,
             start_date=start_date,
             end_date=end_date,
             use_cache=False,  # Force fresh fetch
-            cross_validate=True  # Enable cross-validation for quality
+            cross_validate=True,  # Enable cross-validation for quality
+            include_additional_metrics=include_additional_metrics
         )
         
         # Log data date range and quality metrics

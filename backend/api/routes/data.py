@@ -147,15 +147,17 @@ async def get_data_info(symbol: Optional[str] = Query(default="BTCUSDT", descrip
 async def refresh_data(
     symbol: Optional[str] = Query(default="BTCUSDT", description="Cryptocurrency symbol to refresh"),
     force: bool = Query(default=False, description="Force refresh even if data is fresh"),
-    start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD) to fetch historical data from (e.g., 2016-01-01)")
+    start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD) to fetch historical data from (e.g., 2016-01-01)"),
+    include_additional_metrics: bool = Query(default=False, description="Include additional metrics from CoinGlass (funding rates, open interest, etc.)")
 ) -> Dict[str, Any]:
     """
-    Manually trigger a data refresh from Yahoo Finance (with CoinGecko fallback).
+    Manually trigger a data refresh from CoinGlass API (primary source, with Yahoo Finance/CoinGecko fallback).
     
     Args:
         symbol: Trading pair symbol (default: BTCUSDT)
         force: Force refresh even if data is fresh
         start_date: Start date (YYYY-MM-DD) to fetch historical data from (defaults to token launch date)
+        include_additional_metrics: Include additional metrics from CoinGlass (funding rates, open interest, etc.)
         
     Returns:
         Dict: Refresh status and data info
@@ -182,8 +184,8 @@ async def refresh_data(
                     detail=f"Invalid start_date format. Use YYYY-MM-DD (e.g., 2016-01-01)"
                 )
         
-        logger.info(f"Manual data refresh requested for {symbol} (force={force}, start_date={start_date})")
-        df = update_crypto_data(symbol=symbol, force=force, start_date=start_dt)
+        logger.info(f"Manual data refresh requested for {symbol} (force={force}, start_date={start_date}, include_additional_metrics={include_additional_metrics})")
+        df = update_crypto_data(symbol=symbol, force=force, start_date=start_dt, include_additional_metrics=include_additional_metrics)
         
         # Clear cache AFTER refresh to ensure fresh data is available
         keys_to_remove = [k for k in _dataframe_cache.keys() if k.startswith(f"{symbol}_")]
@@ -224,7 +226,9 @@ async def refresh_data(
         logger.error(f"Error refreshing data: {e}", exc_info=True)
         error_msg = str(e)
         # Provide more helpful error messages
-        if "Yahoo Finance" in error_msg or "yfinance" in error_msg.lower():
+        if "CoinGlass" in error_msg:
+            detail_msg = f"Failed to refresh data from CoinGlass: {error_msg}. Falling back to Yahoo Finance/CoinGecko."
+        elif "Yahoo Finance" in error_msg or "yfinance" in error_msg.lower():
             detail_msg = f"Failed to refresh data from Yahoo Finance: {error_msg}. Falling back to CoinGecko."
         elif "CoinGecko" in error_msg:
             detail_msg = f"Failed to refresh data from CoinGecko: {error_msg}"
