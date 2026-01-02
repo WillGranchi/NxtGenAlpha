@@ -142,7 +142,17 @@ class CoinGlassClient:
                         raise Exception(error_msg)
                 
                 # Success
-                data = response.json()
+                try:
+                    data = response.json()
+                except Exception as e:
+                    logger.error(f"Failed to parse CoinGlass API response as JSON: {e}")
+                    logger.error(f"Response text: {response.text[:500]}")
+                    raise Exception(f"Invalid JSON response from CoinGlass API: {str(e)}")
+                
+                # Log response for debugging
+                logger.debug(f"CoinGlass API response status: {response.status_code}")
+                logger.debug(f"CoinGlass API response keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
+                
                 remaining = _rate_limiter.get_remaining_requests()
                 if remaining < 5:
                     logger.warning(f"CoinGlass API: Only {remaining} requests remaining in current window")
@@ -182,7 +192,15 @@ class CoinGlassClient:
         # Map symbol to CoinGlass format
         coinglass_symbol = self._map_symbol_to_coinglass(symbol)
         
-        endpoint = "/api/futures/trading-market/price-history-ohlc"
+        # Try different possible endpoint paths
+        # CoinGlass API v4 might use different endpoint structures
+        endpoints_to_try = [
+            "/api/futures/trading-market/price-history-ohlc",
+            "/api/futures/trading-market/price-ohlc-history", 
+            "/api/spots/trading-market/price-ohlc-history",
+            "/api/futures/trading-market/coins-markets"  # Alternative endpoint
+        ]
+        
         params = {
             "symbol": coinglass_symbol,
             "interval": interval
@@ -193,32 +211,106 @@ class CoinGlassClient:
         if end_date:
             params["endTime"] = int(end_date.timestamp() * 1000)
         
+        logger.info(f"Fetching CoinGlass price history: symbol={coinglass_symbol}, interval={interval}, start={start_date}, end={end_date}")
+        
+        # Try each endpoint until one works
+        data = None
+        last_error = None
+        for endpoint in endpoints_to_try:
+            try:
+                logger.debug(f"Trying CoinGlass endpoint: {endpoint}")
+                data = self._make_request(endpoint, params)
+                logger.info(f"Successfully fetched data from CoinGlass endpoint: {endpoint}")
+                break
+            except Exception as e:
+                logger.debug(f"Endpoint {endpoint} failed: {e}")
+                last_error = e
+                continue
+        
+        if data is None:
+            error_msg = f"All CoinGlass endpoints failed. Last error: {last_error}"
+            logger.error(error_msg)
+            raise Exception(error_msg)
+        
         try:
-            data = self._make_request(endpoint, params)
+            # Log the response structure for debugging
+            logger.debug(f"CoinGlass API response keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
+            logger.debug(f"CoinGlass API response type: {type(data)}")
+            if isinstance(data, dict):
+                logger.debug(f"CoinGlass API response sample: {str(data)[:1000]}")
             
-            # Parse response
-            if not data or "data" not in data:
-                logger.warning(f"No price data returned from CoinGlass for {symbol}")
-                return pd.DataFrame()
+            # Parse response - CoinGlass might return data in different formats
+            # Try different possible response structures
+            records = None
+            if isinstance(data, dict):
+                # Try "data" key first (most common)
+                if "data" in data:
+                    records = data.get("data", [])
+                # Try "result" key
+                elif "result" in data:
+                    result = data.get("result")
+                    if isinstance(result, list):
+                        records = result
+                    elif isinstance(result, dict) and "data" in result:
+                        records = result.get("data", [])
+                # Try direct list in "result"
+                elif isinstance(data.get("result"), list):
+                    records = data.get("result", [])
+            elif isinstance(data, list):
+                records = data
             
-            records = data.get("data", [])
             if not records:
-                logger.warning(f"Empty price data from CoinGlass for {symbol}")
+                logger.warning(f"No price data returned from CoinGlass for {symbol} (coinglass_symbol={coinglass_symbol})")
+                logger.warning(f"Full response structure: {str(data)[:1000]}")
                 return pd.DataFrame()
             
             # Convert to DataFrame
             df_data = []
             for record in records:
-                # CoinGlass OHLC format: [timestamp, open, high, low, close, volume]
-                if isinstance(record, list) and len(record) >= 6:
-                    df_data.append({
-                        "Date": pd.Timestamp(record[0], unit="ms"),
-                        "Open": float(record[1]),
-                        "High": float(record[2]),
-                        "Low": float(record[3]),
-                        "Close": float(record[4]),
-                        "Volume": float(record[5]) if len(record) > 5 else 0.0
-                    })
+                try:
+                    # CoinGlass OHLC format: [timestamp, open, high, low, close, volume]
+                    if isinstance(record, list) and len(record) >= 5:
+                        # Handle timestamp (might be in ms or seconds)
+                        timestamp = record[0]
+                        if isinstance(timestamp, (int, float)):
+                            # If timestamp is less than 1e10, it's likely in seconds, convert to ms
+                            if timestamp < 1e10:
+                                timestamp = int(timestamp * 1000)
+                            else:
+                                timestamp = int(timestamp)
+                            
+                            df_data.append({
+                                "Date": pd.Timestamp(timestamp, unit="ms"),
+                                "Open": float(record[1]),
+                                "High": float(record[2]),
+                                "Low": float(record[3]),
+                                "Close": float(record[4]),
+                                "Volume": float(record[5]) if len(record) > 5 else 0.0
+                            })
+                        else:
+                            logger.warning(f"Unexpected timestamp format in CoinGlass response: {timestamp}")
+                    elif isinstance(record, dict):
+                        # Handle dict format if CoinGlass returns objects
+                        if "time" in record or "timestamp" in record or "date" in record:
+                            ts_key = "time" if "time" in record else ("timestamp" if "timestamp" in record else "date")
+                            timestamp = record[ts_key]
+                            if isinstance(timestamp, (int, float)):
+                                if timestamp < 1e10:
+                                    timestamp = int(timestamp * 1000)
+                                else:
+                                    timestamp = int(timestamp)
+                                
+                                df_data.append({
+                                    "Date": pd.Timestamp(timestamp, unit="ms"),
+                                    "Open": float(record.get("open", record.get("o", 0))),
+                                    "High": float(record.get("high", record.get("h", 0))),
+                                    "Low": float(record.get("low", record.get("l", 0))),
+                                    "Close": float(record.get("close", record.get("c", 0))),
+                                    "Volume": float(record.get("volume", record.get("v", 0)))
+                                })
+                except Exception as e:
+                    logger.warning(f"Error parsing CoinGlass record: {record}, error: {e}")
+                    continue
             
             if not df_data:
                 return pd.DataFrame()
@@ -408,26 +500,26 @@ class CoinGlassClient:
         Returns:
             CoinGlass symbol format
         """
-        # CoinGlass typically uses formats like "BTC-USDT" or "BTC/USDT"
-        # For now, try to convert BTCUSDT -> BTC-USDT
+        # CoinGlass might use different formats - try multiple variations
         symbol_upper = symbol.upper()
         
-        # Common mappings
+        # Common mappings - try different formats
         symbol_map = {
-            "BTCUSDT": "BTC-USDT",
-            "ETHUSDT": "ETH-USDT",
-            "BNBUSDT": "BNB-USDT",
-            "ADAUSDT": "ADA-USDT",
-            "SOLUSDT": "SOL-USDT",
-            "XRPUSDT": "XRP-USDT",
-            "DOGEUSDT": "DOGE-USDT",
-            "DOTUSDT": "DOT-USDT",
-            "MATICUSDT": "MATIC-USDT",
-            "LTCUSDT": "LTC-USDT",
+            "BTCUSDT": ["BTC-USDT", "BTCUSDT", "BTC/USDT"],
+            "ETHUSDT": ["ETH-USDT", "ETHUSDT", "ETH/USDT"],
+            "BNBUSDT": ["BNB-USDT", "BNBUSDT", "BNB/USDT"],
+            "ADAUSDT": ["ADA-USDT", "ADAUSDT", "ADA/USDT"],
+            "SOLUSDT": ["SOL-USDT", "SOLUSDT", "SOL/USDT"],
+            "XRPUSDT": ["XRP-USDT", "XRPUSDT", "XRP/USDT"],
+            "DOGEUSDT": ["DOGE-USDT", "DOGEUSDT", "DOGE/USDT"],
+            "DOTUSDT": ["DOT-USDT", "DOTUSDT", "DOT/USDT"],
+            "MATICUSDT": ["MATIC-USDT", "MATICUSDT", "MATIC/USDT"],
+            "LTCUSDT": ["LTC-USDT", "LTCUSDT", "LTC/USDT"],
         }
         
         if symbol_upper in symbol_map:
-            return symbol_map[symbol_upper]
+            # Return first format (most common)
+            return symbol_map[symbol_upper][0]
         
         # Try to auto-convert: BTCUSDT -> BTC-USDT
         if symbol_upper.endswith("USDT"):
@@ -444,6 +536,23 @@ class CoinGlassClient:
         # Return as-is if we can't map it
         logger.warning(f"Could not map symbol {symbol} to CoinGlass format, using as-is")
         return symbol_upper
+    
+    def test_connection(self) -> bool:
+        """
+        Test CoinGlass API connection by making a simple request.
+        
+        Returns:
+            True if connection successful, False otherwise
+        """
+        try:
+            # Try to get supported coins list (should be a simple endpoint)
+            endpoint = "/api/futures/trading-market/supported-coins"
+            data = self._make_request(endpoint, {})
+            logger.info(f"CoinGlass API connection test successful")
+            return True
+        except Exception as e:
+            logger.error(f"CoinGlass API connection test failed: {e}")
+            return False
 
 
 # Global client instance

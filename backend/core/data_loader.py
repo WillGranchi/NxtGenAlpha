@@ -684,6 +684,14 @@ def fetch_crypto_data_from_coinglass(
         # Get CoinGlass client
         client = get_coinglass_client()
         
+        # Test connection first (optional, but helpful for debugging)
+        try:
+            connection_ok = client.test_connection()
+            if not connection_ok:
+                logger.warning("CoinGlass API connection test failed, but continuing with data fetch attempt...")
+        except Exception as conn_test_error:
+            logger.warning(f"CoinGlass API connection test error: {conn_test_error}, but continuing with data fetch attempt...")
+        
         # Fetch price history
         df = client.get_price_history(
             symbol=symbol,
