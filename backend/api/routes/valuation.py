@@ -10,7 +10,7 @@ import numpy as np
 from datetime import datetime
 from sqlalchemy.orm import Session
 
-from backend.core.data_loader import load_crypto_data
+from backend.core.data_loader import load_crypto_data, fetch_crypto_data_smart
 from backend.core.indicators import (
     rsi, cci, stochastic, williams_r, macd, roc, momentum, chande_momentum_oscillator,
     bb_percent, tsi, ema, zscore
@@ -270,23 +270,37 @@ async def calculate_valuation_zscores(request: ValuationZScoreRequest) -> Valuat
                 detail=f"Invalid indicators: {invalid_indicators}. Available indicators: {list(TECHNICAL_INDICATORS.keys())}"
             )
         
-        # Load price data
-        df = load_crypto_data(symbol=request.symbol)
+        # Load price data from CoinGlass API (primary) with fallbacks
+        try:
+            start_date_dt = pd.to_datetime(request.start_date) if request.start_date else None
+            end_date_dt = pd.to_datetime(request.end_date) if request.end_date else None
+            df, data_source, quality_metrics = fetch_crypto_data_smart(
+                symbol=request.symbol,
+                start_date=start_date_dt,
+                end_date=end_date_dt,
+                use_cache=True,  # Use cache if available
+                cross_validate=False
+            )
+            logger.info(f"Using price data from {data_source} for valuation calculations")
+        except Exception as e:
+            logger.warning(f"Failed to fetch from CoinGlass API, falling back to CSV: {e}")
+            # Fallback to CSV if CoinGlass API fails
+            df = load_crypto_data(symbol=request.symbol)
+            
+            # Filter by date range if provided
+            if request.start_date:
+                start_date = pd.to_datetime(request.start_date)
+                df = df[df.index >= start_date]
+            
+            if request.end_date:
+                end_date = pd.to_datetime(request.end_date)
+                df = df[df.index <= end_date]
         
         if df is None or len(df) == 0:
             raise HTTPException(
                 status_code=400,
                 detail=f"No price data available for symbol {request.symbol}"
             )
-        
-        # Filter by date range if provided
-        if request.start_date:
-            start_date = pd.to_datetime(request.start_date)
-            df = df[df.index >= start_date]
-        
-        if request.end_date:
-            end_date = pd.to_datetime(request.end_date)
-            df = df[df.index <= end_date]
         
         if len(df) == 0:
             raise HTTPException(
@@ -448,17 +462,31 @@ async def get_valuation_data(
         ValuationDataResponse: Time series data with price and indicator values
     """
     try:
-        # Load price data
-        df = load_crypto_data(symbol=symbol)
-        
-        # Filter by date range if provided
-        if start_date:
-            start_date_dt = pd.to_datetime(start_date)
-            df = df[df.index >= start_date_dt]
-        
-        if end_date:
-            end_date_dt = pd.to_datetime(end_date)
-            df = df[df.index <= end_date_dt]
+        # Load price data from CoinGlass API (primary) with fallbacks
+        try:
+            start_date_dt = pd.to_datetime(start_date) if start_date else None
+            end_date_dt = pd.to_datetime(end_date) if end_date else None
+            df, data_source, quality_metrics = fetch_crypto_data_smart(
+                symbol=symbol,
+                start_date=start_date_dt,
+                end_date=end_date_dt,
+                use_cache=True,  # Use cache if available
+                cross_validate=False
+            )
+            logger.info(f"Using price data from {data_source} for valuation data endpoint")
+        except Exception as e:
+            logger.warning(f"Failed to fetch from CoinGlass API, falling back to CSV: {e}")
+            # Fallback to CSV if CoinGlass API fails
+            df = load_crypto_data(symbol=symbol)
+            
+            # Filter by date range if provided
+            if start_date:
+                start_date_dt = pd.to_datetime(start_date)
+                df = df[df.index >= start_date_dt]
+            
+            if end_date:
+                end_date_dt = pd.to_datetime(end_date)
+                df = df[df.index <= end_date_dt]
         
         if len(df) == 0:
             raise HTTPException(

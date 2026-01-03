@@ -7,7 +7,7 @@ from typing import Dict, Any, List
 import logging
 import pandas as pd
 
-from backend.core.data_loader import load_crypto_data
+from backend.core.data_loader import load_crypto_data, fetch_crypto_data_smart
 from backend.core.indicator_signals import (
     generate_indicator_signals,
     combine_signals_majority,
@@ -39,25 +39,38 @@ async def generate_indicator_signals_endpoint(request: IndicatorSignalRequest) -
     try:
         logger.info(f"Generating signals for {len(request.indicators)} indicators")
         
-        # Load cryptocurrency data
+        # Load cryptocurrency data from CoinGlass API (primary) with fallbacks
         symbol = request.symbol or "BTCUSDT"
         try:
-            df = load_crypto_data(symbol=symbol)
-        except ValueError as e:
-            logger.error(f"Failed to load data for {symbol}: {e}")
-            raise HTTPException(
-                status_code=404,
-                detail=f"Failed to load data for {symbol}: {str(e)}"
+            start_date_dt = pd.to_datetime(request.start_date) if request.start_date else None
+            end_date_dt = pd.to_datetime(request.end_date) if request.end_date else None
+            df, data_source, quality_metrics = fetch_crypto_data_smart(
+                symbol=symbol,
+                start_date=start_date_dt,
+                end_date=end_date_dt,
+                use_cache=True,  # Use cache if available
+                cross_validate=False
             )
-        
-        # Apply date filtering
-        if request.start_date:
-            start_date = pd.to_datetime(request.start_date)
-            df = df[df.index >= start_date]
-        
-        if request.end_date:
-            end_date = pd.to_datetime(request.end_date)
-            df = df[df.index <= end_date]
+            logger.info(f"Using price data from {data_source} for indicator signals")
+        except Exception as e:
+            logger.warning(f"Failed to fetch from CoinGlass API, falling back to CSV: {e}")
+            try:
+                df = load_crypto_data(symbol=symbol)
+                
+                # Apply date filtering
+                if request.start_date:
+                    start_date = pd.to_datetime(request.start_date)
+                    df = df[df.index >= start_date]
+                
+                if request.end_date:
+                    end_date = pd.to_datetime(request.end_date)
+                    df = df[df.index <= end_date]
+            except ValueError as load_error:
+                logger.error(f"Failed to load data for {symbol}: {load_error}")
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Failed to load data for {symbol}: {str(load_error)}"
+                )
         
         if df.empty:
             raise HTTPException(

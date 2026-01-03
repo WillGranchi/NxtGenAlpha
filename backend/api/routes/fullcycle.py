@@ -122,11 +122,11 @@ async def calculate_fullcycle_zscores(
         # Load BTC data (hardcoded to BTCUSDT)
         symbol = "BTCUSDT"
         
-        # Use Yahoo Finance as primary source (same as indicators tab)
+        # Use CoinGlass as primary source (with Yahoo Finance and CoinGecko fallbacks)
         # Force refresh if requested, otherwise try to use smart fetch with cache
         if force_refresh:
-            logger.info(f"Force refreshing {symbol} data from Yahoo Finance...")
-            # Fetch fresh data from Yahoo Finance (primary) with CoinGecko fallback
+            logger.info(f"Force refreshing {symbol} data from CoinGlass API...")
+            # Fetch fresh data from CoinGlass (primary) with Yahoo Finance and CoinGecko fallbacks
             start_date_dt = pd.to_datetime(start_date) if start_date else None
             end_date_dt = pd.to_datetime(end_date) if end_date else None
             df, data_source, quality_metrics = fetch_crypto_data_smart(
@@ -138,7 +138,7 @@ async def calculate_fullcycle_zscores(
             )
             logger.info(f"Fetched data from {data_source}, quality score: {quality_metrics.get('quality_score', 'N/A')}")
         else:
-            # Try to use Yahoo Finance with cache, fallback to CSV if needed
+            # Try to use CoinGlass with cache, fallback to CSV if needed
             try:
                 start_date_dt = pd.to_datetime(start_date) if start_date else None
                 end_date_dt = pd.to_datetime(end_date) if end_date else None
@@ -151,8 +151,8 @@ async def calculate_fullcycle_zscores(
                 )
                 logger.info(f"Using data from {data_source} (cached if available)")
             except Exception as e:
-                logger.warning(f"Failed to fetch from Yahoo Finance, falling back to CSV: {e}")
-                # Fallback to CSV if Yahoo Finance fails
+                logger.warning(f"Failed to fetch from CoinGlass API, falling back to CSV: {e}")
+                # Fallback to CSV if CoinGlass API fails
                 df = load_crypto_data(symbol=symbol)
         
         # Determine the actual date range we have
