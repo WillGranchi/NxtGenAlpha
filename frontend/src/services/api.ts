@@ -577,6 +577,38 @@ export class TradingAPI {
   }
 
   /**
+   * Get price history (OHLC) data from CoinGlass API.
+   */
+  static async getPriceHistory(params: {
+    symbol?: string;
+    start_date?: string;
+    end_date?: string;
+  }): Promise<{
+    success: boolean;
+    data: Array<{
+      date: string;
+      open: number;
+      high: number;
+      low: number;
+      close: number;
+      volume: number;
+    }>;
+    date_range: {
+      start: string;
+      end: string;
+    };
+    data_source: string;
+    total_records: number;
+    quality_metrics?: Record<string, any>;
+  }> {
+    const response: AxiosResponse<any> = await api.get('/api/data/price-history', {
+      params,
+      timeout: 180000, // 3 minutes for CoinGlass API calls
+    });
+    return response.data;
+  }
+
+  /**
    * Test CoinGlass API connection.
    */
   static async testCoinGlassConnection(): Promise<{

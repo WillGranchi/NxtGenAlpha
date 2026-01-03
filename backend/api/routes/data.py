@@ -9,7 +9,7 @@ import logging
 from backend.core.data_loader import (
     load_btc_data, load_crypto_data, get_data_summary, validate_data, 
     update_btc_data, update_crypto_data, get_last_update_time,
-    get_available_symbols
+    get_available_symbols, fetch_crypto_data_smart
 )
 from backend.core.data_quality import validate_data_quality
 from backend.api.models.backtest_models import DataInfoResponse, ErrorResponse
@@ -298,6 +298,94 @@ async def test_coinglass_connection() -> Dict[str, Any]:
         raise HTTPException(
             status_code=500,
             detail=f"Failed to test CoinGlass connection: {str(e)}"
+        )
+
+
+@router.get("/price-history")
+async def get_price_history(
+    symbol: Optional[str] = Query(default="BTCUSDT", description="Trading pair symbol (e.g., BTCUSDT, ETHUSDT)"),
+    start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)")
+) -> Dict[str, Any]:
+    """
+    Get OHLC price history data from CoinGlass API.
+    
+    Args:
+        symbol: Trading pair symbol (default: BTCUSDT)
+        start_date: Start date filter (YYYY-MM-DD)
+        end_date: End date filter (YYYY-MM-DD)
+        
+    Returns:
+        Dict: Price history data with OHLC values
+    """
+    try:
+        import pandas as pd
+        
+        # Parse dates if provided
+        start_date_dt = pd.to_datetime(start_date) if start_date else None
+        end_date_dt = pd.to_datetime(end_date) if end_date else None
+        
+        # Fetch data from CoinGlass API (only source)
+        logger.info(f"Fetching price history for {symbol} from CoinGlass...")
+        df, data_source, quality_metrics = fetch_crypto_data_smart(
+            symbol=symbol,
+            start_date=start_date_dt,
+            end_date=end_date_dt,
+            use_cache=True,  # Use cache if available
+            cross_validate=False
+        )
+        
+        if df is None or len(df) == 0:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No price data available for {symbol}"
+            )
+        
+        # Ensure we have OHLC columns
+        required_cols = ['Open', 'High', 'Low', 'Close']
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Missing required columns: {missing_cols}. Available columns: {list(df.columns)}"
+            )
+        
+        # Convert to list of records
+        data_points = []
+        for date in df.index:
+            date_str = date.strftime('%Y-%m-%d') if isinstance(date, pd.Timestamp) else str(date)
+            data_points.append({
+                'date': date_str,
+                'open': float(df.loc[date, 'Open']),
+                'high': float(df.loc[date, 'High']),
+                'low': float(df.loc[date, 'Low']),
+                'close': float(df.loc[date, 'Close']),
+                'volume': float(df.loc[date, 'Volume']) if 'Volume' in df.columns else 0.0
+            })
+        
+        # Get actual date range
+        actual_start = df.index.min()
+        actual_end = df.index.max()
+        
+        return {
+            "success": True,
+            "data": data_points,
+            "date_range": {
+                "start": actual_start.strftime('%Y-%m-%d') if isinstance(actual_start, pd.Timestamp) else str(actual_start),
+                "end": actual_end.strftime('%Y-%m-%d') if isinstance(actual_end, pd.Timestamp) else str(actual_end)
+            },
+            "data_source": data_source,
+            "total_records": len(data_points),
+            "quality_metrics": quality_metrics if quality_metrics else {}
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching price history: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch price history: {str(e)}"
         )
 
 

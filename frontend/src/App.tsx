@@ -16,6 +16,7 @@ import StrategyLibraryPage from './pages/StrategyLibraryPage';
 import SettingsPage from './pages/SettingsPage';
 import ValuationPage from './pages/ValuationPage';
 import FullCyclePage from './pages/FullCyclePage';
+import PriceTestPage from './pages/PriceTestPage';
 
 export const App: React.FC = () => {
   return (
@@ -94,6 +95,16 @@ export const App: React.FC = () => {
               <ProtectedRoute>
                 <Layout>
                   <FullCyclePage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/pricetest"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <PriceTestPage />
                 </Layout>
               </ProtectedRoute>
             }

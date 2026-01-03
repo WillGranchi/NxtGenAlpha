@@ -51,6 +51,7 @@ export const MobileNavigation: React.FC = () => {
     { path: '/valuation', label: 'Valuation', icon: BarChart3 },
     { path: '/library', label: 'My Creations', icon: Library },
     { path: '/settings', label: 'Settings', icon: Settings },
+    { path: '/pricetest', label: 'Price Test', icon: BarChart3 },
   ];
 
   const isActive = (path: string) => location.pathname === path;
