@@ -25,10 +25,10 @@ const PriceTestPage: React.FC = () => {
   
   // Date range state
   const [startDate, setStartDate] = useState<string>(() => {
-    // Default to 1 year ago
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-    return oneYearAgo.toISOString().split('T')[0];
+    // Default to 6 months ago for better performance (CoinGlass API can be slow with large ranges)
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    return sixMonthsAgo.toISOString().split('T')[0];
   });
   const [endDate, setEndDate] = useState<string>(() => {
     return new Date().toISOString().split('T')[0];

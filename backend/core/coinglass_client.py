@@ -414,38 +414,102 @@ class CoinGlassClient:
                 try:
                     # CoinGlass OHLC format: [timestamp, open, high, low, close, volume]
                     if isinstance(record, list) and len(record) >= 5:
-                        # Handle timestamp (might be in ms or seconds)
+                        # Handle timestamp (might be in ms or seconds, or a date string)
                         timestamp = record[0]
+                        date_obj = None
+                        
                         if isinstance(timestamp, (int, float)):
                             # If timestamp is less than 1e10, it's likely in seconds, convert to ms
                             if timestamp < 1e10:
-                                timestamp = int(timestamp * 1000)
+                                timestamp_ms = int(timestamp * 1000)
                             else:
-                                timestamp = int(timestamp)
+                                timestamp_ms = int(timestamp)
                             
+                            # Validate timestamp is reasonable (between 2009-01-01 and 2100-01-01)
+                            min_timestamp = pd.Timestamp('2009-01-01').value // 1000000  # Convert to ms
+                            max_timestamp = pd.Timestamp('2100-01-01').value // 1000000
+                            
+                            if min_timestamp <= timestamp_ms <= max_timestamp:
+                                date_obj = pd.Timestamp(timestamp_ms, unit="ms")
+                            else:
+                                logger.warning(f"Invalid timestamp value: {timestamp_ms} (out of range)")
+                                continue
+                        elif isinstance(timestamp, str):
+                            # Handle date string format
+                            try:
+                                # Try parsing as ISO format first
+                                date_obj = pd.to_datetime(timestamp, errors='coerce')
+                                if pd.isna(date_obj):
+                                    # Try other common formats
+                                    date_obj = pd.to_datetime(timestamp, format='%Y-%m-%d', errors='coerce')
+                                if pd.isna(date_obj):
+                                    # Try 2-digit year format (e.g., "20-01-03" -> "2020-01-03")
+                                    if len(timestamp) == 8 and timestamp[2] == '-' and timestamp[5] == '-':
+                                        # Format: YY-MM-DD
+                                        year_part = timestamp[:2]
+                                        if int(year_part) < 50:  # Assume 20XX for years < 50
+                                            corrected_timestamp = f"20{timestamp}"
+                                        else:  # Assume 19XX for years >= 50
+                                            corrected_timestamp = f"19{timestamp}"
+                                        date_obj = pd.to_datetime(corrected_timestamp, format='%Y-%m-%d', errors='coerce')
+                                
+                                if pd.isna(date_obj):
+                                    logger.warning(f"Could not parse date string: {timestamp}")
+                                    continue
+                            except Exception as e:
+                                logger.warning(f"Error parsing date string '{timestamp}': {e}")
+                                continue
+                        else:
+                            logger.warning(f"Unexpected timestamp format in CoinGlass response: {timestamp} (type: {type(timestamp)})")
+                            continue
+                        
+                        if date_obj is not None:
                             df_data.append({
-                                "Date": pd.Timestamp(timestamp, unit="ms"),
+                                "Date": date_obj,
                                 "Open": float(record[1]),
                                 "High": float(record[2]),
                                 "Low": float(record[3]),
                                 "Close": float(record[4]),
                                 "Volume": float(record[5]) if len(record) > 5 else 0.0
                             })
-                        else:
-                            logger.warning(f"Unexpected timestamp format in CoinGlass response: {timestamp}")
                     elif isinstance(record, dict):
                         # Handle dict format if CoinGlass returns objects
                         if "time" in record or "timestamp" in record or "date" in record:
                             ts_key = "time" if "time" in record else ("timestamp" if "timestamp" in record else "date")
                             timestamp = record[ts_key]
+                            date_obj = None
+                            
                             if isinstance(timestamp, (int, float)):
                                 if timestamp < 1e10:
-                                    timestamp = int(timestamp * 1000)
+                                    timestamp_ms = int(timestamp * 1000)
                                 else:
-                                    timestamp = int(timestamp)
+                                    timestamp_ms = int(timestamp)
                                 
+                                # Validate timestamp is reasonable
+                                min_timestamp = pd.Timestamp('2009-01-01').value // 1000000
+                                max_timestamp = pd.Timestamp('2100-01-01').value // 1000000
+                                
+                                if min_timestamp <= timestamp_ms <= max_timestamp:
+                                    date_obj = pd.Timestamp(timestamp_ms, unit="ms")
+                                else:
+                                    logger.warning(f"Invalid timestamp value: {timestamp_ms} (out of range)")
+                                    continue
+                            elif isinstance(timestamp, str):
+                                # Handle date string format
+                                try:
+                                    date_obj = pd.to_datetime(timestamp, errors='coerce')
+                                    if pd.isna(date_obj):
+                                        date_obj = pd.to_datetime(timestamp, format='%Y-%m-%d', errors='coerce')
+                                    if pd.isna(date_obj):
+                                        logger.warning(f"Could not parse date string: {timestamp}")
+                                        continue
+                                except Exception as e:
+                                    logger.warning(f"Error parsing date string '{timestamp}': {e}")
+                                    continue
+                            
+                            if date_obj is not None:
                                 df_data.append({
-                                    "Date": pd.Timestamp(timestamp, unit="ms"),
+                                    "Date": date_obj,
                                     "Open": float(record.get("open", record.get("o", 0))),
                                     "High": float(record.get("high", record.get("h", 0))),
                                     "Low": float(record.get("low", record.get("l", 0))),
@@ -459,11 +523,32 @@ class CoinGlassClient:
             if not df_data:
                 return pd.DataFrame()
             
+            if not df_data:
+                return pd.DataFrame()
+            
             df = pd.DataFrame(df_data)
+            
+            # Filter out any invalid dates before setting index
+            valid_mask = df['Date'].notna() & (df['Date'] >= pd.Timestamp('2009-01-01')) & (df['Date'] <= pd.Timestamp('2100-01-01'))
+            invalid_count = (~valid_mask).sum()
+            if invalid_count > 0:
+                logger.warning(f"Filtered out {invalid_count} records with invalid dates")
+                df = df[valid_mask]
+            
+            if df.empty:
+                logger.warning(f"No valid price data after filtering for {symbol}")
+                return pd.DataFrame()
+            
             df.set_index("Date", inplace=True)
             df.sort_index(inplace=True)
             
-            logger.info(f"Parsed {len(df)} price records from CoinGlass for {symbol}")
+            # Remove any duplicate dates (keep first)
+            if df.index.duplicated().any():
+                duplicate_count = df.index.duplicated().sum()
+                logger.warning(f"Removing {duplicate_count} duplicate date entries")
+                df = df[~df.index.duplicated(keep='first')]
+            
+            logger.info(f"Parsed {len(df)} valid price records from CoinGlass for {symbol} (date range: {df.index.min()} to {df.index.max()})")
             return df
             
         except Exception as e:

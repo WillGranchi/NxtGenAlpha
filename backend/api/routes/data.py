@@ -363,16 +363,44 @@ async def get_price_history(
                 'volume': float(df.loc[date, 'Volume']) if 'Volume' in df.columns else 0.0
             })
         
-        # Get actual date range
-        actual_start = df.index.min()
-        actual_end = df.index.max()
+        # Get actual date range - validate dates before formatting
+        try:
+            actual_start = df.index.min()
+            actual_end = df.index.max()
+            
+            # Validate dates are valid Timestamps
+            if not isinstance(actual_start, pd.Timestamp) or pd.isna(actual_start):
+                raise ValueError(f"Invalid start date: {actual_start}")
+            if not isinstance(actual_end, pd.Timestamp) or pd.isna(actual_end):
+                raise ValueError(f"Invalid end date: {actual_end}")
+            
+            # Ensure dates are within reasonable range (2009-2100)
+            min_valid_date = pd.Timestamp('2009-01-01')
+            max_valid_date = pd.Timestamp('2100-01-01')
+            
+            if actual_start < min_valid_date or actual_start > max_valid_date:
+                raise ValueError(f"Start date {actual_start} is out of valid range")
+            if actual_end < min_valid_date or actual_end > max_valid_date:
+                raise ValueError(f"End date {actual_end} is out of valid range")
+            
+            date_range_start = actual_start.strftime('%Y-%m-%d')
+            date_range_end = actual_end.strftime('%Y-%m-%d')
+        except Exception as e:
+            logger.error(f"Error formatting date range: {e}")
+            # Fallback to first and last data point dates
+            if data_points:
+                date_range_start = data_points[0]['date']
+                date_range_end = data_points[-1]['date']
+            else:
+                date_range_start = None
+                date_range_end = None
         
         return {
             "success": True,
             "data": data_points,
             "date_range": {
-                "start": actual_start.strftime('%Y-%m-%d') if isinstance(actual_start, pd.Timestamp) else str(actual_start),
-                "end": actual_end.strftime('%Y-%m-%d') if isinstance(actual_end, pd.Timestamp) else str(actual_end)
+                "start": date_range_start,
+                "end": date_range_end
             },
             "data_source": data_source,
             "total_records": len(data_points),
