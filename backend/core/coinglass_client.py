@@ -247,6 +247,58 @@ class CoinGlassClient:
             "/api/futures/trading-market/pairs-markets",  # Pairs markets might have price data
         ]
         
+        # CoinGlass API may have limits on how much data can be returned in a single request
+        # We'll fetch in chunks if the date range is too large (e.g., > 1000 days)
+        # This ensures we get full historical data even if there are API limits
+        days_range = (end_date - start_date).days if start_date and end_date else None
+        chunk_days = 1000  # Fetch in chunks of 1000 days to avoid API limits
+        
+        if days_range and days_range > chunk_days:
+            logger.info(f"Large date range detected ({days_range} days). Fetching in chunks of {chunk_days} days...")
+            all_dfs = []
+            current_start = start_date
+            
+            while current_start < end_date:
+                current_end = min(current_start + timedelta(days=chunk_days), end_date)
+                logger.info(f"Fetching chunk: {current_start.strftime('%Y-%m-%d')} to {current_end.strftime('%Y-%m-%d')}")
+                
+                chunk_params = {
+                    "symbol": coinglass_symbol,
+                    "interval": interval,
+                    "startTime": int(current_start.timestamp() * 1000),
+                    "endTime": int(current_end.timestamp() * 1000)
+                }
+                
+                # Try each endpoint for this chunk
+                chunk_data = None
+                for endpoint in endpoints_to_try:
+                    try:
+                        chunk_data = self._make_request(endpoint, chunk_params)
+                        break
+                    except Exception as e:
+                        logger.debug(f"Endpoint {endpoint} failed for chunk: {e}")
+                        continue
+                
+                if chunk_data:
+                    # Parse chunk data
+                    chunk_df = self._parse_price_history_response(chunk_data, symbol, coinglass_symbol)
+                    if not chunk_df.empty:
+                        all_dfs.append(chunk_df)
+                        logger.info(f"✓ Fetched {len(chunk_df)} records for chunk")
+                
+                current_start = current_end + timedelta(days=1)  # Start next chunk after current end
+            
+            # Combine all chunks
+            if all_dfs:
+                df = pd.concat(all_dfs)
+                df = df.sort_index()
+                df = df[~df.index.duplicated(keep='first')]  # Remove duplicates
+                logger.info(f"✓ Combined {len(all_dfs)} chunks into {len(df)} total records")
+                return df
+            else:
+                raise Exception(f"Failed to fetch any data chunks for {symbol}")
+        
+        # Single request for smaller date ranges
         params = {
             "symbol": coinglass_symbol,
             "interval": interval
@@ -292,6 +344,22 @@ class CoinGlassClient:
         
         logger.info(f"Using successful CoinGlass endpoint: {successful_endpoint}")
         
+        # Parse the response
+        df = self._parse_price_history_response(data, symbol, coinglass_symbol)
+        return df
+    
+    def _parse_price_history_response(self, data: Any, symbol: str, coinglass_symbol: str) -> pd.DataFrame:
+        """
+        Parse CoinGlass API price history response into a DataFrame.
+        
+        Args:
+            data: API response data
+            symbol: Original symbol (e.g., "BTCUSDT")
+            coinglass_symbol: CoinGlass-formatted symbol (e.g., "BTC-USDT")
+            
+        Returns:
+            DataFrame with OHLCV data
+        """
         try:
             # Log the response structure for debugging
             logger.info(f"CoinGlass API response received - Type: {type(data)}")
@@ -395,7 +463,7 @@ class CoinGlassClient:
             df.set_index("Date", inplace=True)
             df.sort_index(inplace=True)
             
-            logger.info(f"Fetched {len(df)} price records from CoinGlass for {symbol}")
+            logger.info(f"Parsed {len(df)} price records from CoinGlass for {symbol}")
             return df
             
         except Exception as e:

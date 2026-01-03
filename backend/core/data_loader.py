@@ -1175,8 +1175,13 @@ def fetch_crypto_data_smart(
     if end_date is None:
         end_date = datetime.now()
     if start_date is None:
-        # Fetch all available data from launch date
-        start_date, _ = calculate_historical_range(symbol, years=None)
+        # For BTC, fetch from 2010-01-01 (earliest Bitcoin data)
+        # For other coins, fetch from token launch date
+        if symbol == "BTCUSDT":
+            start_date = datetime(2010, 1, 1)  # Bitcoin started in 2009, but reliable price data from 2010
+            logger.info(f"Using Bitcoin launch date: {start_date.strftime('%Y-%m-%d')}")
+        else:
+            start_date, _ = calculate_historical_range(symbol, years=None)
     
     # ONLY use CoinGlass - no fallbacks
     logger.info(f"Fetching {symbol} data from CoinGlass ONLY ({start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')})...")
