@@ -267,6 +267,7 @@ class CoinGlassClient:
                 chunk_params = {
                     "symbol": coinglass_symbol,
                     "interval": effective_interval,
+                    "exchange": "binance",  # Default to Binance
                     "startTime": int(current_start.timestamp() * 1000),
                     "endTime": int(current_end.timestamp() * 1000)
                 }
@@ -321,9 +322,13 @@ class CoinGlassClient:
             logger.warning(f"Interval {interval} not supported for Hobbyist tier (minimum 4h). Using 4h instead.")
             effective_interval = "4h"
         
+        # CoinGlass API requires 'exchange' parameter
+        # Use 'binance' as default (largest exchange) or try to get aggregated data
+        # If exchange is not specified, try common exchanges
         params = {
             "symbol": coinglass_symbol,
-            "interval": effective_interval
+            "interval": effective_interval,
+            "exchange": "binance"  # Default to Binance, can be overridden if needed
         }
         
         if start_date:
@@ -331,12 +336,18 @@ class CoinGlassClient:
         if end_date:
             params["endTime"] = int(end_date.timestamp() * 1000)
         
-        logger.info(f"Fetching CoinGlass price history: symbol={coinglass_symbol}, interval={interval}, start={start_date}, end={end_date}")
+        logger.info(f"Fetching CoinGlass price history: symbol={coinglass_symbol}, interval={effective_interval}, exchange={params.get('exchange')}, start={start_date}, end={end_date}")
         
-        # Try each endpoint with both base URLs
+        # Try different exchanges if the default fails
+        exchanges_to_try = ["binance", "coinbase", "okx", "bybit", "kraken"]
+        if params.get("exchange") not in exchanges_to_try:
+            exchanges_to_try.insert(0, params.get("exchange", "binance"))
+        
+        # Try each endpoint with both base URLs and different exchanges
         data = None
         last_error = None
         successful_endpoint = None
+        successful_exchange = None
         base_urls_to_try = [self.base_url, COINGLASS_BASE_URL_ALT]
         
         for base_url in base_urls_to_try:
@@ -344,25 +355,33 @@ class CoinGlassClient:
             self.base_url = base_url
             logger.info(f"Trying base URL: {base_url}")
             
-            for endpoint in endpoints_to_try:
-                try:
-                    logger.info(f"Trying CoinGlass endpoint: {base_url}{endpoint} with symbol={coinglass_symbol}")
-                    data = self._make_request(endpoint, params)
-                    logger.info(f"✓ Successfully fetched data from CoinGlass endpoint: {base_url}{endpoint}")
-                    successful_endpoint = f"{base_url}{endpoint}"
-                    self.base_url = original_base  # Restore original
+            for exchange in exchanges_to_try:
+                params["exchange"] = exchange
+                
+                for endpoint in endpoints_to_try:
+                    try:
+                        logger.info(f"Trying CoinGlass endpoint: {base_url}{endpoint} with symbol={coinglass_symbol}, exchange={exchange}")
+                        data = self._make_request(endpoint, params)
+                        logger.info(f"✓ Successfully fetched data from CoinGlass endpoint: {base_url}{endpoint} with exchange={exchange}")
+                        successful_endpoint = f"{base_url}{endpoint}"
+                        successful_exchange = exchange
+                        self.base_url = original_base  # Restore original
+                        break
+                    except Exception as e:
+                        error_str = str(e)
+                        logger.warning(f"✗ Endpoint {base_url}{endpoint} with exchange={exchange} failed: {error_str}")
+                        last_error = e
+                        # If it's a 404, try next endpoint
+                        # If it's a 400, might be parameter issue - try next exchange
+                        if "404" in error_str or "not found" in error_str.lower():
+                            logger.debug(f"Endpoint {endpoint} not found (404), trying next...")
+                        elif "400" in error_str:
+                            logger.warning(f"Endpoint {endpoint} returned 400 (bad request) with exchange={exchange}, trying next exchange...")
+                            break  # Try next exchange
+                        continue
+                
+                if data is not None:
                     break
-                except Exception as e:
-                    error_str = str(e)
-                    logger.warning(f"✗ Endpoint {base_url}{endpoint} failed: {error_str}")
-                    last_error = e
-                    # If it's a 404, try next endpoint
-                    # If it's a 400, might be parameter issue - log it but continue
-                    if "404" in error_str or "not found" in error_str.lower():
-                        logger.debug(f"Endpoint {endpoint} not found (404), trying next...")
-                    elif "400" in error_str:
-                        logger.warning(f"Endpoint {endpoint} returned 400 (bad request) - might be parameter issue")
-                    continue
             
             if data is not None:
                 break
@@ -371,6 +390,7 @@ class CoinGlassClient:
         if data is None:
             error_msg = (
                 f"All CoinGlass endpoints failed for {symbol} (coinglass_symbol={coinglass_symbol}). "
+                f"Tried exchanges: {exchanges_to_try}. "
                 f"Last error: {last_error}. "
                 f"This may indicate that historical price data is not available in your CoinGlass API tier, "
                 f"or the endpoints have changed. Please check the CoinGlass API documentation for the correct endpoints."
@@ -378,10 +398,11 @@ class CoinGlassClient:
             logger.error(error_msg)
             logger.error(f"Tried base URLs: {base_urls_to_try}")
             logger.error(f"Tried endpoints: {endpoints_to_try}")
+            logger.error(f"Tried exchanges: {exchanges_to_try}")
             logger.error(f"Request params were: {params}")
             raise Exception(error_msg)
         
-        logger.info(f"Using successful CoinGlass endpoint: {successful_endpoint}")
+        logger.info(f"Using successful CoinGlass endpoint: {successful_endpoint} with exchange: {successful_exchange}")
         
         # Parse the response
         df = self._parse_price_history_response(data, symbol, coinglass_symbol)
