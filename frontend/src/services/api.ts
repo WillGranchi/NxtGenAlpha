@@ -35,9 +35,10 @@ const validateApiUrl = () => {
 validateApiUrl();
 
 // Create axios instance with default config
+// Increased timeout to 120 seconds (2 minutes) for CoinGlass API calls
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 120000, // 2 minutes for slow API calls (CoinGlass, data refresh, etc.)
   headers: {
     'Content-Type': 'application/json',
   },
@@ -420,7 +421,11 @@ export class TradingAPI {
     if (start_date) {
       params.start_date = start_date;
     }
-    const response: AxiosResponse<DataRefreshResponse> = await api.post('/api/data/refresh', null, { params });
+    // Use extended timeout for data refresh (CoinGlass API can be slow)
+    const response: AxiosResponse<DataRefreshResponse> = await api.post('/api/data/refresh', null, { 
+      params,
+      timeout: 180000, // 3 minutes for CoinGlass API calls
+    });
     return response.data;
   }
 
@@ -568,6 +573,34 @@ export class TradingAPI {
    */
   static async getAvailableSymbols(): Promise<{ success: boolean; symbols: string[]; count: number }> {
     const response = await api.get('/api/data/symbols');
+    return response.data;
+  }
+
+  /**
+   * Test CoinGlass API connection.
+   */
+  static async testCoinGlassConnection(): Promise<{
+    success: boolean;
+    connection_test: {
+      success: boolean;
+      endpoint?: string;
+      error?: string;
+      response_preview?: string;
+      api_key_configured: boolean;
+      base_url: string;
+    };
+    api_key_configured: boolean;
+    api_key_preview: string;
+    base_url: string;
+    test_data_fetch: {
+      success: boolean;
+      records: number;
+      error?: string;
+    };
+  }> {
+    const response: AxiosResponse<any> = await api.get('/api/data/test-coinglass', {
+      timeout: 60000, // 1 minute for connection test
+    });
     return response.data;
   }
 
@@ -792,6 +825,7 @@ export class TradingAPI {
 
   /**
    * Calculate full cycle z-scores for selected indicators.
+   * Uses extended timeout (3 minutes) for CoinGlass API calls.
    */
   static async calculateFullCycleZScores(request: {
     indicators: string[];
@@ -821,7 +855,10 @@ export class TradingAPI {
     indicators_requested?: number;
     warnings?: string[] | null;
   }> {
-    const response: AxiosResponse<any> = await api.post('/api/fullcycle/zscores', request);
+    // Use extended timeout for Full Cycle calculations (3 minutes)
+    const response: AxiosResponse<any> = await api.post('/api/fullcycle/zscores', request, {
+      timeout: 180000, // 3 minutes for CoinGlass API calls
+    });
     return response.data;
   }
 

@@ -3,13 +3,15 @@
  * Controls for selecting indicators, date range, and visibility settings
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { FullCycleIndicator, FullCycleDataPoint } from '../../hooks/useFullCycle';
 import { useMobile } from '../../hooks/useMobile';
 import { DateRangePicker } from '../DateRangePicker';
 import { ROCTable } from './ROCTable';
 import { IndicatorParameterControls } from './IndicatorParameterControls';
 import { PresetManager } from './PresetManager';
+import TradingAPI from '../../services/api';
+import { Loader2, CheckCircle2, XCircle, Wifi } from 'lucide-react';
 
 interface FullCycleControlsProps {
   availableIndicators: FullCycleIndicator[];
@@ -86,10 +88,45 @@ export const FullCycleControls: React.FC<FullCycleControlsProps> = ({
   refreshData,
 }) => {
   const { isMobile } = useMobile();
+  const [testingCoinGlass, setTestingCoinGlass] = useState(false);
+  const [coinGlassTestResult, setCoinGlassTestResult] = useState<{
+    success: boolean;
+    message: string;
+    details?: any;
+  } | null>(null);
 
   // Group indicators by category
   const fundamentalIndicators = availableIndicators.filter((ind) => ind.category === 'fundamental');
   const technicalIndicators = availableIndicators.filter((ind) => ind.category === 'technical');
+
+  const handleTestCoinGlass = async () => {
+    setTestingCoinGlass(true);
+    setCoinGlassTestResult(null);
+    try {
+      const result = await TradingAPI.testCoinGlassConnection();
+      if (result.connection_test.success) {
+        setCoinGlassTestResult({
+          success: true,
+          message: `✓ CoinGlass API connection successful! Endpoint: ${result.connection_test.endpoint}`,
+          details: result,
+        });
+      } else {
+        setCoinGlassTestResult({
+          success: false,
+          message: `✗ CoinGlass API connection failed: ${result.connection_test.error || 'Unknown error'}`,
+          details: result,
+        });
+      }
+    } catch (error: any) {
+      setCoinGlassTestResult({
+        success: false,
+        message: `✗ Error testing CoinGlass: ${error?.response?.data?.detail || error?.message || 'Unknown error'}`,
+        details: error,
+      });
+    } finally {
+      setTestingCoinGlass(false);
+    }
+  };
 
   const handleIndicatorToggle = (indicatorId: string) => {
     if (selectedIndicators.includes(indicatorId)) {
@@ -185,7 +222,52 @@ export const FullCycleControls: React.FC<FullCycleControlsProps> = ({
               </>
             )}
           </button>
+          <button
+            onClick={handleTestCoinGlass}
+            disabled={testingCoinGlass}
+            className="flex items-center gap-2 px-4 py-2 bg-bg-secondary hover:bg-bg-tertiary border border-border-default disabled:bg-bg-secondary/50 disabled:cursor-not-allowed text-text-primary rounded-lg text-sm transition-colors"
+            title="Test CoinGlass API connection"
+          >
+            {testingCoinGlass ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Testing...
+              </>
+            ) : (
+              <>
+                <Wifi className="h-4 w-4" />
+                Test CoinGlass
+              </>
+            )}
+          </button>
         </div>
+        {coinGlassTestResult && (
+          <div className={`mt-2 p-3 rounded-lg border ${
+            coinGlassTestResult.success 
+              ? 'bg-green-500/10 border-green-500/50 text-green-400' 
+              : 'bg-red-500/10 border-red-500/50 text-red-400'
+          }`}>
+            <div className="flex items-start gap-2">
+              {coinGlassTestResult.success ? (
+                <CheckCircle2 className="h-5 w-5 flex-shrink-0 mt-0.5" />
+              ) : (
+                <XCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+              )}
+              <div className="flex-1">
+                <p className="text-sm font-medium">{coinGlassTestResult.message}</p>
+                {coinGlassTestResult.details && (
+                  <details className="mt-2 text-xs">
+                    <summary className="cursor-pointer hover:underline">Show details</summary>
+                    <pre className="mt-2 p-2 bg-bg-primary rounded text-xs overflow-auto max-h-40">
+                      {JSON.stringify(coinGlassTestResult.details, null, 2)}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
         <DateRangePicker
           startDate={startDate}
           endDate={endDate}
