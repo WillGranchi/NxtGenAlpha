@@ -253,8 +253,8 @@ async def test_coinglass_connection() -> Dict[str, Any]:
         
         client = get_coinglass_client()
         
-        # Test connection
-        connection_ok = client.test_connection()
+        # Test connection (now returns dict with detailed results)
+        connection_result = client.test_connection()
         
         # Try to fetch a small amount of data
         test_data = None
@@ -276,7 +276,14 @@ async def test_coinglass_connection() -> Dict[str, Any]:
         
         return {
             "success": True,
-            "connection_test": connection_ok,
+            "connection_test": {
+                "success": connection_result.get("success", False),
+                "endpoint": connection_result.get("endpoint"),
+                "error": connection_result.get("error"),
+                "response_preview": connection_result.get("response"),
+                "api_key_configured": connection_result.get("api_key_configured", False),
+                "base_url": connection_result.get("base_url")
+            },
             "api_key_configured": bool(client.api_key),
             "api_key_preview": client.api_key[:8] + "..." if client.api_key else "Not set",
             "base_url": client.base_url,

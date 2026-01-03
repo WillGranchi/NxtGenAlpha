@@ -113,8 +113,18 @@ class CoinGlassClient:
                 # Rate limiting
                 _rate_limiter.wait_if_needed()
                 
-                # Make request
-                response = self.session.get(url, params=params, timeout=30)
+                # Make request with separate connection and read timeouts
+                # Connection timeout: how long to wait to establish connection (5 seconds)
+                # Read timeout: how long to wait for response data (60 seconds)
+                try:
+                    response = self.session.get(url, params=params, timeout=(5, 60))
+                except requests.exceptions.Timeout as timeout_error:
+                    if "ConnectTimeout" in str(type(timeout_error)):
+                        raise Exception(f"CoinGlass API connection timeout - unable to connect to {url}. Check network connectivity.")
+                    else:
+                        raise Exception(f"CoinGlass API read timeout - server took too long to respond. URL: {url}")
+                except requests.exceptions.ConnectionError as conn_error:
+                    raise Exception(f"CoinGlass API connection error - unable to reach server. URL: {url}, Error: {str(conn_error)}")
                 
                 # Check for rate limit errors
                 if response.status_code == 429:
@@ -170,10 +180,32 @@ class CoinGlassClient:
                 
                 return data
                 
-            except requests.exceptions.RequestException as e:
+            except requests.exceptions.Timeout as timeout_error:
+                error_msg = f"CoinGlass API timeout error: {str(timeout_error)}"
+                logger.error(error_msg)
                 if attempt < max_retries:
                     wait_time = retry_delay * (2 ** attempt)
-                    logger.warning(f"Request failed: {e}. Retrying in {wait_time:.2f} seconds...")
+                    logger.warning(f"{error_msg}. Retrying in {wait_time:.2f} seconds...")
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    raise Exception(f"CoinGlass API request timed out after {max_retries} retries. URL: {url}")
+            except requests.exceptions.ConnectionError as conn_error:
+                error_msg = f"CoinGlass API connection error: {str(conn_error)}"
+                logger.error(error_msg)
+                if attempt < max_retries:
+                    wait_time = retry_delay * (2 ** attempt)
+                    logger.warning(f"{error_msg}. Retrying in {wait_time:.2f} seconds...")
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    raise Exception(f"CoinGlass API connection failed after {max_retries} retries. URL: {url}")
+            except requests.exceptions.RequestException as e:
+                error_msg = f"CoinGlass API request error: {str(e)}"
+                logger.error(error_msg)
+                if attempt < max_retries:
+                    wait_time = retry_delay * (2 ** attempt)
+                    logger.warning(f"{error_msg}. Retrying in {wait_time:.2f} seconds...")
                     time.sleep(wait_time)
                     continue
                 else:
