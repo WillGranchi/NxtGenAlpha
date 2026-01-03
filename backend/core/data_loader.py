@@ -1375,15 +1375,15 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
         # Calculate end_date (today)
         end_date = datetime.now()
         fetch_days = (end_date - start_date).days
-        logger.info(f"Fetching {symbol} data using smart multi-source strategy from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')} ({fetch_days} days)...")
+        logger.info(f"Fetching {symbol} data from CoinGlass ONLY from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')} ({fetch_days} days)...")
         
-        # Use smart fetching strategy (CoinGlass primary, with Yahoo/CoinGecko fallback)
+        # Use CoinGlass ONLY (no fallbacks)
         df, data_source, quality_metrics = fetch_crypto_data_smart(
             symbol=symbol,
             start_date=start_date,
             end_date=end_date,
             use_cache=False,  # Force fresh fetch
-            cross_validate=True,  # Enable cross-validation for quality
+            cross_validate=False,  # Disabled when using only CoinGlass
             include_additional_metrics=include_additional_metrics
         )
         
