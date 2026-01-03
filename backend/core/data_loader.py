@@ -1224,24 +1224,6 @@ def fetch_crypto_data_smart(
         logger.error(error_msg)
         logger.error("No fallback sources available - CoinGlass is the only data source configured.")
         raise Exception(f"{error_msg} Please check: 1) CoinGlass API key is set, 2) API key is valid, 3) Network connectivity, 4) CoinGlass API status.")
-            quality_metrics['consistency_score'],
-            quality_metrics['freshness_score'],
-            cv_results['accuracy_score']
-        )
-    
-    # Determine primary source name
-    if "coinglass" in sources_used:
-        primary_source = "coinglass"
-    elif "yahoo_finance" in sources_used:
-        primary_source = "yahoo_finance"
-    elif "coingecko" in sources_used:
-        primary_source = "coingecko"
-    else:
-        primary_source = "unknown"
-    
-    logger.info(f"Data fetch complete for {symbol}: {len(df_merged)} days, sources: {sources_used}, quality score: {quality_metrics['quality_score']:.2f}")
-    
-    return df_merged, primary_source, quality_metrics
 
 
 def save_data_to_csv(df: pd.DataFrame, file_path: Optional[str] = None, symbol: str = "BTCUSDT") -> str:
