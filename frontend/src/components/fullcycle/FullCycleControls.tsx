@@ -267,7 +267,6 @@ export const FullCycleControls: React.FC<FullCycleControlsProps> = ({
             </div>
           </div>
         )}
-      </div>
         <DateRangePicker
           startDate={startDate}
           endDate={endDate}
