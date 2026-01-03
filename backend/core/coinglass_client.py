@@ -235,16 +235,12 @@ class CoinGlassClient:
         # Map symbol to CoinGlass format
         coinglass_symbol = self._map_symbol_to_coinglass(symbol)
         
-        # Try different possible endpoint paths based on CoinGlass API v4 documentation
-        # According to docs:
-        # - Futures > Trading Market > Price History (OHLC) -> /api/futures/trading-market/price-history-ohlc
-        # - Spots > Trading market > Price OHLC History -> /api/spot/trading-market/price-ohlc-history
-        # Note: "spot" (singular) not "spots" (plural) for spot endpoints
+        # Use the correct CoinGlass API v4 endpoint from documentation
+        # Documentation: https://docs.coinglass.com/reference/price-ohlc-history
+        # Endpoint: /api/futures/price/history
+        # Note: For Hobbyist tier, interval must be >= 4h
         endpoints_to_try = [
-            "/api/futures/trading-market/price-history-ohlc",  # Futures price history (from docs)
-            "/api/spot/trading-market/price-ohlc-history",  # Spot price history (from docs)
-            "/api/futures/trading-market/price-ohlc-history",  # Alternative futures format
-            "/api/futures/trading-market/pairs-markets",  # Pairs markets might have price data
+            "/api/futures/price/history",  # Correct endpoint from CoinGlass API v4 docs
         ]
         
         # CoinGlass API may have limits on how much data can be returned in a single request
@@ -257,27 +253,43 @@ class CoinGlassClient:
             logger.info(f"Large date range detected ({days_range} days). Fetching in chunks of {chunk_days} days...")
             all_dfs = []
             current_start = start_date
+            base_urls_to_try = [self.base_url, COINGLASS_BASE_URL_ALT]
             
             while current_start < end_date:
                 current_end = min(current_start + timedelta(days=chunk_days), end_date)
                 logger.info(f"Fetching chunk: {current_start.strftime('%Y-%m-%d')} to {current_end.strftime('%Y-%m-%d')}")
                 
+                # For Hobbyist tier, interval must be >= 4h
+                effective_interval = interval
+                if interval in ["1m", "5m", "15m", "30m", "1h", "2h", "3h"]:
+                    effective_interval = "4h"
+                
                 chunk_params = {
                     "symbol": coinglass_symbol,
-                    "interval": interval,
+                    "interval": effective_interval,
                     "startTime": int(current_start.timestamp() * 1000),
                     "endTime": int(current_end.timestamp() * 1000)
                 }
                 
-                # Try each endpoint for this chunk
+                # Try each endpoint with both base URLs for this chunk
                 chunk_data = None
-                for endpoint in endpoints_to_try:
-                    try:
-                        chunk_data = self._make_request(endpoint, chunk_params)
+                original_base = self.base_url
+                
+                for base_url in base_urls_to_try:
+                    self.base_url = base_url
+                    for endpoint in endpoints_to_try:
+                        try:
+                            chunk_data = self._make_request(endpoint, chunk_params)
+                            logger.info(f"✓ Successfully fetched chunk data from {base_url}{endpoint}")
+                            break
+                        except Exception as e:
+                            logger.debug(f"Endpoint {base_url}{endpoint} failed for chunk: {e}")
+                            continue
+                    
+                    if chunk_data is not None:
                         break
-                    except Exception as e:
-                        logger.debug(f"Endpoint {endpoint} failed for chunk: {e}")
-                        continue
+                
+                self.base_url = original_base  # Restore original
                 
                 if chunk_data:
                     # Parse chunk data
@@ -296,12 +308,22 @@ class CoinGlassClient:
                 logger.info(f"✓ Combined {len(all_dfs)} chunks into {len(df)} total records")
                 return df
             else:
-                raise Exception(f"Failed to fetch any data chunks for {symbol}")
+                raise Exception(
+                    f"Failed to fetch any data chunks for {symbol}. "
+                    f"This may indicate that historical price data is not available in your CoinGlass API tier."
+                )
         
         # Single request for smaller date ranges
+        # For Hobbyist tier, interval must be >= 4h according to docs
+        # Documentation: https://docs.coinglass.com/reference/price-ohlc-history
+        effective_interval = interval
+        if interval in ["1m", "5m", "15m", "30m", "1h", "2h", "3h"]:
+            logger.warning(f"Interval {interval} not supported for Hobbyist tier (minimum 4h). Using 4h instead.")
+            effective_interval = "4h"
+        
         params = {
             "symbol": coinglass_symbol,
-            "interval": interval
+            "interval": effective_interval
         }
         
         if start_date:
@@ -311,33 +333,50 @@ class CoinGlassClient:
         
         logger.info(f"Fetching CoinGlass price history: symbol={coinglass_symbol}, interval={interval}, start={start_date}, end={end_date}")
         
-        # Try each endpoint until one works
+        # Try each endpoint with both base URLs
         data = None
         last_error = None
         successful_endpoint = None
+        base_urls_to_try = [self.base_url, COINGLASS_BASE_URL_ALT]
         
-        for endpoint in endpoints_to_try:
-            try:
-                logger.info(f"Trying CoinGlass endpoint: {endpoint} with symbol={coinglass_symbol}")
-                data = self._make_request(endpoint, params)
-                logger.info(f"✓ Successfully fetched data from CoinGlass endpoint: {endpoint}")
-                successful_endpoint = endpoint
+        for base_url in base_urls_to_try:
+            original_base = self.base_url
+            self.base_url = base_url
+            logger.info(f"Trying base URL: {base_url}")
+            
+            for endpoint in endpoints_to_try:
+                try:
+                    logger.info(f"Trying CoinGlass endpoint: {base_url}{endpoint} with symbol={coinglass_symbol}")
+                    data = self._make_request(endpoint, params)
+                    logger.info(f"✓ Successfully fetched data from CoinGlass endpoint: {base_url}{endpoint}")
+                    successful_endpoint = f"{base_url}{endpoint}"
+                    self.base_url = original_base  # Restore original
+                    break
+                except Exception as e:
+                    error_str = str(e)
+                    logger.warning(f"✗ Endpoint {base_url}{endpoint} failed: {error_str}")
+                    last_error = e
+                    # If it's a 404, try next endpoint
+                    # If it's a 400, might be parameter issue - log it but continue
+                    if "404" in error_str or "not found" in error_str.lower():
+                        logger.debug(f"Endpoint {endpoint} not found (404), trying next...")
+                    elif "400" in error_str:
+                        logger.warning(f"Endpoint {endpoint} returned 400 (bad request) - might be parameter issue")
+                    continue
+            
+            if data is not None:
                 break
-            except Exception as e:
-                error_str = str(e)
-                logger.warning(f"✗ Endpoint {endpoint} failed: {error_str}")
-                last_error = e
-                # If it's a 404, try next endpoint
-                # If it's a 400, might be parameter issue - log it but continue
-                if "404" in error_str or "not found" in error_str.lower():
-                    logger.debug(f"Endpoint {endpoint} not found (404), trying next...")
-                elif "400" in error_str:
-                    logger.warning(f"Endpoint {endpoint} returned 400 (bad request) - might be parameter issue")
-                continue
+            self.base_url = original_base  # Restore original
         
         if data is None:
-            error_msg = f"All CoinGlass endpoints failed for {symbol} (coinglass_symbol={coinglass_symbol}). Last error: {last_error}"
+            error_msg = (
+                f"All CoinGlass endpoints failed for {symbol} (coinglass_symbol={coinglass_symbol}). "
+                f"Last error: {last_error}. "
+                f"This may indicate that historical price data is not available in your CoinGlass API tier, "
+                f"or the endpoints have changed. Please check the CoinGlass API documentation for the correct endpoints."
+            )
             logger.error(error_msg)
+            logger.error(f"Tried base URLs: {base_urls_to_try}")
             logger.error(f"Tried endpoints: {endpoints_to_try}")
             logger.error(f"Request params were: {params}")
             raise Exception(error_msg)
@@ -473,17 +512,15 @@ class CoinGlassClient:
                                 "Volume": float(record[5]) if len(record) > 5 else 0.0
                             })
                     elif isinstance(record, dict):
-                        # Handle dict format if CoinGlass returns objects
-                        if "time" in record or "timestamp" in record or "date" in record:
-                            ts_key = "time" if "time" in record else ("timestamp" if "timestamp" in record else "date")
-                            timestamp = record[ts_key]
+                        # Handle dict format - CoinGlass API returns: {"time": ms, "open": "str", "high": "str", "low": "str", "close": "str", "volume_usd": "str"}
+                        # Documentation: https://docs.coinglass.com/reference/price-ohlc-history
+                        if "time" in record:
+                            timestamp = record["time"]
                             date_obj = None
                             
                             if isinstance(timestamp, (int, float)):
-                                if timestamp < 1e10:
-                                    timestamp_ms = int(timestamp * 1000)
-                                else:
-                                    timestamp_ms = int(timestamp)
+                                # Timestamp is in milliseconds
+                                timestamp_ms = int(timestamp)
                                 
                                 # Validate timestamp is reasonable
                                 min_timestamp = pd.Timestamp('2009-01-01').value // 1000000
@@ -494,28 +531,24 @@ class CoinGlassClient:
                                 else:
                                     logger.warning(f"Invalid timestamp value: {timestamp_ms} (out of range)")
                                     continue
-                            elif isinstance(timestamp, str):
-                                # Handle date string format
-                                try:
-                                    date_obj = pd.to_datetime(timestamp, errors='coerce')
-                                    if pd.isna(date_obj):
-                                        date_obj = pd.to_datetime(timestamp, format='%Y-%m-%d', errors='coerce')
-                                    if pd.isna(date_obj):
-                                        logger.warning(f"Could not parse date string: {timestamp}")
-                                        continue
-                                except Exception as e:
-                                    logger.warning(f"Error parsing date string '{timestamp}': {e}")
-                                    continue
+                            else:
+                                logger.warning(f"Unexpected timestamp format in CoinGlass response: {timestamp} (type: {type(timestamp)})")
+                                continue
                             
                             if date_obj is not None:
+                                # Prices are strings in CoinGlass response, convert to float
+                                # Volume is in volume_usd field
                                 df_data.append({
                                     "Date": date_obj,
-                                    "Open": float(record.get("open", record.get("o", 0))),
-                                    "High": float(record.get("high", record.get("h", 0))),
-                                    "Low": float(record.get("low", record.get("l", 0))),
-                                    "Close": float(record.get("close", record.get("c", 0))),
-                                    "Volume": float(record.get("volume", record.get("v", 0)))
+                                    "Open": float(record.get("open", 0)),
+                                    "High": float(record.get("high", 0)),
+                                    "Low": float(record.get("low", 0)),
+                                    "Close": float(record.get("close", 0)),
+                                    "Volume": float(record.get("volume_usd", record.get("volume", 0)))
                                 })
+                        else:
+                            logger.warning(f"Record missing 'time' field: {record}")
+                            continue
                 except Exception as e:
                     logger.warning(f"Error parsing CoinGlass record: {record}, error: {e}")
                     continue

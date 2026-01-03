@@ -693,11 +693,13 @@ def fetch_crypto_data_from_coinglass(
             logger.warning(f"CoinGlass API connection test error: {conn_test_error}, but continuing with data fetch attempt...")
         
         # Fetch price history
+        # Use "1d" (daily) interval - CoinGlass supports this for all tiers
+        # For Hobbyist tier, minimum is 4h, but 1d is fine
         df = client.get_price_history(
             symbol=symbol,
             start_date=start_date,
             end_date=end_date,
-            interval="1d"
+            interval="1d"  # Daily interval for price data
         )
         
         if df.empty:
