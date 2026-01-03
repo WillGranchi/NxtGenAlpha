@@ -1146,30 +1146,28 @@ def fetch_crypto_data_smart(
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
     use_cache: bool = True,
-    cross_validate: bool = True,
+    cross_validate: bool = False,  # Disabled by default when using only CoinGlass
     include_additional_metrics: bool = False
 ) -> Tuple[pd.DataFrame, str, Dict]:
     """
-    Smart data fetching strategy that uses CoinGlass as primary source.
+    Fetch cryptocurrency data using ONLY CoinGlass API (no fallbacks).
     
-    Priority:
-    1. Fetch data from CoinGlass (primary source - comprehensive market data)
-    2. Fallback to Yahoo Finance if CoinGlass fails
-    3. Fallback to CoinGecko if Yahoo Finance fails
-    4. Cross-validate with CryptoCompare (optional, for quality assurance)
-    5. Merge, deduplicate, and validate quality
-    6. Cache result
+    This function is configured to use CoinGlass exclusively to verify API connectivity
+    and ensure all data comes from a single, reliable source.
     
     Args:
         symbol: Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
         start_date: Start date for historical data (defaults to 5 years back or token launch)
         end_date: End date (defaults to today)
-        use_cache: Whether to use cached data if fresh
-        cross_validate: Whether to cross-validate with CryptoCompare
+        use_cache: Whether to use cached data if fresh (not currently used, always fetches fresh)
+        cross_validate: Whether to cross-validate (disabled when using only CoinGlass)
         include_additional_metrics: Whether to fetch additional metrics (funding rates, OI, etc.)
         
     Returns:
         Tuple[pd.DataFrame, str, Dict]: DataFrame, data_source, quality_metrics
+        
+    Raises:
+        Exception: If CoinGlass API request fails
     """
     logger = logging.getLogger(__name__)
     
@@ -1180,117 +1178,52 @@ def fetch_crypto_data_smart(
         # Fetch all available data from launch date
         start_date, _ = calculate_historical_range(symbol, years=None)
     
-    df_coinglass = None
-    df_yahoo = None
-    df_coingecko = None
-    df_cryptocompare = None
+    # ONLY use CoinGlass - no fallbacks
+    logger.info(f"Fetching {symbol} data from CoinGlass ONLY ({start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')})...")
     
-    sources_used = []
-    
-    # Step 1: Try CoinGlass first (primary source - comprehensive market data)
     try:
-        logger.info(f"Fetching {symbol} data from CoinGlass ({start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')})...")
         df_coinglass = fetch_crypto_data_from_coinglass(
             symbol=symbol,
             start_date=start_date,
             end_date=end_date
         )
-        if not df_coinglass.empty:
-            sources_used.append("coinglass")
-            logger.info(f"Successfully fetched {len(df_coinglass)} days from CoinGlass")
-            
-            # Fetch additional metrics if requested
-            if include_additional_metrics:
-                try:
-                    additional_metrics = fetch_coinglass_additional_metrics(
-                        symbol=symbol,
-                        start_date=start_date,
-                        end_date=end_date
-                    )
-                    # Merge additional metrics into DataFrame
-                    for metric_name, metric_series in additional_metrics.items():
-                        if not metric_series.empty:
-                            df_coinglass[metric_name] = metric_series
-                            logger.info(f"Added {metric_name} metric to DataFrame")
-                except Exception as e:
-                    logger.warning(f"Failed to fetch additional metrics from CoinGlass: {e}")
+        
+        if df_coinglass.empty:
+            raise Exception(f"CoinGlass API returned empty data for {symbol}. Check API key and endpoint configuration.")
+        
+        logger.info(f"✓ Successfully fetched {len(df_coinglass)} days from CoinGlass")
+        
+        # Fetch additional metrics if requested
+        if include_additional_metrics:
+            try:
+                additional_metrics = fetch_coinglass_additional_metrics(
+                    symbol=symbol,
+                    start_date=start_date,
+                    end_date=end_date
+                )
+                # Merge additional metrics into DataFrame
+                for metric_name, metric_series in additional_metrics.items():
+                    if not metric_series.empty:
+                        df_coinglass[metric_name] = metric_series
+                        logger.info(f"✓ Added {metric_name} metric to DataFrame")
+            except Exception as e:
+                logger.warning(f"Failed to fetch additional metrics from CoinGlass: {e}")
+        
+        # Filter to requested date range
+        df_merged = df_coinglass[(df_coinglass.index >= start_date) & (df_coinglass.index <= end_date)]
+        
+        # Validate data quality
+        quality_metrics = validate_data_quality(df_merged, symbol)
+        quality_metrics['data_source'] = 'coinglass'
+        quality_metrics['sources_used'] = ['coinglass']
+        
+        return df_merged, "coinglass", quality_metrics
+        
     except Exception as e:
-        logger.warning(f"CoinGlass fetch failed: {e}, will try Yahoo Finance")
-    
-    # Step 2: Fallback to Yahoo Finance if CoinGlass failed
-    if df_coinglass is None or df_coinglass.empty:
-        try:
-            logger.info(f"Fetching {symbol} data from Yahoo Finance ({start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')})...")
-            df_yahoo = fetch_crypto_data_from_yahoo_finance(
-                symbol=symbol,
-                start_date=start_date,
-                end_date=end_date
-            )
-            if not df_yahoo.empty:
-                sources_used.append("yahoo_finance")
-                logger.info(f"Successfully fetched {len(df_yahoo)} days from Yahoo Finance")
-        except Exception as e:
-            logger.warning(f"Yahoo Finance fetch failed: {e}, will try CoinGecko")
-    
-    # Step 3: Fallback to CoinGecko if both CoinGlass and Yahoo Finance failed
-    if (df_coinglass is None or df_coinglass.empty) and (df_yahoo is None or df_yahoo.empty):
-        try:
-            logger.info(f"Fetching {symbol} data from CoinGecko ({start_date.strftime('%Y-%m-%d')} onwards)...")
-            df_coingecko = fetch_crypto_data_from_coingecko(
-                symbol=symbol,
-                start_date=start_date,
-                end_date=end_date
-            )
-            if not df_coingecko.empty:
-                sources_used.append("coingecko")
-                logger.info(f"Successfully fetched {len(df_coingecko)} days from CoinGecko")
-        except Exception as e:
-            logger.warning(f"CoinGecko fetch failed: {e}")
-    
-    # Step 4: Cross-validate with CryptoCompare (optional, for quality)
-    days_needed = (end_date - start_date).days
-    if cross_validate and days_needed <= 2000:  # CryptoCompare can fetch up to 2000 days
-        try:
-            logger.info(f"Cross-validating {symbol} data with CryptoCompare...")
-            df_cryptocompare = fetch_crypto_data_from_cryptocompare(
-                symbol=symbol,
-                days=min(days_needed, 2000),
-                start_date=start_date
-            )
-            if not df_cryptocompare.empty:
-                sources_used.append("cryptocompare")
-                logger.info(f"Successfully fetched {len(df_cryptocompare)} days from CryptoCompare for validation")
-        except Exception as e:
-            logger.debug(f"CryptoCompare validation skipped: {e}")
-    
-    # Step 5: Use CoinGlass data if available, otherwise Yahoo Finance, then CoinGecko
-    if df_coinglass is not None and not df_coinglass.empty:
-        df_merged = df_coinglass
-    elif df_yahoo is not None and not df_yahoo.empty:
-        df_merged = df_yahoo
-    elif df_coingecko is not None and not df_coingecko.empty:
-        df_merged = df_coingecko
-    else:
-        # All sources failed
-        raise Exception(f"Failed to fetch {symbol} data from any source (CoinGlass, Yahoo Finance, or CoinGecko)")
-    
-    # Filter to requested date range
-    df_merged = df_merged[(df_merged.index >= start_date) & (df_merged.index <= end_date)]
-    
-    # Step 6: Cross-validate quality if CryptoCompare data available
-    quality_metrics = validate_data_quality(df_merged, symbol)
-    
-    if df_cryptocompare is not None and not df_cryptocompare.empty:
-        cv_results = cross_validate_sources(
-            df_merged,
-            df_cryptocompare,
-            source1_name="primary",
-            source2_name="cryptocompare"
-        )
-        quality_metrics['cross_validation'] = cv_results
-        # Update quality score with accuracy from cross-validation
-        quality_metrics['quality_score'] = calculate_quality_score(
-            quality_metrics['completeness_score'],
+        error_msg = f"CoinGlass API fetch failed for {symbol}: {str(e)}"
+        logger.error(error_msg)
+        logger.error("No fallback sources available - CoinGlass is the only data source configured.")
+        raise Exception(f"{error_msg} Please check: 1) CoinGlass API key is set, 2) API key is valid, 3) Network connectivity, 4) CoinGlass API status.")
             quality_metrics['consistency_score'],
             quality_metrics['freshness_score'],
             cv_results['accuracy_score']
@@ -1398,7 +1331,7 @@ def fetch_crypto_data_hybrid(symbol: str = "BTCUSDT", days: int = 1825, start_da
 
 def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int = 1825, start_date: Optional[datetime] = None, include_additional_metrics: bool = False) -> pd.DataFrame:
     """
-    Update cryptocurrency data using CoinGlass API (primary) with Yahoo Finance/CoinGecko fallback.
+    Update cryptocurrency data using ONLY CoinGlass API (no fallbacks).
     Saves to CSV and caches locally. Checks if data is fresh (updated within last 24 hours) before fetching.
     
     Args:
