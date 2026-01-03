@@ -265,11 +265,11 @@ class CoinGlassClient:
                     effective_interval = "4h"
                 
                 chunk_params = {
-                    "symbol": coinglass_symbol,
+                    "symbol": coinglass_symbol.replace("-", "/"),  # Convert BTC-USDT to BTC/USDT
                     "interval": effective_interval,
-                    "exchange": "binance",  # Default to Binance
-                    "startTime": int(current_start.timestamp() * 1000),
-                    "endTime": int(current_end.timestamp() * 1000)
+                    "exchange": "Binance",  # Capitalized exchange name
+                    "start_time": int(current_start.timestamp() * 1000),  # Use start_time
+                    "end_time": int(current_end.timestamp() * 1000)  # Use end_time
                 }
                 
                 # Try each endpoint with both base URLs for this chunk
@@ -322,26 +322,26 @@ class CoinGlassClient:
             logger.warning(f"Interval {interval} not supported for Hobbyist tier (minimum 4h). Using 4h instead.")
             effective_interval = "4h"
         
-        # CoinGlass API requires 'exchange' parameter
-        # Use 'binance' as default (largest exchange) or try to get aggregated data
-        # If exchange is not specified, try common exchanges
+        # CoinGlass API requires 'exchange' parameter (capitalized, e.g., "Binance")
+        # Symbol format should be "BTC/USDT" (with slash, not dash)
+        # Parameters use start_time and end_time (not startTime/endTime)
         params = {
-            "symbol": coinglass_symbol,
+            "symbol": coinglass_symbol.replace("-", "/"),  # Convert BTC-USDT to BTC/USDT
             "interval": effective_interval,
-            "exchange": "binance"  # Default to Binance, can be overridden if needed
+            "exchange": "Binance"  # Capitalized exchange name
         }
         
         if start_date:
-            params["startTime"] = int(start_date.timestamp() * 1000)
+            params["start_time"] = int(start_date.timestamp() * 1000)  # Use start_time not startTime
         if end_date:
-            params["endTime"] = int(end_date.timestamp() * 1000)
+            params["end_time"] = int(end_date.timestamp() * 1000)  # Use end_time not endTime
         
         logger.info(f"Fetching CoinGlass price history: symbol={coinglass_symbol}, interval={effective_interval}, exchange={params.get('exchange')}, start={start_date}, end={end_date}")
         
-        # Try different exchanges if the default fails
-        exchanges_to_try = ["binance", "coinbase", "okx", "bybit", "kraken"]
+        # Try different exchanges if the default fails (capitalized names)
+        exchanges_to_try = ["Binance", "Coinbase", "OKX", "Bybit", "Kraken"]
         if params.get("exchange") not in exchanges_to_try:
-            exchanges_to_try.insert(0, params.get("exchange", "binance"))
+            exchanges_to_try.insert(0, params.get("exchange", "Binance"))
         
         # Try each endpoint with both base URLs and different exchanges
         data = None
@@ -801,10 +801,11 @@ class CoinGlassClient:
         }
         
         if symbol_upper in symbol_map:
-            # Return first format (most common)
+            # Return BTC/USDT format (with slash) for CoinGlass API
+            # The mapping returns BTC-USDT, but we'll convert to BTC/USDT in the request
             return symbol_map[symbol_upper][0]
         
-        # Try to auto-convert: BTCUSDT -> BTC-USDT
+        # Try to auto-convert: BTCUSDT -> BTC-USDT (will be converted to BTC/USDT in request)
         if symbol_upper.endswith("USDT"):
             base = symbol_upper[:-4]
             return f"{base}-USDT"
