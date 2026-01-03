@@ -613,13 +613,22 @@ class CoinGlassClient:
         logger.warning(f"Could not map symbol {symbol} to CoinGlass format, using as-is")
         return symbol_upper
     
-    def test_connection(self) -> bool:
+    def test_connection(self) -> Dict[str, Any]:
         """
         Test CoinGlass API connection by making a simple request.
         
         Returns:
-            True if connection successful, False otherwise
+            Dictionary with test results including success status, endpoint used, and response details
         """
+        result = {
+            "success": False,
+            "endpoint": None,
+            "error": None,
+            "response": None,
+            "api_key_configured": bool(self.api_key),
+            "base_url": self.base_url
+        }
+        
         try:
             # Try to get supported coins list (should be a simple endpoint)
             # Based on docs: /api/spot/supported-coins and /api/futures/supported-coins
@@ -632,20 +641,38 @@ class CoinGlassClient:
             
             for endpoint in endpoints_to_try:
                 try:
-                    logger.debug(f"Testing CoinGlass connection with endpoint: {endpoint}")
+                    logger.info(f"Testing CoinGlass connection with endpoint: {endpoint}")
+                    logger.info(f"Base URL: {self.base_url}, API Key configured: {bool(self.api_key)}")
                     data = self._make_request(endpoint, {})
-                    logger.info(f"CoinGlass API connection test successful using endpoint: {endpoint}")
-                    logger.debug(f"Test response: {str(data)[:200]}")
-                    return True
+                    result["success"] = True
+                    result["endpoint"] = endpoint
+                    result["response"] = str(data)[:500]  # First 500 chars of response
+                    logger.info(f"✓ CoinGlass API connection test successful using endpoint: {endpoint}")
+                    return result
+                except requests.exceptions.Timeout as timeout_error:
+                    error_msg = f"Timeout error for {endpoint}: {str(timeout_error)}"
+                    logger.warning(f"✗ {error_msg}")
+                    result["error"] = error_msg
+                    continue
+                except requests.exceptions.ConnectionError as conn_error:
+                    error_msg = f"Connection error for {endpoint}: {str(conn_error)}"
+                    logger.warning(f"✗ {error_msg}")
+                    result["error"] = error_msg
+                    continue
                 except Exception as e:
-                    logger.debug(f"Endpoint {endpoint} failed: {e}")
+                    error_msg = f"Error for {endpoint}: {str(e)}"
+                    logger.warning(f"✗ {error_msg}")
+                    result["error"] = error_msg
                     continue
             
             logger.error("CoinGlass API connection test failed for all endpoints")
-            return False
+            result["error"] = "All endpoints failed"
+            return result
         except Exception as e:
-            logger.error(f"CoinGlass API connection test failed: {e}")
-            return False
+            error_msg = f"Connection test exception: {str(e)}"
+            logger.error(error_msg)
+            result["error"] = error_msg
+            return result
 
 
 # Global client instance
