@@ -1149,6 +1149,7 @@ def fetch_crypto_data_smart(
     symbol: str = "BTCUSDT",
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
+    exchange: str = "Binance",
     use_cache: bool = True,
     cross_validate: bool = False,  # Disabled by default when using only CoinGlass
     include_additional_metrics: bool = False
@@ -1163,6 +1164,7 @@ def fetch_crypto_data_smart(
         symbol: Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
         start_date: Start date for historical data (defaults to 5 years back or token launch)
         end_date: End date (defaults to today)
+        exchange: Exchange name (e.g., "Binance", "Coinbase", "OKX")
         use_cache: Whether to use cached data if fresh (not currently used, always fetches fresh)
         cross_validate: Whether to cross-validate (disabled when using only CoinGlass)
         include_additional_metrics: Whether to fetch additional metrics (funding rates, OI, etc.)
