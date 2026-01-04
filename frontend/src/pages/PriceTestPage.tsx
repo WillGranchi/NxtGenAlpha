@@ -23,12 +23,16 @@ interface PriceDataPoint {
 const PriceTestPage: React.FC = () => {
   const { isMobile } = useMobile();
   
+  // Symbol and Exchange state
+  const [symbol, setSymbol] = useState<string>('BTCUSDT');
+  const [exchange, setExchange] = useState<string>('Binance');
+  
   // Date range state
   const [startDate, setStartDate] = useState<string>(() => {
-    // Default to 6 months ago for better performance (CoinGlass API can be slow with large ranges)
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    return sixMonthsAgo.toISOString().split('T')[0];
+    // Default to 1 year ago - users can extend via date picker
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    return oneYearAgo.toISOString().split('T')[0];
   });
   const [endDate, setEndDate] = useState<string>(() => {
     return new Date().toISOString().split('T')[0];
@@ -43,6 +47,13 @@ const PriceTestPage: React.FC = () => {
   const [totalRecords, setTotalRecords] = useState<number>(0);
   const [useLogScale, setUseLogScale] = useState<boolean>(true);
   const [showVolume, setShowVolume] = useState<boolean>(true);
+  
+  // Supported symbols and exchanges
+  const supportedSymbols = [
+    'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'SOLUSDT', 
+    'XRPUSDT', 'DOGEUSDT', 'DOTUSDT', 'MATICUSDT', 'LTCUSDT'
+  ];
+  const supportedExchanges = ['Binance', 'Coinbase', 'OKX', 'Bybit', 'Kraken'];
 
   // Load price data
   const loadPriceData = useCallback(async (forceRefresh: boolean = false) => {
@@ -51,7 +62,8 @@ const PriceTestPage: React.FC = () => {
     
     try {
       const response = await TradingAPI.getPriceHistory({
-        symbol: 'BTCUSDT',
+        symbol: symbol,
+        exchange: exchange,
         start_date: startDate,
         end_date: endDate,
       });
@@ -72,7 +84,7 @@ const PriceTestPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [startDate, endDate]);
+  }, [symbol, exchange, startDate, endDate]);
 
   // Load data on mount and when date range changes
   useEffect(() => {
@@ -86,17 +98,17 @@ const PriceTestPage: React.FC = () => {
           {/* Header */}
           <div className="text-center mb-6">
             <h1 className="text-3xl md:text-4xl font-bold text-gradient mb-2">
-              BTC Price Test
+              Price Test
             </h1>
             <p className="text-text-secondary">
-              Test visualization of Bitcoin price history from CoinGlass API
+              Visualize cryptocurrency price history from CoinGlass API
             </p>
           </div>
 
           {/* Controls Section */}
           <div className="bg-bg-secondary border border-border-default rounded-lg p-6">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-              <h2 className="text-xl font-semibold text-text-primary">Date Range & Controls</h2>
+              <h2 className="text-xl font-semibold text-text-primary">Symbol, Exchange & Date Range</h2>
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => loadPriceData(true)}
@@ -116,6 +128,42 @@ const PriceTestPage: React.FC = () => {
                     </>
                   )}
                 </button>
+              </div>
+            </div>
+
+            {/* Symbol and Exchange Selectors */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Trading Pair (Symbol)
+                </label>
+                <select
+                  value={symbol}
+                  onChange={(e) => setSymbol(e.target.value)}
+                  className="w-full px-3 py-2 bg-bg-primary border border-border-default rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  {supportedSymbols.map((sym) => (
+                    <option key={sym} value={sym}>
+                      {sym}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Exchange
+                </label>
+                <select
+                  value={exchange}
+                  onChange={(e) => setExchange(e.target.value)}
+                  className="w-full px-3 py-2 bg-bg-primary border border-border-default rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  {supportedExchanges.map((ex) => (
+                    <option key={ex} value={ex}>
+                      {ex}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -187,7 +235,7 @@ const PriceTestPage: React.FC = () => {
             ) : priceData.length > 0 ? (
               <CandlestickChart
                 data={priceData}
-                title="Bitcoin Price (OHLC) - CoinGlass Data"
+                title={`${symbol} Price (OHLC) - ${exchange} via CoinGlass`}
                 height={600}
                 showVolume={showVolume}
                 useLogScale={useLogScale}

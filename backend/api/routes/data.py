@@ -305,7 +305,8 @@ async def test_coinglass_connection() -> Dict[str, Any]:
 async def get_price_history(
     symbol: Optional[str] = Query(default="BTCUSDT", description="Trading pair symbol (e.g., BTCUSDT, ETHUSDT)"),
     start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD)"),
-    end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)")
+    end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)"),
+    exchange: Optional[str] = Query(default="Binance", description="Exchange name (e.g., Binance, Coinbase, OKX)")
 ) -> Dict[str, Any]:
     """
     Get OHLC price history data from CoinGlass API.
@@ -326,11 +327,12 @@ async def get_price_history(
         end_date_dt = pd.to_datetime(end_date) if end_date else None
         
         # Fetch data from CoinGlass API (only source)
-        logger.info(f"Fetching price history for {symbol} from CoinGlass...")
+        logger.info(f"Fetching price history for {symbol} on {exchange} from CoinGlass...")
         df, data_source, quality_metrics = fetch_crypto_data_smart(
             symbol=symbol,
             start_date=start_date_dt,
             end_date=end_date_dt,
+            exchange=exchange,
             use_cache=True,  # Use cache if available
             cross_validate=False
         )

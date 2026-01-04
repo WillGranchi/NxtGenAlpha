@@ -343,6 +343,7 @@ class CoinGlassClient:
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
         interval: str = "4h",  # Default to 4h for Hobbyist tier compatibility (minimum allowed)
+        exchange: str = "Binance",  # Exchange name (capitalized)
         use_cache: bool = True
     ) -> pd.DataFrame:
         """
@@ -353,6 +354,7 @@ class CoinGlassClient:
             start_date: Start date for historical data
             end_date: End date for historical data
             interval: Time interval (1d, 1h, etc.)
+            exchange: Exchange name (e.g., "Binance", "Coinbase", "OKX")
             use_cache: Whether to use cache (default: True)
             
         Returns:
@@ -361,14 +363,17 @@ class CoinGlassClient:
         # Map symbol to CoinGlass format
         coinglass_symbol = self._map_symbol_to_coinglass(symbol)
         
+        # Store exchange for use in requests
+        successful_exchange = exchange
+        
         # Check cache first if enabled
         if use_cache:
             is_recent = _is_recent_data(start_date, end_date)
-            cache_key = _generate_cache_key(symbol, "Binance", interval, start_date, end_date)
+            cache_key = _generate_cache_key(symbol, exchange, interval, start_date, end_date)
             cached_df = _get_cached_response(cache_key, is_recent)
             
             if cached_df is not None:
-                logger.info(f"Returning cached CoinGlass data for {symbol} (cache key: {cache_key[:8]}...)")
+                logger.info(f"Returning cached CoinGlass data for {symbol} on {exchange} (cache key: {cache_key[:8]}...)")
                 return cached_df
         
         # Clean expired cache entries periodically (every 10th request)
@@ -409,7 +414,8 @@ class CoinGlassClient:
                 chunk_params = {
                     "symbol": symbol_clean,  # Format: BTCUSDT (no separator)
                     "interval": effective_interval,
-                    "exchange": "Binance",  # Capitalized exchange name
+                    "exchange": successful_exchange,  # Use provided exchange
+                    "limit": "1000",  # Maximum allowed
                     "start_time": int(current_start.timestamp() * 1000),  # Use start_time
                     "end_time": int(current_end.timestamp() * 1000)  # Use end_time
                 }
@@ -453,9 +459,9 @@ class CoinGlassClient:
                 # Store in cache if enabled and data is valid
                 if use_cache and not df.empty:
                     is_recent = _is_recent_data(start_date, end_date)
-                    cache_key = _generate_cache_key(symbol, "Binance", effective_interval, start_date, end_date)
+                    cache_key = _generate_cache_key(symbol, successful_exchange, effective_interval, start_date, end_date)
                     _store_cached_response(cache_key, df)
-                    logger.info(f"Cached CoinGlass chunked response for {symbol} (cache key: {cache_key[:8]}...)")
+                    logger.info(f"Cached CoinGlass chunked response for {symbol} on {successful_exchange} (cache key: {cache_key[:8]}...)")
                 
                 return df
             else:
@@ -466,7 +472,7 @@ class CoinGlassClient:
         
         # Single request for smaller date ranges
         # For Hobbyist tier, interval must be >= 4h according to docs
-        # Documentation: https://docs.coinglass.com/reference/price-ohlc-history
+        # Documentation: https://docs.coinglass.com/reference/price-history
         effective_interval = interval
         if interval in ["1m", "5m", "15m", "30m", "1h", "2h", "3h"]:
             logger.warning(f"Interval {interval} not supported for Hobbyist tier (minimum 4h). Using 4h instead.")
@@ -477,10 +483,32 @@ class CoinGlassClient:
         # Parameters use start_time and end_time (not startTime/endTime)
         # Remove any separators from symbol to get "BTCUSDT" format
         symbol_clean = coinglass_symbol.replace("-", "").replace("/", "").replace("_", "")
+        
+        # CoinGlass API limit: max 1000 records per request
+        # For daily data: 1000 days per request
+        # For 4h data: ~166 days per request
+        # Calculate how many records we need based on date range and interval
+        if start_date and end_date:
+            days_range = (end_date - start_date).days
+            # Estimate records needed based on interval
+            interval_hours = {"1d": 24, "4h": 4, "6h": 6, "8h": 8, "12h": 12, "1w": 168}.get(effective_interval, 24)
+            estimated_records = int((days_range * 24) / interval_hours)
+            
+            # If estimated records > 1000, we need pagination
+            if estimated_records > 1000:
+                logger.info(f"Large date range detected ({days_range} days, ~{estimated_records} records). Using pagination with limit=1000")
+                # Use pagination logic
+                return self._fetch_price_history_paginated(
+                    symbol_clean, effective_interval, start_date, end_date, 
+                    successful_exchange, use_cache
+                )
+        
+        # Single request for smaller ranges
         params = {
             "symbol": symbol_clean,  # Format: BTCUSDT (no separator)
             "interval": effective_interval,
-            "exchange": "Binance"  # Capitalized exchange name
+            "exchange": successful_exchange,  # Use provided exchange
+            "limit": "1000"  # Maximum allowed by CoinGlass API
         }
         
         if start_date:
@@ -488,12 +516,12 @@ class CoinGlassClient:
         if end_date:
             params["end_time"] = int(end_date.timestamp() * 1000)  # Use end_time not endTime
         
-        logger.info(f"Fetching CoinGlass price history: symbol={coinglass_symbol}, interval={effective_interval}, exchange={params.get('exchange')}, start={start_date}, end={end_date}")
+        logger.info(f"Fetching CoinGlass price history: symbol={coinglass_symbol}, interval={effective_interval}, exchange={successful_exchange}, start={start_date}, end={end_date}")
         
         # Try different exchanges if the default fails (capitalized names)
         exchanges_to_try = ["Binance", "Coinbase", "OKX", "Bybit", "Kraken"]
-        if params.get("exchange") not in exchanges_to_try:
-            exchanges_to_try.insert(0, params.get("exchange", "Binance"))
+        if successful_exchange not in exchanges_to_try:
+            exchanges_to_try.insert(0, successful_exchange)
         
         # Try each endpoint with both base URLs and different exchanges
         data = None
@@ -562,11 +590,124 @@ class CoinGlassClient:
         # Store in cache if enabled and data is valid
         if use_cache and not df.empty:
             is_recent = _is_recent_data(start_date, end_date)
-            cache_key = _generate_cache_key(symbol, successful_exchange or "Binance", effective_interval, start_date, end_date)
+            cache_key = _generate_cache_key(symbol, successful_exchange, effective_interval, start_date, end_date)
             _store_cached_response(cache_key, df)
-            logger.info(f"Cached CoinGlass response for {symbol} (cache key: {cache_key[:8]}...)")
+            logger.info(f"Cached CoinGlass response for {symbol} on {successful_exchange} (cache key: {cache_key[:8]}...)")
         
         return df
+    
+    def _fetch_price_history_paginated(
+        self,
+        symbol: str,
+        interval: str,
+        start_date: datetime,
+        end_date: datetime,
+        exchange: str,
+        use_cache: bool = True
+    ) -> pd.DataFrame:
+        """
+        Fetch price history using pagination for large date ranges.
+        CoinGlass API limit is 1000 records per request.
+        
+        Args:
+            symbol: Trading pair symbol (e.g., "BTCUSDT")
+            interval: Time interval
+            start_date: Start date
+            end_date: End date
+            exchange: Exchange name
+            use_cache: Whether to use cache
+            
+        Returns:
+            DataFrame with all paginated data combined
+        """
+        logger.info(f"Fetching paginated price history for {symbol} on {exchange} ({start_date} to {end_date})")
+        
+        # Calculate interval hours to estimate records per day
+        interval_hours = {"1d": 24, "4h": 4, "6h": 6, "8h": 8, "12h": 12, "1w": 168}.get(interval, 24)
+        records_per_day = 24 / interval_hours
+        days_per_request = int(1000 / records_per_day)  # How many days fit in 1000 records
+        
+        all_dfs = []
+        current_start = start_date
+        endpoints_to_try = ["/api/spot/price/history"]
+        base_urls_to_try = [self.base_url, COINGLASS_BASE_URL_ALT]
+        
+        while current_start < end_date:
+            # Calculate end date for this chunk (ensure we don't exceed end_date)
+            current_end = min(current_start + timedelta(days=days_per_request), end_date)
+            
+            logger.info(f"Fetching page: {current_start.strftime('%Y-%m-%d')} to {current_end.strftime('%Y-%m-%d')}")
+            
+            # Check cache for this chunk
+            chunk_df = None
+            if use_cache:
+                is_recent = _is_recent_data(current_start, current_end)
+                cache_key = _generate_cache_key(symbol, exchange, interval, current_start, current_end)
+                chunk_df = _get_cached_response(cache_key, is_recent)
+            
+            if chunk_df is None:
+                # Fetch this chunk from API
+                params = {
+                    "symbol": symbol,
+                    "interval": interval,
+                    "exchange": exchange,
+                    "limit": "1000",
+                    "start_time": int(current_start.timestamp() * 1000),
+                    "end_time": int(current_end.timestamp() * 1000)
+                }
+                
+                # Make API request
+                chunk_data = None
+                original_base = self.base_url
+                
+                for base_url in base_urls_to_try:
+                    self.base_url = base_url
+                    for endpoint in endpoints_to_try:
+                        try:
+                            chunk_data = self._make_request(endpoint, params)
+                            logger.info(f"✓ Successfully fetched chunk data from {base_url}{endpoint}")
+                            break
+                        except Exception as e:
+                            logger.debug(f"Endpoint {base_url}{endpoint} failed for chunk: {e}")
+                            continue
+                    
+                    if chunk_data is not None:
+                        break
+                
+                self.base_url = original_base  # Restore original
+                
+                if chunk_data:
+                    # Parse response
+                    chunk_df = self._parse_price_history_response(chunk_data, symbol, symbol)
+                    
+                    # Cache this chunk
+                    if use_cache and not chunk_df.empty:
+                        is_recent = _is_recent_data(current_start, current_end)
+                        cache_key = _generate_cache_key(symbol, exchange, interval, current_start, current_end)
+                        _store_cached_response(cache_key, chunk_df)
+            
+            if chunk_df is not None and not chunk_df.empty:
+                all_dfs.append(chunk_df)
+                logger.info(f"✓ Fetched {len(chunk_df)} records for chunk")
+            
+            # Move to next chunk
+            current_start = current_end + timedelta(days=1)
+        
+        # Combine all chunks
+        if all_dfs:
+            df = pd.concat(all_dfs)
+            df = df.sort_index()
+            df = df[~df.index.duplicated(keep='first')]  # Remove duplicates
+            logger.info(f"✓ Combined {len(all_dfs)} pages into {len(df)} total records")
+            
+            # Filter to exact date range
+            if start_date and end_date:
+                df = df[(df.index >= start_date) & (df.index <= end_date)]
+            
+            return df
+        else:
+            logger.warning(f"No data fetched for {symbol} on {exchange}")
+            return pd.DataFrame()
     
     def _parse_price_history_response(self, data: Any, symbol: str, coinglass_symbol: str) -> pd.DataFrame:
         """

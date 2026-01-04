@@ -583,6 +583,7 @@ export class TradingAPI {
     symbol?: string;
     start_date?: string;
     end_date?: string;
+    exchange?: string;
   }): Promise<{
     success: boolean;
     data: Array<{

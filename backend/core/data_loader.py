@@ -653,7 +653,8 @@ def get_yahoo_finance_ticker(symbol: str) -> Optional[str]:
 def fetch_crypto_data_from_coinglass(
     symbol: str = "BTCUSDT",
     start_date: Optional[datetime] = None,
-    end_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None,
+    exchange: str = "Binance"
 ) -> pd.DataFrame:
     """
     Fetch cryptocurrency historical data from CoinGlass API.
@@ -699,7 +700,8 @@ def fetch_crypto_data_from_coinglass(
             symbol=symbol,
             start_date=start_date,
             end_date=end_date,
-            interval="1d"  # Daily interval for price data
+            interval="1d",  # Daily interval for price data
+            exchange=exchange
         )
         
         if df.empty:
@@ -1192,7 +1194,8 @@ def fetch_crypto_data_smart(
         df_coinglass = fetch_crypto_data_from_coinglass(
             symbol=symbol,
             start_date=start_date,
-            end_date=end_date
+            end_date=end_date,
+            exchange=exchange
         )
         
         if df_coinglass.empty:
