@@ -9,11 +9,13 @@ import os
 import time
 import logging
 import requests
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime, timedelta
 from collections import deque
 import pandas as pd
 import numpy as np
+import hashlib
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +72,128 @@ class RateLimiter:
 
 # Global rate limiter instance
 _rate_limiter = RateLimiter()
+
+# In-memory cache for CoinGlass API responses
+# Structure: {cache_key: (dataframe, timestamp)}
+# TTL: 10 minutes for recent data, 1 hour for historical data
+_coinglass_cache: Dict[str, Tuple[pd.DataFrame, float]] = {}
+CACHE_TTL_RECENT = 600  # 10 minutes for recent data (last 7 days)
+CACHE_TTL_HISTORICAL = 3600  # 1 hour for historical data (older than 7 days)
+
+
+def _generate_cache_key(
+    symbol: str,
+    exchange: str,
+    interval: str,
+    start_date: Optional[datetime],
+    end_date: Optional[datetime]
+) -> str:
+    """
+    Generate a cache key for CoinGlass API requests.
+    
+    Args:
+        symbol: Trading pair symbol
+        exchange: Exchange name
+        interval: Time interval
+        start_date: Start date
+        end_date: End date
+        
+    Returns:
+        Cache key string
+    """
+    # Create a deterministic key from parameters
+    key_parts = [
+        symbol.upper(),
+        exchange,
+        interval,
+        start_date.isoformat() if start_date else "none",
+        end_date.isoformat() if end_date else "none"
+    ]
+    key_string = "|".join(key_parts)
+    # Use hash to keep keys manageable
+    return hashlib.md5(key_string.encode()).hexdigest()
+
+
+def _is_recent_data(start_date: Optional[datetime], end_date: Optional[datetime]) -> bool:
+    """
+    Determine if the requested data is recent (within last 7 days).
+    
+    Args:
+        start_date: Start date
+        end_date: End date
+        
+    Returns:
+        True if data is recent, False otherwise
+    """
+    if end_date is None:
+        end_date = datetime.now()
+    seven_days_ago = datetime.now() - timedelta(days=7)
+    # Consider recent if end_date is within last 7 days
+    return end_date >= seven_days_ago
+
+
+def _get_cached_response(cache_key: str, is_recent: bool) -> Optional[pd.DataFrame]:
+    """
+    Get cached response if available and not expired.
+    
+    Args:
+        cache_key: Cache key
+        is_recent: Whether data is recent (affects TTL)
+        
+    Returns:
+        Cached DataFrame if available and fresh, None otherwise
+    """
+    if cache_key not in _coinglass_cache:
+        return None
+    
+    df, cached_time = _coinglass_cache[cache_key]
+    current_time = time.time()
+    
+    # Use shorter TTL for recent data, longer for historical
+    ttl = CACHE_TTL_RECENT if is_recent else CACHE_TTL_HISTORICAL
+    age = current_time - cached_time
+    
+    if age > ttl:
+        # Cache expired, remove it
+        logger.debug(f"Cache expired for key {cache_key[:8]}... (age: {age:.1f}s, TTL: {ttl}s)")
+        del _coinglass_cache[cache_key]
+        return None
+    
+    logger.debug(f"Cache hit for key {cache_key[:8]}... (age: {age:.1f}s)")
+    return df
+
+
+def _store_cached_response(cache_key: str, df: pd.DataFrame):
+    """
+    Store response in cache.
+    
+    Args:
+        cache_key: Cache key
+        df: DataFrame to cache
+    """
+    _coinglass_cache[cache_key] = (df.copy(), time.time())
+    logger.debug(f"Cached response for key {cache_key[:8]}... (cache size: {len(_coinglass_cache)} entries)")
+
+
+def _clean_expired_cache():
+    """
+    Remove expired entries from cache to prevent memory bloat.
+    Called periodically to clean up old cache entries.
+    """
+    current_time = time.time()
+    expired_keys = []
+    
+    for cache_key, (df, cached_time) in _coinglass_cache.items():
+        # Use maximum TTL to check expiration
+        age = current_time - cached_time
+        if age > CACHE_TTL_HISTORICAL:
+            expired_keys.append(cache_key)
+    
+    for key in expired_keys:
+        del _coinglass_cache[key]
+    
+    if expired_keys:
+        logger.debug(f"Cleaned {len(expired_keys)} expired cache entries (remaining: {len(_coinglass_cache)})")
 
 
 class CoinGlassClient:
@@ -309,6 +433,14 @@ class CoinGlassClient:
                 df = df.sort_index()
                 df = df[~df.index.duplicated(keep='first')]  # Remove duplicates
                 logger.info(f"✓ Combined {len(all_dfs)} chunks into {len(df)} total records")
+                
+                # Store in cache if enabled and data is valid
+                if use_cache and not df.empty:
+                    is_recent = _is_recent_data(start_date, end_date)
+                    cache_key = _generate_cache_key(symbol, "Binance", effective_interval, start_date, end_date)
+                    _store_cached_response(cache_key, df)
+                    logger.info(f"Cached CoinGlass chunked response for {symbol} (cache key: {cache_key[:8]}...)")
+                
                 return df
             else:
                 raise Exception(
@@ -410,6 +542,14 @@ class CoinGlassClient:
         
         # Parse the response
         df = self._parse_price_history_response(data, symbol, coinglass_symbol)
+        
+        # Store in cache if enabled and data is valid
+        if use_cache and not df.empty:
+            is_recent = _is_recent_data(start_date, end_date)
+            cache_key = _generate_cache_key(symbol, successful_exchange or "Binance", effective_interval, start_date, end_date)
+            _store_cached_response(cache_key, df)
+            logger.info(f"Cached CoinGlass response for {symbol} (cache key: {cache_key[:8]}...)")
+        
         return df
     
     def _parse_price_history_response(self, data: Any, symbol: str, coinglass_symbol: str) -> pd.DataFrame:
