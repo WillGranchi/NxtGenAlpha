@@ -1431,6 +1431,228 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
             raise Exception(f"Failed to update {symbol} data and no local data available: {str(e)}")
 
 
+def build_full_historical_dataset(
+    symbol: str = "BTCUSDT",
+    target_start_date: Optional[datetime] = None,
+    exchange: str = "Binance",
+    chunk_days: int = 999,  # Fetch 999 days per chunk (under 1000 limit)
+    save_after_each_chunk: bool = True,
+    delay_between_chunks: float = 2.0  # Delay in seconds to avoid rate limits
+) -> pd.DataFrame:
+    """
+    Build a complete historical dataset by fetching data in chunks going backward in time.
+    This allows building datasets that exceed the CoinGlass API's 1000 record limit.
+    
+    Strategy:
+    1. Start from today and fetch the most recent chunk (999 days)
+    2. Save that chunk
+    3. Move back in time and fetch the next 999 days
+    4. Merge with existing data
+    5. Continue until reaching target_start_date
+    
+    Args:
+        symbol: Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
+        target_start_date: Target start date to fetch back to (defaults to token launch date)
+        exchange: Exchange name (e.g., "Binance", "Coinbase")
+        chunk_days: Number of days per chunk (default: 999, under the 1000 limit)
+        save_after_each_chunk: Whether to save after each chunk (recommended for safety)
+        delay_between_chunks: Delay in seconds between chunks to avoid rate limits
+        
+    Returns:
+        pd.DataFrame: Complete historical dataset
+    """
+    logger = logging.getLogger(__name__)
+    
+    # Determine target start date
+    if target_start_date is None:
+        if symbol == "BTCUSDT":
+            target_start_date = datetime(2010, 1, 1)  # Bitcoin launch
+        else:
+            target_start_date, _ = calculate_historical_range(symbol, years=None)
+    
+    logger.info(f"Building full historical dataset for {symbol} from {target_start_date.strftime('%Y-%m-%d')} to today")
+    
+    # Load existing data if available
+    try:
+        existing_df = load_crypto_data(symbol=symbol)
+        if not existing_df.empty:
+            existing_start = existing_df.index.min()
+            existing_end = existing_df.index.max()
+            logger.info(f"Found existing data: {len(existing_df)} rows from {existing_start.strftime('%Y-%m-%d')} to {existing_end.strftime('%Y-%m-%d')}")
+            
+            # If we already have data going back to target, check if we need to update recent data
+            if existing_start <= target_start_date:
+                logger.info(f"Existing data already goes back to {existing_start.strftime('%Y-%m-%d')} (target: {target_start_date.strftime('%Y-%m-%d')})")
+                # Check if we need to update recent data
+                days_since_last_update = (datetime.now() - existing_end).days
+                if days_since_last_update < 7:
+                    logger.info("Recent data is fresh, no update needed")
+                    return existing_df
+                else:
+                    # Start from existing end date and fetch forward
+                    start_date = existing_end + timedelta(days=1)
+                    all_data = existing_df.copy()
+            else:
+                # Need to fetch data going further back
+                start_date = target_start_date
+                all_data = existing_df.copy()
+        else:
+            # No existing data, start fresh
+            all_data = pd.DataFrame()
+            start_date = target_start_date
+    except Exception as e:
+        logger.warning(f"Could not load existing data: {e}. Starting fresh.")
+        all_data = pd.DataFrame()
+        start_date = target_start_date
+    
+    # Start fetching chunks going backward from today
+    current_end = datetime.now()
+    chunk_number = 0
+    
+    while current_end > start_date:
+        chunk_number += 1
+        
+        # Calculate chunk start date (going backward)
+        chunk_start = current_end - timedelta(days=chunk_days)
+        
+        # Ensure we don't go before target_start_date
+        if chunk_start < start_date:
+            chunk_start = start_date
+        
+        logger.info(f"Fetching chunk {chunk_number}: {chunk_start.strftime('%Y-%m-%d')} to {current_end.strftime('%Y-%m-%d')} ({chunk_days} days)")
+        
+        try:
+            # Fetch this chunk
+            chunk_df, data_source, quality_metrics = fetch_crypto_data_smart(
+                symbol=symbol,
+                start_date=chunk_start,
+                end_date=current_end,
+                exchange=exchange,
+                use_cache=False,  # Don't use cache for incremental building
+                cross_validate=False
+            )
+            
+            if chunk_df.empty:
+                logger.warning(f"Empty chunk received for {chunk_start.strftime('%Y-%m-%d')} to {current_end.strftime('%Y-%m-%d')}")
+                # Move back and try next chunk
+                current_end = chunk_start - timedelta(days=1)
+                continue
+            
+            logger.info(f"✓ Fetched chunk {chunk_number}: {len(chunk_df)} rows from {chunk_df.index.min()} to {chunk_df.index.max()}")
+            
+            # Merge with existing data
+            if all_data.empty:
+                all_data = chunk_df.copy()
+            else:
+                # Combine and remove duplicates (keep most recent)
+                all_data = pd.concat([chunk_df, all_data])
+                all_data = all_data[~all_data.index.duplicated(keep='first')]
+                all_data = all_data.sort_index()
+            
+            logger.info(f"Total data so far: {len(all_data)} rows from {all_data.index.min()} to {all_data.index.max()}")
+            
+            # Save after each chunk if requested
+            if save_after_each_chunk:
+                csv_path = save_data_to_csv(all_data, symbol=symbol)
+                logger.info(f"Saved progress to {csv_path} ({len(all_data)} total rows)")
+                
+                # Clear cache to ensure fresh data on next load
+                cache_key = f"{symbol}_{csv_path}"
+                if cache_key in _dataframe_cache:
+                    del _dataframe_cache[cache_key]
+            
+            # Move back in time for next chunk
+            current_end = chunk_start - timedelta(days=1)
+            
+            # Delay to avoid rate limits
+            if delay_between_chunks > 0 and current_end > start_date:
+                logger.info(f"Waiting {delay_between_chunks} seconds before next chunk...")
+                time.sleep(delay_between_chunks)
+            
+        except Exception as e:
+            logger.error(f"Error fetching chunk {chunk_number}: {e}")
+            logger.warning(f"Stopping incremental fetch. Current data: {len(all_data)} rows")
+            break
+    
+    # Final save
+    if not all_data.empty:
+        csv_path = save_data_to_csv(all_data, symbol=symbol)
+        logger.info(f"✓ Complete dataset saved: {csv_path}")
+        logger.info(f"Final dataset: {len(all_data)} rows from {all_data.index.min()} to {all_data.index.max()}")
+        logger.info(f"Total days: {(all_data.index.max() - all_data.index.min()).days} days ({(all_data.index.max() - all_data.index.min()).days/365:.2f} years)")
+        
+        # Clear cache
+        cache_key = f"{symbol}_{csv_path}"
+        if cache_key in _dataframe_cache:
+            del _dataframe_cache[cache_key]
+        
+        _last_update_time[symbol] = datetime.now()
+    
+    return all_data
+
+
+def ensure_full_btc_history(
+    exchange: str = "Binance",
+    target_start_date: datetime = datetime(2010, 1, 1),
+    force_rebuild: bool = False
+) -> Tuple[pd.DataFrame, bool]:
+    """
+    Ensure BTC has complete historical data going back to target_start_date.
+    If data is incomplete, automatically builds it using incremental CSV storage.
+    
+    Args:
+        exchange: Exchange name (default: "Binance")
+        target_start_date: Target start date (default: 2010-01-01 for BTC)
+        force_rebuild: Force rebuild even if data appears complete
+        
+    Returns:
+        Tuple[pd.DataFrame, bool]: (DataFrame, was_built) - True if data was just built
+    """
+    logger = logging.getLogger(__name__)
+    symbol = "BTCUSDT"
+    
+    try:
+        # Check existing data
+        existing_df = load_crypto_data(symbol=symbol)
+        
+        if not existing_df.empty and not force_rebuild:
+            data_start = existing_df.index.min()
+            data_end = existing_df.index.max()
+            
+            # Check if data goes back to target date
+            if data_start <= target_start_date:
+                logger.info(f"BTC data is complete: {len(existing_df)} rows from {data_start.strftime('%Y-%m-%d')} to {data_end.strftime('%Y-%m-%d')}")
+                return existing_df, False
+        
+        # Data is incomplete or force rebuild requested
+        logger.info(f"BTC data is incomplete or missing. Building full history from {target_start_date.strftime('%Y-%m-%d')}...")
+        
+        # Build full history
+        df = build_full_historical_dataset(
+            symbol=symbol,
+            target_start_date=target_start_date,
+            exchange=exchange,
+            chunk_days=999,
+            save_after_each_chunk=True,
+            delay_between_chunks=2.0
+        )
+        
+        if df.empty:
+            logger.warning("Failed to build BTC history, returning existing data if available")
+            return existing_df if not existing_df.empty else pd.DataFrame(), False
+        
+        logger.info(f"✓ BTC full history built: {len(df)} rows from {df.index.min()} to {df.index.max()}")
+        return df, True
+        
+    except Exception as e:
+        logger.error(f"Error ensuring full BTC history: {e}", exc_info=True)
+        # Return existing data if available
+        try:
+            return load_crypto_data(symbol=symbol), False
+        except:
+            return pd.DataFrame(), False
+
+
 def update_btc_data(force: bool = False) -> pd.DataFrame:
     """
     Update Bitcoin data (backward compatibility wrapper).

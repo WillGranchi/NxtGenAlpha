@@ -610,6 +610,54 @@ export class TradingAPI {
   }
 
   /**
+   * Check BTC history status.
+   */
+  static async checkBTCHistoryStatus(): Promise<{
+    status: 'complete' | 'incomplete' | 'building';
+    message: string;
+    date_range: {
+      start: string;
+      end: string;
+    } | null;
+    total_records: number;
+    target_start_date?: string;
+    is_complete?: boolean;
+  }> {
+    const response: AxiosResponse<any> = await api.get('/api/data/btc-history-status');
+    return response.data;
+  }
+
+  /**
+   * Ensure BTC has complete historical data.
+   */
+  static async ensureBTCHistory(params?: {
+    exchange?: string;
+    force_rebuild?: boolean;
+  }): Promise<{
+    success: boolean;
+    message: string;
+    was_built: boolean;
+    is_complete: boolean;
+    symbol: string;
+    total_records: number;
+    date_range: {
+      start: string;
+      end: string;
+    };
+    total_days: number;
+    total_years: number;
+    target_start_date: string;
+    latest_price: number;
+    latest_date: string;
+  }> {
+    const response: AxiosResponse<any> = await api.post('/api/data/ensure-btc-history', null, {
+      params: params || {},
+      timeout: 600000, // 10 minutes for full history build
+    });
+    return response.data;
+  }
+
+  /**
    * Test CoinGlass API connection.
    */
   static async testCoinGlassConnection(): Promise<{
