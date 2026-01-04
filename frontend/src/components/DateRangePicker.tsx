@@ -9,6 +9,7 @@ interface DateRangePickerProps {
   endDate: string;
   minDate?: string;
   maxDate?: string;
+  maxDaysRange?: number; // Maximum number of days allowed in the date range
   onStartDateChange: (date: string) => void;
   onEndDateChange: (date: string) => void;
   className?: string;
@@ -19,6 +20,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
   endDate,
   minDate,
   maxDate,
+  maxDaysRange = 999, // Default to 999 days (CoinGlass API limit)
   onStartDateChange,
   onEndDateChange,
   className = '',
@@ -27,32 +29,72 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
 
   const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newStartDate = e.target.value;
-    onStartDateChange(newStartDate);
     
     // Validate end date is after start date
     if (newStartDate && endDate && newStartDate > endDate) {
       setValidationError('End date must be after start date');
-    } else {
-      setValidationError(null);
+      return;
     }
+    
+    // Validate date range doesn't exceed maxDaysRange
+    if (newStartDate && endDate) {
+      const start = new Date(newStartDate);
+      const end = new Date(endDate);
+      const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (daysDiff > maxDaysRange) {
+        setValidationError(`Date range cannot exceed ${maxDaysRange} days. Please select a shorter range.`);
+        return;
+      }
+    }
+    
+    setValidationError(null);
+    onStartDateChange(newStartDate);
   };
 
   const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newEndDate = e.target.value;
-    onEndDateChange(newEndDate);
     
     // Validate end date is after start date
     if (startDate && newEndDate && startDate > newEndDate) {
       setValidationError('End date must be after start date');
-    } else {
-      setValidationError(null);
+      return;
     }
+    
+    // Validate date range doesn't exceed maxDaysRange
+    if (startDate && newEndDate) {
+      const start = new Date(startDate);
+      const end = new Date(newEndDate);
+      const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (daysDiff > maxDaysRange) {
+        setValidationError(`Date range cannot exceed ${maxDaysRange} days. Please select a shorter range.`);
+        return;
+      }
+    }
+    
+    setValidationError(null);
+    onEndDateChange(newEndDate);
   };
 
   // Get today's date in YYYY-MM-DD format for max date
   const today = new Date().toISOString().split('T')[0];
   const effectiveMaxDate = maxDate || today;
   const effectiveMinDate = minDate || '2010-01-01';
+  
+  // Calculate maximum allowed start date based on end date and maxDaysRange
+  // This ensures the calendar popup only allows selecting dates within the limit
+  const calculateMaxAllowedStartDate = (endDateStr: string): string => {
+    if (!endDateStr) return effectiveMinDate;
+    const end = new Date(endDateStr);
+    const maxStart = new Date(end);
+    maxStart.setDate(maxStart.getDate() - maxDaysRange);
+    const maxStartStr = maxStart.toISOString().split('T')[0];
+    // Return the more restrictive date (later date) between calculated max and provided minDate
+    return maxStartStr > effectiveMinDate ? maxStartStr : effectiveMinDate;
+  };
+  
+  const maxAllowedStartDate = calculateMaxAllowedStartDate(endDate);
 
   return (
     <div className={`space-y-2 ${className}`}>
@@ -65,8 +107,8 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
             id="start-date"
             type="date"
             value={startDate}
-            min={effectiveMinDate}
-            max={effectiveMaxDate || endDate || today}
+            min={maxAllowedStartDate}
+            max={endDate || effectiveMaxDate}
             onChange={handleStartDateChange}
             step="1"
             className="w-full px-3 py-2.5 border border-border-default rounded-lg shadow-sm 

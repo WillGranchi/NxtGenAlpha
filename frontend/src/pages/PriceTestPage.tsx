@@ -170,9 +170,13 @@ const PriceTestPage: React.FC = () => {
             <DateRangePicker
               startDate={startDate}
               endDate={endDate}
+              maxDaysRange={999}
               onStartDateChange={setStartDate}
               onEndDateChange={setEndDate}
             />
+            <p className="text-xs text-text-secondary mt-2">
+              Maximum date range: 999 days (CoinGlass API limit)
+            </p>
 
             {/* Chart Options */}
             <div className="mt-4 flex flex-wrap items-center gap-4">
