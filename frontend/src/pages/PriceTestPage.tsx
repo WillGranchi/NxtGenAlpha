@@ -28,14 +28,20 @@ const PriceTestPage: React.FC = () => {
   const [exchange, setExchange] = useState<string>('Binance');
   
   // Date range state
-  const [startDate, setStartDate] = useState<string>(() => {
-    // Default to 1 year ago - users can extend via date picker
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-    return oneYearAgo.toISOString().split('T')[0];
-  });
+  const calculateMaxStartDate = (endDateStr: string): string => {
+    const end = new Date(endDateStr);
+    const maxStart = new Date(end);
+    maxStart.setDate(maxStart.getDate() - 999); // 999 days back (CoinGlass API limit)
+    return maxStart.toISOString().split('T')[0];
+  };
+
   const [endDate, setEndDate] = useState<string>(() => {
     return new Date().toISOString().split('T')[0];
+  });
+  const [startDate, setStartDate] = useState<string>(() => {
+    // Default to 999 days back from end date (maximum allowed)
+    const today = new Date().toISOString().split('T')[0];
+    return calculateMaxStartDate(today);
   });
 
   // Data state
@@ -90,6 +96,12 @@ const PriceTestPage: React.FC = () => {
   useEffect(() => {
     loadPriceData();
   }, [loadPriceData]);
+
+  // Handler to set start date to maximum allowed (999 days back from end date)
+  const handleSetMaxRange = () => {
+    const maxStart = calculateMaxStartDate(endDate);
+    setStartDate(maxStart);
+  };
 
   return (
     <ErrorBoundary>
@@ -167,16 +179,27 @@ const PriceTestPage: React.FC = () => {
               </div>
             </div>
 
-            <DateRangePicker
-              startDate={startDate}
-              endDate={endDate}
-              maxDaysRange={999}
-              onStartDateChange={setStartDate}
-              onEndDateChange={setEndDate}
-            />
-            <p className="text-xs text-text-secondary mt-2">
-              Maximum date range: 999 days (CoinGlass API limit)
-            </p>
+            <div className="space-y-2">
+              <DateRangePicker
+                startDate={startDate}
+                endDate={endDate}
+                maxDaysRange={999}
+                onStartDateChange={setStartDate}
+                onEndDateChange={setEndDate}
+              />
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-text-secondary">
+                  Maximum date range: 999 days (CoinGlass API limit)
+                </p>
+                <button
+                  onClick={handleSetMaxRange}
+                  className="px-3 py-1.5 text-xs font-medium bg-primary-500/10 hover:bg-primary-500/20 text-primary-400 border border-primary-500/30 rounded-lg transition-colors"
+                  title="Set start date to maximum allowed (999 days back)"
+                >
+                  Use Max Range
+                </button>
+              </div>
+            </div>
 
             {/* Chart Options */}
             <div className="mt-4 flex flex-wrap items-center gap-4">
