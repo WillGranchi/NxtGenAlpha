@@ -342,22 +342,38 @@ class CoinGlassClient:
         symbol: str,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        interval: str = "1d"
+        interval: str = "4h",  # Default to 4h for Hobbyist tier compatibility (minimum allowed)
+        use_cache: bool = True
     ) -> pd.DataFrame:
         """
-        Fetch price history (OHLCV) from CoinGlass.
+        Fetch price history (OHLCV) from CoinGlass with in-memory caching.
         
         Args:
             symbol: Trading pair symbol (e.g., "BTCUSDT")
             start_date: Start date for historical data
             end_date: End date for historical data
             interval: Time interval (1d, 1h, etc.)
+            use_cache: Whether to use cache (default: True)
             
         Returns:
             DataFrame with OHLCV data
         """
         # Map symbol to CoinGlass format
         coinglass_symbol = self._map_symbol_to_coinglass(symbol)
+        
+        # Check cache first if enabled
+        if use_cache:
+            is_recent = _is_recent_data(start_date, end_date)
+            cache_key = _generate_cache_key(symbol, "Binance", interval, start_date, end_date)
+            cached_df = _get_cached_response(cache_key, is_recent)
+            
+            if cached_df is not None:
+                logger.info(f"Returning cached CoinGlass data for {symbol} (cache key: {cache_key[:8]}...)")
+                return cached_df
+        
+        # Clean expired cache entries periodically (every 10th request)
+        if len(_coinglass_cache) > 0 and len(_coinglass_cache) % 10 == 0:
+            _clean_expired_cache()
         
         # Use the correct CoinGlass API v4 endpoint from documentation
         # Documentation: https://docs.coinglass.com/reference/price-history
