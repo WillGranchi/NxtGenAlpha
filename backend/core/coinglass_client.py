@@ -236,11 +236,11 @@ class CoinGlassClient:
         coinglass_symbol = self._map_symbol_to_coinglass(symbol)
         
         # Use the correct CoinGlass API v4 endpoint from documentation
-        # Documentation: https://docs.coinglass.com/reference/price-ohlc-history
-        # Endpoint: /api/futures/price/history
+        # Documentation: https://docs.coinglass.com/reference/price-history
+        # Endpoint: /api/spot/price/history (spot market, not futures)
         # Note: For Hobbyist tier, interval must be >= 4h
         endpoints_to_try = [
-            "/api/futures/price/history",  # Correct endpoint from CoinGlass API v4 docs
+            "/api/spot/price/history",  # Correct endpoint from CoinGlass API v4 docs
         ]
         
         # CoinGlass API may have limits on how much data can be returned in a single request
@@ -264,8 +264,10 @@ class CoinGlassClient:
                 if interval in ["1m", "5m", "15m", "30m", "1h", "2h", "3h"]:
                     effective_interval = "4h"
                 
+                # Remove any separators from symbol to get "BTCUSDT" format
+                symbol_clean = coinglass_symbol.replace("-", "").replace("/", "").replace("_", "")
                 chunk_params = {
-                    "symbol": coinglass_symbol.replace("-", "/"),  # Convert BTC-USDT to BTC/USDT
+                    "symbol": symbol_clean,  # Format: BTCUSDT (no separator)
                     "interval": effective_interval,
                     "exchange": "Binance",  # Capitalized exchange name
                     "start_time": int(current_start.timestamp() * 1000),  # Use start_time
@@ -323,10 +325,12 @@ class CoinGlassClient:
             effective_interval = "4h"
         
         # CoinGlass API requires 'exchange' parameter (capitalized, e.g., "Binance")
-        # Symbol format should be "BTC/USDT" (with slash, not dash)
+        # Symbol format should be "BTCUSDT" (no separator - no slash, no dash)
         # Parameters use start_time and end_time (not startTime/endTime)
+        # Remove any separators from symbol to get "BTCUSDT" format
+        symbol_clean = coinglass_symbol.replace("-", "").replace("/", "").replace("_", "")
         params = {
-            "symbol": coinglass_symbol.replace("-", "/"),  # Convert BTC-USDT to BTC/USDT
+            "symbol": symbol_clean,  # Format: BTCUSDT (no separator)
             "interval": effective_interval,
             "exchange": "Binance"  # Capitalized exchange name
         }
