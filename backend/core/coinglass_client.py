@@ -1122,6 +1122,144 @@ class CoinGlassClient:
         logger.warning(f"Could not map symbol {symbol} to CoinGlass format, using as-is")
         return symbol_upper
     
+    def get_supported_coins(self, use_cache: bool = True) -> List[Dict[str, Any]]:
+        """
+        Get list of supported coins/tokens from CoinGlass API.
+        
+        Args:
+            use_cache: Whether to use cached data if available
+            
+        Returns:
+            List of dictionaries with symbol information:
+            [
+                {
+                    "symbol": "BTC/USDT",
+                    "name": "Bitcoin",
+                    "exchange": "Binance" (if available)
+                },
+                ...
+            ]
+        """
+        # Check cache first
+        if use_cache:
+            cached_symbols = _get_cached_supported_coins()
+            if cached_symbols is not None:
+                return cached_symbols
+        
+        # Try multiple endpoints to get supported coins
+        endpoints_to_try = [
+            "/api/spot/supported-coins",
+            "/api/futures/supported-coins",
+            "/api/spot/trading-market/supported-coins",
+            "/api/futures/trading-market/supported-coins"
+        ]
+        
+        for endpoint in endpoints_to_try:
+            try:
+                logger.info(f"Fetching supported coins from CoinGlass: {endpoint}")
+                data = self._make_request(endpoint, {})
+                
+                if not data:
+                    logger.warning(f"Empty response from {endpoint}")
+                    continue
+                
+                # Parse response - CoinGlass may return different formats
+                symbols_list = []
+                
+                # Try to parse as list of objects
+                if isinstance(data, list):
+                    for item in data:
+                        if isinstance(item, dict):
+                            # Extract symbol (could be "symbol", "pair", "trading_pair", etc.)
+                            symbol = (
+                                item.get("symbol") or 
+                                item.get("pair") or 
+                                item.get("trading_pair") or
+                                item.get("coin") or
+                                ""
+                            )
+                            
+                            if symbol:
+                                # Normalize symbol format to "BTC/USDT" (with slash)
+                                normalized_symbol = symbol.replace("-", "/").replace("_", "/")
+                                symbols_list.append({
+                                    "symbol": normalized_symbol,
+                                    "name": item.get("name") or item.get("coin_name") or normalized_symbol.split("/")[0] if "/" in normalized_symbol else normalized_symbol,
+                                    "exchange": item.get("exchange") or item.get("exchange_name")
+                                })
+                
+                # Try to parse as dict with data array
+                elif isinstance(data, dict):
+                    data_array = data.get("data") or data.get("symbols") or data.get("coins") or []
+                    if isinstance(data_array, list):
+                        for item in data_array:
+                            if isinstance(item, dict):
+                                symbol = (
+                                    item.get("symbol") or 
+                                    item.get("pair") or 
+                                    item.get("trading_pair") or
+                                    item.get("coin") or
+                                    ""
+                                )
+                                
+                                if symbol:
+                                    # Normalize symbol format to "BTC/USDT" (with slash)
+                                    normalized_symbol = symbol.replace("-", "/").replace("_", "/")
+                                    symbols_list.append({
+                                        "symbol": normalized_symbol,
+                                        "name": item.get("name") or item.get("coin_name") or normalized_symbol.split("/")[0] if "/" in normalized_symbol else normalized_symbol,
+                                        "exchange": item.get("exchange") or item.get("exchange_name")
+                                    })
+                    # If data is a dict of symbols
+                    elif isinstance(data_array, dict):
+                        for symbol, info in data_array.items():
+                            # Normalize symbol format to "BTC/USDT" (with slash)
+                            normalized_symbol = symbol.replace("-", "/").replace("_", "/")
+                            if isinstance(info, dict):
+                                symbols_list.append({
+                                    "symbol": normalized_symbol,
+                                    "name": info.get("name") or normalized_symbol.split("/")[0] if "/" in normalized_symbol else normalized_symbol,
+                                    "exchange": info.get("exchange")
+                                })
+                            else:
+                                symbols_list.append({
+                                    "symbol": normalized_symbol,
+                                    "name": normalized_symbol.split("/")[0] if "/" in normalized_symbol else normalized_symbol,
+                                    "exchange": None
+                                })
+                
+                if symbols_list:
+                    # Remove duplicates based on symbol
+                    seen = set()
+                    unique_symbols = []
+                    for item in symbols_list:
+                        symbol = item["symbol"]
+                        if symbol not in seen:
+                            seen.add(symbol)
+                            unique_symbols.append(item)
+                    
+                    # Sort by symbol for consistency
+                    unique_symbols.sort(key=lambda x: x["symbol"])
+                    
+                    logger.info(f"✓ Fetched {len(unique_symbols)} supported coins from CoinGlass ({endpoint})")
+                    
+                    # Cache the result
+                    if use_cache:
+                        _store_cached_supported_coins(unique_symbols)
+                    
+                    return unique_symbols
+                else:
+                    logger.warning(f"No symbols found in response from {endpoint}")
+                    continue
+                    
+            except Exception as e:
+                logger.warning(f"Error fetching supported coins from {endpoint}: {e}")
+                continue
+        
+        # If all endpoints failed, return empty list
+        logger.error("Failed to fetch supported coins from all CoinGlass endpoints")
+        return []
+    
     def test_connection(self) -> Dict[str, Any]:
         """
         Test CoinGlass API connection by making a simple request.
@@ -1182,6 +1320,36 @@ class CoinGlassClient:
             logger.error(error_msg)
             result["error"] = error_msg
             return result
+
+
+# Cache for supported coins (separate from price data cache)
+# Structure: {cache_key: (symbols_list, timestamp)}
+_supported_coins_cache: Dict[str, Tuple[List[Dict[str, Any]], float]] = {}
+SUPPORTED_COINS_CACHE_TTL = 86400  # 24 hours
+
+
+def _get_cached_supported_coins() -> Optional[List[Dict[str, Any]]]:
+    """Get cached supported coins if available and not expired."""
+    cache_key = "supported_coins"
+    if cache_key not in _supported_coins_cache:
+        return None
+    
+    symbols_list, cached_time = _supported_coins_cache[cache_key]
+    age = time.time() - cached_time
+    
+    if age > SUPPORTED_COINS_CACHE_TTL:
+        del _supported_coins_cache[cache_key]
+        return None
+    
+    logger.debug(f"Using cached supported coins (age: {age:.0f}s)")
+    return symbols_list
+
+
+def _store_cached_supported_coins(symbols_list: List[Dict[str, Any]]):
+    """Store supported coins in cache."""
+    cache_key = "supported_coins"
+    _supported_coins_cache[cache_key] = (symbols_list, time.time())
+    logger.debug(f"Cached supported coins list ({len(symbols_list)} symbols)")
 
 
 # Global client instance

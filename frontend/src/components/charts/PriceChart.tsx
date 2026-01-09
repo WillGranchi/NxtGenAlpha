@@ -197,20 +197,18 @@ export const PriceChart: React.FC<PriceChartProps> = ({
 
   const { plotData } = chartData;
 
-  // Memoize layout - match Full Cycle Model styling
+  // Memoize layout - match Full Cycle Model styling exactly
   const layout = useMemo(() => {
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
     const yaxisType: 'log' | 'linear' = useLogScale ? 'log' : 'linear';
     
     return {
       title: {
         text: title,
-        font: { color: '#FFFFFF', size: isMobile ? 18 : 24 },
+        font: { color: '#FFFFFF', size: 24 },
         x: 0.5,
       },
       xaxis: {
         title: 'Date',
-        type: 'date' as const,
         color: '#9CA3AF',
         gridcolor: '#374151',
         showgrid: true,
@@ -222,18 +220,19 @@ export const PriceChart: React.FC<PriceChartProps> = ({
         color: '#9CA3AF',
         gridcolor: '#374151',
         showgrid: true,
+        side: 'left' as const,
       },
       hovermode: 'x unified' as const,
       hoverlabel: {
-        bgcolor: 'rgba(31, 41, 55, 0.95)',
-        bordercolor: '#4B5563',
+        bgcolor: 'rgba(31, 41, 55, 0.95)', // Dark gray background (gray-800)
+        bordercolor: '#4B5563', // Gray-600 border
         font: {
-          color: '#F3F4F6',
+          color: '#F3F4F6', // Light gray text (gray-100)
           family: 'Inter, system-ui, sans-serif',
           size: 12,
         },
       },
-      showlegend: !isMobile && showOverlayLegend,
+      showlegend: showOverlayLegend,
       legend: {
         x: 1.02,
         y: 1,
@@ -243,44 +242,45 @@ export const PriceChart: React.FC<PriceChartProps> = ({
         font: { color: '#FFFFFF' },
       },
       margin: {
-        l: isMobile ? 50 : 60,
-        r: isMobile ? 10 : 80,
-        t: isMobile ? 50 : 80,
-        b: isMobile ? 60 : 60,
+        l: 60,
+        r: 80,
+        t: 80,
+        b: 60,
       },
       plot_bgcolor: 'rgba(0, 0, 0, 0)',
       paper_bgcolor: 'rgba(0, 0, 0, 0)',
       font: {
         color: '#9CA3AF',
-        size: isMobile ? 10 : 12,
       },
-      dragmode: 'pan' as const,
     };
-  }, [title, height, showOverlayLegend, useLogScale]);
+  }, [title, showOverlayLegend, useLogScale]);
 
-  // Memoize config - match Full Cycle Model
+  // Memoize config - match Full Cycle Model exactly
   const config = useMemo(() => ({
-    displayModeBar: false, // Hide default mode bar, we'll add custom toggle
-    displaylogo: false,
+    displayModeBar: true,
     responsive: true,
+    displaylogo: false,
+    modeBarButtonsToRemove: ['pan2d', 'lasso2d'] as any,
     toImageButtonOptions: {
       format: 'png' as const,
       filename: 'price-chart',
       height: height,
       width: 1200,
-      scale: 2,
+      scale: 1,
     },
+    doubleClick: 'reset' as const,
   }), [height]);
 
   return (
-    <div className="relative bg-bg-tertiary rounded-lg border border-border-default p-6">
-      {/* Log Scale Toggle Button - Top Right */}
+    <div className="bg-bg-secondary border border-border-default rounded-lg p-4 relative transition-all duration-200">
+      {/* Log Scale Toggle Button - Top Right Corner - Match Full Cycle Model exactly */}
       <button
         onClick={handleLogScaleToggle}
-        className="absolute top-8 right-8 z-10 bg-bg-secondary hover:bg-bg-tertiary border border-border-default rounded px-3 py-1.5 text-sm text-text-primary transition-colors flex items-center gap-2"
+        className="absolute top-6 right-6 z-10 px-3 py-1.5 bg-bg-tertiary hover:bg-bg-tertiary/80 border border-border-default rounded-lg text-text-primary text-sm font-medium transition-colors shadow-lg"
         title={useLogScale ? 'Switch to Linear Scale' : 'Switch to Log Scale'}
+        aria-label={useLogScale ? 'Switch to Linear Scale' : 'Switch to Log Scale'}
       >
-        <span>{useLogScale ? 'Linear' : 'Log'}</span>
+        {useLogScale ? 'Linear' : 'Log'}
       </button>
       
       <Plot
@@ -288,6 +288,7 @@ export const PriceChart: React.FC<PriceChartProps> = ({
         layout={layout}
         config={config}
         style={{ width: '100%', height: `${height}px` }}
+        useResizeHandler={true}
       />
       
       {/* Custom CSS for dark tooltips */}

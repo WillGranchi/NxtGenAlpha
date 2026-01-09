@@ -8,15 +8,45 @@ import { ChevronDown, Search, Check } from 'lucide-react';
 import { TradingAPI } from '../services/api';
 
 interface TokenInfo {
-  symbol: string;
+  symbol: string; // CoinGlass format: "BTC/USDT"
   name: string;
   chain: string;
+  exchange?: string | null;
 }
 
 interface TokenSelectorProps {
-  selectedSymbol: string;
-  onSymbolChange: (symbol: string) => void;
+  selectedSymbol: string; // Can be either format (CoinGlass or internal)
+  onSymbolChange: (symbol: string) => void; // Will receive CoinGlass format
   className?: string;
+}
+
+/**
+ * Convert CoinGlass format ("BTC/USDT") to internal format ("BTCUSDT")
+ */
+function coinglassToInternal(symbol: string): string {
+  return symbol.replace('/', '');
+}
+
+/**
+ * Convert internal format ("BTCUSDT") to CoinGlass format ("BTC/USDT")
+ */
+function internalToCoinglass(symbol: string): string {
+  // If already in CoinGlass format, return as is
+  if (symbol.includes('/')) {
+    return symbol;
+  }
+  // Convert "BTCUSDT" -> "BTC/USDT"
+  const match = symbol.match(/^([A-Z]+)(USDT|USD|BTC|ETH)$/);
+  if (match) {
+    return `${match[1]}/${match[2]}`;
+  }
+  // Fallback: try to split at common lengths
+  if (symbol.length >= 6) {
+    const base = symbol.slice(0, -4);
+    const quote = symbol.slice(-4);
+    return `${base}/${quote}`;
+  }
+  return symbol;
 }
 
 export const TokenSelector: React.FC<TokenSelectorProps> = ({
@@ -33,48 +63,59 @@ export const TokenSelector: React.FC<TokenSelectorProps> = ({
     const fetchTokens = async () => {
       try {
         setIsLoading(true);
-        const response = await TradingAPI.getAvailableSymbols();
-        if (response.symbols) {
-          // Convert backend symbols to TokenInfo format
-          const tokenList: TokenInfo[] = response.symbols.map((symbol: string) => {
-            // Map symbols to names and chains
-            const symbolMap: Record<string, { name: string; chain: string }> = {
-              'BTCUSDT': { name: 'Bitcoin', chain: 'Bitcoin' },
-              'ETHUSDT': { name: 'Ethereum', chain: 'Ethereum' },
-              'BNBUSDT': { name: 'Binance Coin', chain: 'BSC' },
-              'SOLUSDT': { name: 'Solana', chain: 'Solana' },
-              'SUIUSDT': { name: 'Sui', chain: 'Sui' },
-              'XRPUSDT': { name: 'Ripple', chain: 'Ripple' },
-              'ADAUSDT': { name: 'Cardano', chain: 'Cardano' },
-              'DOTUSDT': { name: 'Polkadot', chain: 'Polkadot' },
-              'DOGEUSDT': { name: 'Dogecoin', chain: 'Dogecoin' },
-              'AVAXUSDT': { name: 'Avalanche', chain: 'Avalanche' },
-              'MATICUSDT': { name: 'Polygon', chain: 'Polygon' },
-              'LINKUSDT': { name: 'Chainlink', chain: 'Ethereum' },
-              'UNIUSDT': { name: 'Uniswap', chain: 'Ethereum' },
-              'LTCUSDT': { name: 'Litecoin', chain: 'Litecoin' },
-              'ATOMUSDT': { name: 'Cosmos', chain: 'Cosmos' },
-              'ETCUSDT': { name: 'Ethereum Classic', chain: 'Ethereum Classic' },
+        const response = await TradingAPI.getCoinGlassSymbols();
+        if (response.symbols && response.symbols.length > 0) {
+          // Convert CoinGlass symbols to TokenInfo format
+          const tokenList: TokenInfo[] = response.symbols.map((item) => {
+            const symbol = item.symbol; // Already in CoinGlass format: "BTC/USDT"
+            const baseToken = symbol.split('/')[0] || symbol;
+            
+            // Map common tokens to their names and chains
+            const tokenNameMap: Record<string, { name: string; chain: string }> = {
+              'BTC': { name: 'Bitcoin', chain: 'Bitcoin' },
+              'ETH': { name: 'Ethereum', chain: 'Ethereum' },
+              'BNB': { name: 'Binance Coin', chain: 'BSC' },
+              'SOL': { name: 'Solana', chain: 'Solana' },
+              'SUI': { name: 'Sui', chain: 'Sui' },
+              'XRP': { name: 'Ripple', chain: 'Ripple' },
+              'ADA': { name: 'Cardano', chain: 'Cardano' },
+              'DOT': { name: 'Polkadot', chain: 'Polkadot' },
+              'DOGE': { name: 'Dogecoin', chain: 'Dogecoin' },
+              'AVAX': { name: 'Avalanche', chain: 'Avalanche' },
+              'MATIC': { name: 'Polygon', chain: 'Polygon' },
+              'LINK': { name: 'Chainlink', chain: 'Ethereum' },
+              'UNI': { name: 'Uniswap', chain: 'Ethereum' },
+              'LTC': { name: 'Litecoin', chain: 'Litecoin' },
+              'ATOM': { name: 'Cosmos', chain: 'Cosmos' },
+              'ETC': { name: 'Ethereum Classic', chain: 'Ethereum Classic' },
             };
             
-            const info = symbolMap[symbol] || { name: symbol.replace('USDT', ''), chain: 'Unknown' };
+            const info = tokenNameMap[baseToken] || { 
+              name: item.name || baseToken, 
+              chain: item.exchange || 'Unknown' 
+            };
+            
             return {
-              symbol,
-              name: info.name,
+              symbol, // CoinGlass format: "BTC/USDT"
+              name: item.name || info.name,
               chain: info.chain,
+              exchange: item.exchange,
             };
           });
           setTokens(tokenList);
+        } else {
+          throw new Error('No symbols returned');
         }
       } catch (error) {
-        // Fallback to default tokens (BTC and ETH first, then others)
+        console.error('Failed to fetch CoinGlass symbols:', error);
+        // Fallback to default tokens in CoinGlass format
         setTokens([
-          { symbol: 'BTCUSDT', name: 'Bitcoin', chain: 'Bitcoin' },
-          { symbol: 'ETHUSDT', name: 'Ethereum', chain: 'Ethereum' },
-          { symbol: 'SOLUSDT', name: 'Solana', chain: 'Solana' },
-          { symbol: 'SUIUSDT', name: 'Sui', chain: 'Sui' },
-          { symbol: 'BNBUSDT', name: 'Binance Coin', chain: 'BSC' },
-          { symbol: 'XRPUSDT', name: 'Ripple', chain: 'Ripple' },
+          { symbol: 'BTC/USDT', name: 'Bitcoin', chain: 'Bitcoin', exchange: null },
+          { symbol: 'ETH/USDT', name: 'Ethereum', chain: 'Ethereum', exchange: null },
+          { symbol: 'SOL/USDT', name: 'Solana', chain: 'Solana', exchange: null },
+          { symbol: 'SUI/USDT', name: 'Sui', chain: 'Sui', exchange: null },
+          { symbol: 'BNB/USDT', name: 'Binance Coin', chain: 'BSC', exchange: null },
+          { symbol: 'XRP/USDT', name: 'Ripple', chain: 'Ripple', exchange: null },
         ]);
       } finally {
         setIsLoading(false);
@@ -109,7 +150,12 @@ export const TokenSelector: React.FC<TokenSelectorProps> = ({
     return groups;
   }, [filteredTokens]);
 
-  const selectedToken = tokens.find((t) => t.symbol === selectedSymbol);
+  // Normalize selectedSymbol to CoinGlass format for comparison
+  const normalizedSelectedSymbol = selectedSymbol.includes('/') 
+    ? selectedSymbol 
+    : internalToCoinglass(selectedSymbol);
+  
+  const selectedToken = tokens.find((t) => t.symbol === normalizedSelectedSymbol);
 
   return (
     <div className={`relative ${className}`}>
@@ -172,6 +218,7 @@ export const TokenSelector: React.FC<TokenSelectorProps> = ({
                       <button
                         key={token.symbol}
                         onClick={() => {
+                          // Pass CoinGlass format to parent
                           onSymbolChange(token.symbol);
                           setIsOpen(false);
                           setSearchQuery('');

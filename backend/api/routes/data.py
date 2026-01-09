@@ -43,6 +43,70 @@ async def get_available_crypto_symbols() -> Dict[str, Any]:
         )
 
 
+@router.get("/coinglass-symbols")
+async def get_coinglass_symbols() -> Dict[str, Any]:
+    """
+    Get list of supported coins/tokens from CoinGlass API.
+    
+    Returns:
+        Dict: List of symbols in CoinGlass format (e.g., "BTC/USDT") with metadata
+    """
+    try:
+        from backend.core.coinglass_client import get_coinglass_client
+        
+        client = get_coinglass_client()
+        symbols_list = client.get_supported_coins(use_cache=True)
+        
+        if not symbols_list:
+            # Fallback to hardcoded list if CoinGlass API fails
+            logger.warning("CoinGlass API returned no symbols, using fallback list")
+            fallback_symbols = [
+                {"symbol": "BTC/USDT", "name": "Bitcoin", "exchange": None},
+                {"symbol": "ETH/USDT", "name": "Ethereum", "exchange": None},
+                {"symbol": "BNB/USDT", "name": "Binance Coin", "exchange": None},
+                {"symbol": "SOL/USDT", "name": "Solana", "exchange": None},
+                {"symbol": "XRP/USDT", "name": "Ripple", "exchange": None},
+                {"symbol": "ADA/USDT", "name": "Cardano", "exchange": None},
+                {"symbol": "DOT/USDT", "name": "Polkadot", "exchange": None},
+                {"symbol": "DOGE/USDT", "name": "Dogecoin", "exchange": None},
+                {"symbol": "AVAX/USDT", "name": "Avalanche", "exchange": None},
+                {"symbol": "MATIC/USDT", "name": "Polygon", "exchange": None},
+                {"symbol": "LINK/USDT", "name": "Chainlink", "exchange": None},
+                {"symbol": "UNI/USDT", "name": "Uniswap", "exchange": None},
+                {"symbol": "LTC/USDT", "name": "Litecoin", "exchange": None},
+                {"symbol": "ATOM/USDT", "name": "Cosmos", "exchange": None},
+                {"symbol": "ETC/USDT", "name": "Ethereum Classic", "exchange": None},
+            ]
+            return {
+                "success": True,
+                "symbols": fallback_symbols,
+                "count": len(fallback_symbols),
+                "source": "fallback"
+            }
+        
+        return {
+            "success": True,
+            "symbols": symbols_list,
+            "count": len(symbols_list),
+            "source": "coinglass"
+        }
+    except Exception as e:
+        logger.error(f"Error getting CoinGlass symbols: {e}", exc_info=True)
+        # Return fallback list on error
+        fallback_symbols = [
+            {"symbol": "BTC/USDT", "name": "Bitcoin", "exchange": None},
+            {"symbol": "ETH/USDT", "name": "Ethereum", "exchange": None},
+            {"symbol": "SOL/USDT", "name": "Solana", "exchange": None},
+        ]
+        return {
+            "success": False,
+            "symbols": fallback_symbols,
+            "count": len(fallback_symbols),
+            "source": "fallback",
+            "error": str(e)
+        }
+
+
 @router.get("/info", response_model=DataInfoResponse)
 async def get_data_info(symbol: Optional[str] = Query(default="BTCUSDT", description="Cryptocurrency symbol (e.g., BTCUSDT, ETHUSDT)")) -> DataInfoResponse:
     """

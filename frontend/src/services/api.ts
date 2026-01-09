@@ -577,6 +577,25 @@ export class TradingAPI {
   }
 
   /**
+   * Get supported coins/tokens from CoinGlass API.
+   * Returns symbols in CoinGlass format (e.g., "BTC/USDT").
+   */
+  static async getCoinGlassSymbols(): Promise<{
+    success: boolean;
+    symbols: Array<{
+      symbol: string;
+      name: string;
+      exchange?: string | null;
+    }>;
+    count: number;
+    source?: string;
+    error?: string;
+  }> {
+    const response = await api.get('/api/data/coinglass-symbols');
+    return response.data;
+  }
+
+  /**
    * Get price history (OHLC) data from CoinGlass API.
    */
   static async getPriceHistory(params: {

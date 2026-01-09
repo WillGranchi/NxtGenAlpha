@@ -30,7 +30,28 @@ const IndicatorsPage: React.FC = () => {
   const [availableConditions, setAvailableConditions] = useState<Record<string, string>>({});
   
   // Settings
-  const [symbol, setSymbol] = useState<string>('BTCUSDT');
+  // Store symbol in CoinGlass format (BTC/USDT) for display, convert to internal format (BTCUSDT) for API calls
+  const [symbol, setSymbol] = useState<string>('BTC/USDT');
+  
+  // Helper function to convert CoinGlass format to internal format for API calls
+  const symbolToInternal = (coinglassSymbol: string): string => {
+    return coinglassSymbol.replace('/', '');
+  };
+  
+  // Helper function to convert internal format to CoinGlass format for display
+  const symbolToCoinglass = (internalSymbol: string): string => {
+    if (internalSymbol.includes('/')) return internalSymbol;
+    const match = internalSymbol.match(/^([A-Z]+)(USDT|USD|BTC|ETH)$/);
+    if (match) {
+      return `${match[1]}/${match[2]}`;
+    }
+    if (internalSymbol.length >= 6) {
+      const base = internalSymbol.slice(0, -4);
+      const quote = internalSymbol.slice(-4);
+      return `${base}/${quote}`;
+    }
+    return internalSymbol;
+  };
   const [startDate, setStartDate] = useState<string>('2010-01-01');
   const [endDate, setEndDate] = useState<string>('');
   const [strategyType, setStrategyType] = useState<'long_cash' | 'long_short'>('long_cash');
@@ -88,21 +109,26 @@ const IndicatorsPage: React.FC = () => {
   // Load base price data for default chart display
   const loadBasePriceData = useCallback(async (forceRefresh: boolean = false) => {
     try {
-      // If force refresh is requested, refresh data from Yahoo Finance first
+      // Convert CoinGlass format to internal format for API calls
+      const internalSymbol = symbolToInternal(symbol);
+      
+      // If force refresh is requested, refresh data from CoinGlass first
       if (forceRefresh) {
         setIsRefreshingData(true);
         try {
-          await TradingAPI.refreshData(symbol, true);
+          await TradingAPI.refreshData(internalSymbol, true);
         } catch (refreshErr) {
-          console.warn('Failed to refresh data:', refreshErr);
+          console.warn('Failed to refresh data from CoinGlass:', refreshErr);
           // Continue to load existing data even if refresh fails
         } finally {
           setIsRefreshingData(false);
         }
       }
 
+      // Convert to internal format for API call
+      const internalSymbol = symbolToInternal(symbol);
       const response = await TradingAPI.getValuationData({
-        symbol,
+        symbol: internalSymbol,
         indicators: [], // No indicators, just price
         start_date: startDate || undefined,
         end_date: endDate || undefined,
@@ -120,13 +146,13 @@ const IndicatorsPage: React.FC = () => {
         setBasePriceData(formattedData);
         setError(null);
       }
-    } catch (err) {
-      console.error('Failed to load base price data:', err);
-      setError('Failed to load price data. Click "Refresh Data" to fetch from Yahoo Finance.');
-    }
+      } catch (err) {
+        console.error('Failed to load base price data:', err);
+        setError('Failed to load price data. Click "Refresh Data" to fetch from CoinGlass.');
+      }
   }, [symbol, startDate, endDate]);
 
-  // Auto-load Yahoo Finance data on initial page load
+  // Auto-load CoinGlass data on initial page load
   useEffect(() => {
     if (!initialLoadAttempted) {
       setInitialLoadAttempted(true);
@@ -148,14 +174,16 @@ const IndicatorsPage: React.FC = () => {
     setIsRefreshingData(true);
     setError(null);
     try {
-      // Force refresh from Yahoo Finance (will use token launch date automatically)
-      await TradingAPI.refreshData(symbol, true);
+      // Convert to internal format for API call
+      const internalSymbol = symbolToInternal(symbol);
+      // Force refresh from CoinGlass (will use token launch date automatically)
+      await TradingAPI.refreshData(internalSymbol, true);
       // Reload price data after refresh
       await loadBasePriceData();
       setError(null);
     } catch (err: any) {
       console.error('Failed to refresh data:', err);
-      const errorDetail = err?.response?.data?.detail || 'Failed to refresh data from Yahoo Finance';
+      const errorDetail = err?.response?.data?.detail || 'Failed to refresh data from CoinGlass';
       setError(errorDetail);
     } finally {
       setIsRefreshingData(false);
@@ -254,7 +282,7 @@ const IndicatorsPage: React.FC = () => {
         initial_capital: initialCapital,
         start_date: startDate || undefined,
         end_date: endDate || undefined,
-        symbol,
+        symbol: symbolToInternal(symbol), // Convert to internal format for API
       });
       
       if (!backtestResponse.success) {
