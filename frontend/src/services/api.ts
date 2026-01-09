@@ -1283,6 +1283,106 @@ export class TradingAPI {
       throw error;
     }
   }
+
+  // ==================== Dashboard API ====================
+
+  /**
+   * Get all saved strategies (Indicator, Valuation, Full Cycle) for the current user.
+   */
+  static async getAllSavedStrategies(): Promise<{
+    success: boolean;
+    indicator_strategies: Array<{
+      id: number;
+      name: string;
+      description?: string;
+      created_at: string;
+      updated_at: string;
+      type: string;
+    }>;
+    valuation_strategies: Array<{
+      id: number;
+      name: string;
+      description?: string;
+      created_at: string;
+      updated_at: string;
+      type: string;
+    }>;
+    fullcycle_presets: Array<{
+      id: number;
+      name: string;
+      description?: string;
+      created_at: string;
+      updated_at: string;
+      type: string;
+    }>;
+    total: number;
+  }> {
+    const response: AxiosResponse<any> = await api.get('/api/dashboard/strategies/all');
+    return response.data;
+  }
+
+  /**
+   * Calculate combined signals from selected strategies.
+   */
+  static async calculateCombinedSignals(params: {
+    strategy_selection: {
+      indicator_strategy_ids: number[];
+      valuation_strategy_ids: number[];
+      fullcycle_preset_ids: number[];
+    };
+    combination_rule: {
+      method: 'weighted' | 'majority' | 'custom';
+      weights?: Record<string, number>;
+      threshold?: number;
+      expression?: string;
+    };
+    start_date?: string;
+    end_date?: string;
+    symbol?: string;
+  }): Promise<{
+    success: boolean;
+    combined_signals: {
+      dates: string[];
+      values: number[];
+    };
+    individual_signals: Record<string, {
+      dates: string[];
+      values: number[];
+    }>;
+    metadata: any;
+  }> {
+    const response: AxiosResponse<any> = await api.post('/api/dashboard/calculate-combined-signals', params);
+    return response.data;
+  }
+
+  /**
+   * Run combined backtest using multiple strategies.
+   */
+  static async runCombinedBacktest(params: {
+    strategy_selection: {
+      indicator_strategy_ids: number[];
+      valuation_strategy_ids: number[];
+      fullcycle_preset_ids: number[];
+    };
+    combination_rule: {
+      method: 'weighted' | 'majority' | 'custom';
+      weights?: Record<string, number>;
+      threshold?: number;
+      expression?: string;
+    };
+    start_date?: string;
+    end_date?: string;
+    symbol?: string;
+    initial_capital?: number;
+  }): Promise<{
+    success: boolean;
+    backtest_results: any;
+    metrics: any;
+    metadata: any;
+  }> {
+    const response: AxiosResponse<any> = await api.post('/api/dashboard/combined-backtest', params);
+    return response.data;
+  }
 }
 
 export default TradingAPI;
