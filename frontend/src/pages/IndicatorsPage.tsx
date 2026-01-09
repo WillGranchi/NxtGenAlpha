@@ -125,8 +125,7 @@ const IndicatorsPage: React.FC = () => {
         }
       }
 
-      // Convert to internal format for API call
-      const internalSymbol = symbolToInternal(symbol);
+      // Use the already converted internal symbol for API call
       const response = await TradingAPI.getValuationData({
         symbol: internalSymbol,
         indicators: [], // No indicators, just price
