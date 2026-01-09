@@ -625,7 +625,8 @@ async def get_btc_history_status() -> Dict[str, Any]:
 @router.post("/ensure-btc-history")
 async def ensure_btc_history(
     exchange: Optional[str] = Query(default="Binance", description="Exchange name (e.g., Binance, Coinbase)"),
-    force_rebuild: bool = Query(default=False, description="Force rebuild even if data appears complete")
+    force_rebuild: bool = Query(default=False, description="Force rebuild even if data appears complete"),
+    background: bool = Query(default=True, description="Run build in background (non-blocking)")
 ) -> Dict[str, Any]:
     """
     Ensure BTC has complete historical data. If incomplete, automatically builds it.
@@ -639,45 +640,102 @@ async def ensure_btc_history(
     """
     try:
         import pandas as pd
+        from concurrent.futures import ThreadPoolExecutor
+        
         target_start_date = datetime(2010, 1, 1)
         
-        logger.info(f"Ensuring full BTC history (exchange: {exchange}, force: {force_rebuild})")
+        # Check if data already exists and is complete
+        try:
+            existing_df = load_crypto_data(symbol="BTCUSDT")
+            if not existing_df.empty:
+                data_start = existing_df.index.min()
+                days_from_target = (data_start - target_start_date).days
+                if days_from_target <= 30 and not force_rebuild:
+                    # Data is already complete, return immediately
+                    total_days = (existing_df.index.max() - existing_df.index.min()).days
+                    return {
+                        "success": True,
+                        "message": "BTC history is already complete",
+                        "was_built": False,
+                        "is_complete": True,
+                        "symbol": "BTCUSDT",
+                        "total_records": len(existing_df),
+                        "date_range": {
+                            "start": existing_df.index.min().strftime("%Y-%m-%d"),
+                            "end": existing_df.index.max().strftime("%Y-%m-%d")
+                        },
+                        "total_days": total_days,
+                        "total_years": round(total_days / 365.0, 2),
+                        "target_start_date": target_start_date.strftime("%Y-%m-%d"),
+                        "latest_price": float(existing_df['Close'].iloc[-1]),
+                        "latest_date": existing_df.index.max().strftime("%Y-%m-%d")
+                    }
+        except:
+            pass  # Continue to build if check fails
         
-        # Build or verify the dataset
-        df, was_built = ensure_full_btc_history(
-            exchange=exchange,
-            target_start_date=target_start_date,
-            force_rebuild=force_rebuild
-        )
+        logger.info(f"Ensuring full BTC history (exchange: {exchange}, force: {force_rebuild}, background: {background})")
         
-        if df.empty:
-            raise HTTPException(
-                status_code=404,
-                detail="Failed to build or load BTC history"
+        if background:
+            # Run build in background thread (non-blocking)
+            def build_in_background():
+                try:
+                    ensure_full_btc_history(
+                        exchange=exchange,
+                        target_start_date=target_start_date,
+                        force_rebuild=force_rebuild
+                    )
+                except Exception as e:
+                    logger.error(f"Background BTC history build failed: {e}")
+            
+            # Start background task
+            executor = ThreadPoolExecutor(max_workers=1)
+            executor.submit(build_in_background)
+            
+            # Return immediately with status
+            return {
+                "success": True,
+                "message": "BTC history build started in background",
+                "was_built": False,
+                "is_complete": False,
+                "symbol": "BTCUSDT",
+                "background": True
+            }
+        else:
+            # Build synchronously (blocking)
+            df, was_built = ensure_full_btc_history(
+                exchange=exchange,
+                target_start_date=target_start_date,
+                force_rebuild=force_rebuild
             )
-        
-        # Calculate summary statistics
-        total_days = (df.index.max() - df.index.min()).days
-        total_years = total_days / 365.0
-        is_complete = df.index.min() <= target_start_date
-        
-        return {
-            "success": True,
-            "message": "BTC history is complete" if is_complete else "BTC history built (may be incomplete)",
-            "was_built": was_built,
-            "is_complete": is_complete,
-            "symbol": "BTCUSDT",
-            "total_records": len(df),
-            "date_range": {
-                "start": df.index.min().strftime("%Y-%m-%d"),
-                "end": df.index.max().strftime("%Y-%m-%d")
-            },
-            "total_days": total_days,
-            "total_years": round(total_years, 2),
-            "target_start_date": target_start_date.strftime("%Y-%m-%d"),
-            "latest_price": float(df['Close'].iloc[-1]),
-            "latest_date": df.index.max().strftime("%Y-%m-%d")
-        }
+            
+            if df.empty:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Failed to build or load BTC history"
+                )
+            
+            # Calculate summary statistics
+            total_days = (df.index.max() - df.index.min()).days
+            total_years = total_days / 365.0
+            is_complete = df.index.min() <= target_start_date
+            
+            return {
+                "success": True,
+                "message": "BTC history is complete" if is_complete else "BTC history built (may be incomplete)",
+                "was_built": was_built,
+                "is_complete": is_complete,
+                "symbol": "BTCUSDT",
+                "total_records": len(df),
+                "date_range": {
+                    "start": df.index.min().strftime("%Y-%m-%d"),
+                    "end": df.index.max().strftime("%Y-%m-%d")
+                },
+                "total_days": total_days,
+                "total_years": round(total_years, 2),
+                "target_start_date": target_start_date.strftime("%Y-%m-%d"),
+                "latest_price": float(df['Close'].iloc[-1]),
+                "latest_date": df.index.max().strftime("%Y-%m-%d")
+            }
         
     except Exception as e:
         logger.error(f"Error ensuring BTC history: {e}", exc_info=True)

@@ -64,30 +64,30 @@ const FullCyclePage: React.FC = () => {
     refreshData,
   } = useFullCycle();
 
-  // Check BTC history status on page load and ensure it's complete
+  // Check BTC history status on page load (non-blocking)
   useEffect(() => {
-    const checkAndEnsureHistory = async () => {
+    const checkHistoryStatus = async () => {
       try {
         setIsCheckingHistory(true);
         const status = await TradingAPI.checkBTCHistoryStatus();
         
         setBtcHistoryComplete(status.is_complete || false);
         
-        // If incomplete, automatically trigger build
+        // If incomplete, trigger build in background (non-blocking)
+        // Don't wait for it to complete - let it run in background
         if (!status.is_complete) {
-          try {
-            await TradingAPI.ensureBTCHistory({ exchange: 'Binance', force_rebuild: false });
-            // Refresh status after build
-            const newStatus = await TradingAPI.checkBTCHistoryStatus();
-            setBtcHistoryComplete(newStatus.is_complete || false);
-            
-            // Refresh Full Cycle data after history is built
-            if (newStatus.is_complete) {
-              await refreshData();
-            }
-          } catch (buildError) {
-            console.error('Failed to build BTC history:', buildError);
-          }
+          // Trigger build but don't await - let it run in background
+          TradingAPI.ensureBTCHistory({ exchange: 'Binance', force_rebuild: false })
+            .then((result) => {
+              if (result.is_complete) {
+                setBtcHistoryComplete(true);
+                // Refresh data after build completes
+                refreshData().catch(err => console.error('Failed to refresh data:', err));
+              }
+            })
+            .catch((buildError) => {
+              console.error('Failed to build BTC history:', buildError);
+            });
         }
       } catch (error) {
         console.error('Failed to check BTC history status:', error);
@@ -96,8 +96,8 @@ const FullCyclePage: React.FC = () => {
       }
     };
     
-    checkAndEnsureHistory();
-  }, [refreshData]);
+    checkHistoryStatus();
+  }, []); // Only run once on mount, don't depend on refreshData
 
   // Load preset if navigating from My Creations
   useEffect(() => {

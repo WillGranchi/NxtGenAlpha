@@ -633,6 +633,7 @@ export class TradingAPI {
   static async ensureBTCHistory(params?: {
     exchange?: string;
     force_rebuild?: boolean;
+    background?: boolean;
   }): Promise<{
     success: boolean;
     message: string;
@@ -650,9 +651,16 @@ export class TradingAPI {
     latest_price: number;
     latest_date: string;
   }> {
+    const requestParams = {
+      ...(params || {}),
+      background: params?.background !== false, // Default to true (background)
+    };
+    
+    const timeout = requestParams.background ? 10000 : 600000; // 10s for background, 10min for blocking
+    
     const response: AxiosResponse<any> = await api.post('/api/data/ensure-btc-history', null, {
-      params: params || {},
-      timeout: 600000, // 10 minutes for full history build
+      params: requestParams,
+      timeout,
     });
     return response.data;
   }

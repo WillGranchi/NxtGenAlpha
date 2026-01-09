@@ -1437,7 +1437,7 @@ def build_full_historical_dataset(
     exchange: str = "Binance",
     chunk_days: int = 999,  # Fetch 999 days per chunk (under 1000 limit)
     save_after_each_chunk: bool = True,
-    delay_between_chunks: float = 2.0  # Delay in seconds to avoid rate limits
+    delay_between_chunks: float = 0.5  # Delay in seconds to avoid rate limits (reduced for faster loading)
 ) -> pd.DataFrame:
     """
     Build a complete historical dataset by fetching data in chunks going backward in time.
@@ -1619,8 +1619,9 @@ def ensure_full_btc_history(
             data_start = existing_df.index.min()
             data_end = existing_df.index.max()
             
-            # Check if data goes back to target date
-            if data_start <= target_start_date:
+            # Check if data goes back to target date (with 30-day buffer for flexibility)
+            days_from_target = (data_start - target_start_date).days
+            if days_from_target <= 30:
                 logger.info(f"BTC data is complete: {len(existing_df)} rows from {data_start.strftime('%Y-%m-%d')} to {data_end.strftime('%Y-%m-%d')}")
                 return existing_df, False
         
@@ -1634,7 +1635,7 @@ def ensure_full_btc_history(
             exchange=exchange,
             chunk_days=999,
             save_after_each_chunk=True,
-            delay_between_chunks=2.0
+            delay_between_chunks=0.5  # Reduced delay for faster building
         )
         
         if df.empty:

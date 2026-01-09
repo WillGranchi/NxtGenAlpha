@@ -239,9 +239,9 @@ class CoinGlassClient:
                 
                 # Make request with separate connection and read timeouts
                 # Connection timeout: how long to wait to establish connection (5 seconds)
-                # Read timeout: how long to wait for response data (60 seconds)
+                # Read timeout: how long to wait for response data (30 seconds - reduced for faster failures)
                 try:
-                    response = self.session.get(url, params=params, timeout=(5, 60))
+                    response = self.session.get(url, params=params, timeout=(5, 30))
                 except requests.exceptions.Timeout as timeout_error:
                     if "ConnectTimeout" in str(type(timeout_error)):
                         raise Exception(f"CoinGlass API connection timeout - unable to connect to {url}. Check network connectivity.")
