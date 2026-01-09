@@ -650,7 +650,7 @@ async def ensure_btc_history(
             if not existing_df.empty:
                 data_start = existing_df.index.min()
                 days_from_target = (data_start - target_start_date).days
-                if days_from_target <= 30 and not force_rebuild:
+                if days_from_target <= 90 and not force_rebuild:
                     # Data is already complete, return immediately
                     total_days = (existing_df.index.max() - existing_df.index.min()).days
                     return {

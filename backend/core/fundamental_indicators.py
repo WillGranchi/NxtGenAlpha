@@ -1,27 +1,21 @@
 """
 Fundamental/On-chain indicators module.
 
-This module provides stub functions for fundamental indicators that require
-external data sources. These functions return mock data for now and should be
-replaced with real data sources in the future.
-
-TODO: Connect to real data sources:
-- MVRV: Market Value to Realized Value ratio (requires on-chain data)
-- Bitcoin Thermocap: Cumulative miner revenue (requires on-chain data)
-- NUPL: Net Unrealized Profit/Loss (requires UTXO data)
-- CVDD: Cumulative Value Days Destroyed (requires on-chain data)
-- NVTS: Network Value to Transactions ratio (requires transaction volume data)
-- SOPR: Spent Output Profit Ratio (requires UTXO data)
-- Realized PnL Momentum: Requires on-chain profit/loss data
+This module provides functions for fundamental indicators that require
+external on-chain data sources. Uses Glassnode API for real data with
+fallback to stub data if API is unavailable.
 
 Recommended API: Glassnode (https://docs.glassnode.com/basic-api/endpoints/indicators)
-Provides: MVRV, Bitcoin Thermocap, NUPL, CVDD, SOPR
+Provides: MVRV, Bitcoin Thermocap, NUPL, CVDD, SOPR, Puell Multiple, Reserve Risk, etc.
 """
 
 import pandas as pd
 import numpy as np
 from typing import Optional
 import logging
+from datetime import datetime
+
+from .glassnode_client import get_glassnode_client
 
 logger = logging.getLogger(__name__)
 
@@ -37,23 +31,39 @@ def calculate_mvrv(df: pd.DataFrame) -> pd.Series:
         df: DataFrame with OHLCV data and Date index
         
     Returns:
-        Pandas Series with MVRV values (stub - returns mock data)
-        
-    TODO: Replace with real MVRV calculation from on-chain data sources
+        Pandas Series with MVRV values from Glassnode API (or stub data if API unavailable)
     """
-    logger.warning("Using stub MVRV data - replace with real on-chain data source")
-    
-    # Generate mock MVRV values (typically ranges from 0.5 to 5.0)
-    # Mock data oscillates around 1.0 with some volatility
     dates = df.index
-    n = len(dates)
+    start_date = dates.min()
+    end_date = dates.max()
     
-    # Create oscillating pattern with some randomness
+    # Try to fetch from Glassnode
+    try:
+        client = get_glassnode_client()
+        mvrv_data = client.get_mvrv("BTC", start_date, end_date, use_cache=True)
+        
+        if len(mvrv_data) > 0:
+            # Align with DataFrame index
+            aligned = mvrv_data.reindex(dates, method='ffill')
+            aligned = aligned.bfill()
+            
+            # Validate data
+            if aligned.notna().sum() > len(dates) * 0.5:  # At least 50% valid data
+                logger.info(f"Using real MVRV data from Glassnode: {len(mvrv_data)} data points")
+                return aligned.fillna(1.0)  # Fill remaining NaN with neutral value
+            else:
+                logger.warning("Glassnode MVRV data has too many gaps, falling back to stub data")
+        else:
+            logger.warning("No MVRV data from Glassnode, falling back to stub data")
+    except Exception as e:
+        logger.warning(f"Error fetching MVRV from Glassnode: {e}. Using stub data.")
+    
+    # Fallback to stub data
+    logger.warning("Using stub MVRV data - Glassnode API unavailable or no API key")
+    n = len(dates)
     trend = np.sin(np.linspace(0, 4 * np.pi, n))
     noise = np.random.normal(0, 0.3, n)
     mvrv_values = 1.0 + trend * 0.5 + noise
-    
-    # Ensure values stay in reasonable range
     mvrv_values = np.clip(mvrv_values, 0.3, 4.0)
     
     return pd.Series(mvrv_values, index=dates, name='MVRV')
@@ -70,21 +80,39 @@ def calculate_nupl(df: pd.DataFrame) -> pd.Series:
         df: DataFrame with OHLCV data and Date index
         
     Returns:
-        Pandas Series with NUPL values (stub - returns mock data)
-        
-    TODO: Replace with real NUPL calculation from UTXO data
+        Pandas Series with NUPL values from Glassnode API (or stub data if API unavailable)
     """
-    logger.warning("Using stub NUPL data - replace with real UTXO data source")
-    
     dates = df.index
-    n = len(dates)
+    start_date = dates.min()
+    end_date = dates.max()
     
-    # NUPL typically ranges from -0.5 to 0.75
+    # Try to fetch from Glassnode
+    try:
+        client = get_glassnode_client()
+        nupl_data = client.get_nupl("BTC", start_date, end_date, use_cache=True)
+        
+        if len(nupl_data) > 0:
+            # Align with DataFrame index
+            aligned = nupl_data.reindex(dates, method='ffill')
+            aligned = aligned.bfill()
+            
+            # Validate data
+            if aligned.notna().sum() > len(dates) * 0.5:
+                logger.info(f"Using real NUPL data from Glassnode: {len(nupl_data)} data points")
+                return aligned.fillna(0.0)
+            else:
+                logger.warning("Glassnode NUPL data has too many gaps, falling back to stub data")
+        else:
+            logger.warning("No NUPL data from Glassnode, falling back to stub data")
+    except Exception as e:
+        logger.warning(f"Error fetching NUPL from Glassnode: {e}. Using stub data.")
+    
+    # Fallback to stub data
+    logger.warning("Using stub NUPL data - Glassnode API unavailable or no API key")
+    n = len(dates)
     trend = np.sin(np.linspace(0, 3 * np.pi, n))
     noise = np.random.normal(0, 0.1, n)
     nupl_values = trend * 0.3 + noise
-    
-    # Ensure values stay in reasonable range
     nupl_values = np.clip(nupl_values, -0.5, 0.75)
     
     return pd.Series(nupl_values, index=dates, name='NUPL')
@@ -102,24 +130,39 @@ def calculate_bitcoin_thermocap(df: pd.DataFrame) -> pd.Series:
         df: DataFrame with OHLCV data and Date index
         
     Returns:
-        Pandas Series with Bitcoin Thermocap values (stub - returns mock data)
-        
-    TODO: Replace with real Bitcoin Thermocap calculation from on-chain data.
-    Recommended API: Glassnode (https://docs.glassnode.com/basic-api/endpoints/indicators)
-    Endpoint: /v1/metrics/mining/thermocap
+        Pandas Series with Bitcoin Thermocap values from Glassnode API (or stub data if API unavailable)
     """
-    logger.warning("Using stub Bitcoin Thermocap data - replace with real on-chain data source (Glassnode API recommended)")
-    
     dates = df.index
-    n = len(dates)
+    start_date = dates.min()
+    end_date = dates.max()
     
-    # Bitcoin Thermocap is cumulative and should trend upward over time
-    # Generate cumulative sum with exponential growth pattern
-    base_growth = np.linspace(1, 10, n)  # Simulate growth over time
+    # Try to fetch from Glassnode
+    try:
+        client = get_glassnode_client()
+        thermocap_data = client.get_thermocap("BTC", start_date, end_date, use_cache=True)
+        
+        if len(thermocap_data) > 0:
+            # Align with DataFrame index
+            aligned = thermocap_data.reindex(dates, method='ffill')
+            aligned = aligned.bfill()
+            
+            # Validate data
+            if aligned.notna().sum() > len(dates) * 0.5:
+                logger.info(f"Using real Bitcoin Thermocap data from Glassnode: {len(thermocap_data)} data points")
+                return aligned.fillna(0.0)
+            else:
+                logger.warning("Glassnode Thermocap data has too many gaps, falling back to stub data")
+        else:
+            logger.warning("No Thermocap data from Glassnode, falling back to stub data")
+    except Exception as e:
+        logger.warning(f"Error fetching Thermocap from Glassnode: {e}. Using stub data.")
+    
+    # Fallback to stub data
+    logger.warning("Using stub Bitcoin Thermocap data - Glassnode API unavailable or no API key")
+    n = len(dates)
+    base_growth = np.linspace(1, 10, n)
     daily_values = base_growth * np.random.exponential(0.5, n)
     thermocap_values = np.cumsum(daily_values)
-    
-    # Normalize to reasonable range (in billions)
     thermocap_values = (thermocap_values - thermocap_values.min()) / (thermocap_values.max() - thermocap_values.min()) * 1000
     
     return pd.Series(thermocap_values, index=dates, name='Bitcoin_Thermocap')
@@ -136,23 +179,38 @@ def calculate_cvdd(df: pd.DataFrame) -> pd.Series:
         df: DataFrame with OHLCV data and Date index
         
     Returns:
-        Pandas Series with CVDD values (stub - returns mock data)
-        
-    TODO: Replace with real CVDD calculation from on-chain data.
-    Recommended API: Glassnode (https://docs.glassnode.com/basic-api/endpoints/indicators)
-    Endpoint: /v1/metrics/indicators/cvdd
+        Pandas Series with CVDD values from Glassnode API (or stub data if API unavailable)
     """
-    logger.warning("Using stub CVDD data - replace with real on-chain data source")
-    
     dates = df.index
-    n = len(dates)
+    start_date = dates.min()
+    end_date = dates.max()
     
-    # CVDD is cumulative, so it should generally trend upward
-    # Generate cumulative sum with some variation
+    # Try to fetch from Glassnode
+    try:
+        client = get_glassnode_client()
+        cvdd_data = client.get_cvdd("BTC", start_date, end_date, use_cache=True)
+        
+        if len(cvdd_data) > 0:
+            # Align with DataFrame index
+            aligned = cvdd_data.reindex(dates, method='ffill')
+            aligned = aligned.bfill()
+            
+            # Validate data
+            if aligned.notna().sum() > len(dates) * 0.5:
+                logger.info(f"Using real CVDD data from Glassnode: {len(cvdd_data)} data points")
+                return aligned.fillna(0.0)
+            else:
+                logger.warning("Glassnode CVDD data has too many gaps, falling back to stub data")
+        else:
+            logger.warning("No CVDD data from Glassnode, falling back to stub data")
+    except Exception as e:
+        logger.warning(f"Error fetching CVDD from Glassnode: {e}. Using stub data.")
+    
+    # Fallback to stub data
+    logger.warning("Using stub CVDD data - Glassnode API unavailable or no API key")
+    n = len(dates)
     daily_values = np.random.exponential(0.1, n)
     cvdd_values = np.cumsum(daily_values)
-    
-    # Normalize to reasonable range
     cvdd_values = (cvdd_values - cvdd_values.min()) / (cvdd_values.max() - cvdd_values.min()) * 100
     
     return pd.Series(cvdd_values, index=dates, name='CVDD')
@@ -170,24 +228,39 @@ def calculate_puell_multiple(df: pd.DataFrame) -> pd.Series:
         df: DataFrame with OHLCV data and Date index
         
     Returns:
-        Pandas Series with Puell Multiple values (stub - returns mock data)
-        
-    TODO: Replace with real Puell Multiple calculation from on-chain data.
-    Recommended API: Glassnode (https://docs.glassnode.com/basic-api/endpoints/indicators)
-    Endpoint: /v1/metrics/indicators/puell_multiple
+        Pandas Series with Puell Multiple values from Glassnode API (or stub data if API unavailable)
     """
-    logger.warning("Using stub Puell Multiple data - replace with real on-chain data source (Glassnode API recommended)")
-    
     dates = df.index
-    n = len(dates)
+    start_date = dates.min()
+    end_date = dates.max()
     
-    # Puell Multiple typically ranges from 0.3 to 4.0
-    # Low values (< 0.5) indicate cycle bottoms
+    # Try to fetch from Glassnode
+    try:
+        client = get_glassnode_client()
+        puell_data = client.get_puell_multiple("BTC", start_date, end_date, use_cache=True)
+        
+        if len(puell_data) > 0:
+            # Align with DataFrame index
+            aligned = puell_data.reindex(dates, method='ffill')
+            aligned = aligned.bfill()
+            
+            # Validate data
+            if aligned.notna().sum() > len(dates) * 0.5:
+                logger.info(f"Using real Puell Multiple data from Glassnode: {len(puell_data)} data points")
+                return aligned.fillna(1.0)
+            else:
+                logger.warning("Glassnode Puell Multiple data has too many gaps, falling back to stub data")
+        else:
+            logger.warning("No Puell Multiple data from Glassnode, falling back to stub data")
+    except Exception as e:
+        logger.warning(f"Error fetching Puell Multiple from Glassnode: {e}. Using stub data.")
+    
+    # Fallback to stub data
+    logger.warning("Using stub Puell Multiple data - Glassnode API unavailable or no API key")
+    n = len(dates)
     trend = np.sin(np.linspace(0, 3 * np.pi, n))
     noise = np.random.normal(0, 0.2, n)
     puell_values = 1.0 + trend * 0.8 + noise
-    
-    # Ensure values stay in reasonable range
     puell_values = np.clip(puell_values, 0.3, 4.0)
     
     return pd.Series(puell_values, index=dates, name='Puell_Multiple')
@@ -210,18 +283,37 @@ def calculate_reserve_risk(df: pd.DataFrame) -> pd.Series:
     Recommended API: Glassnode (https://docs.glassnode.com/basic-api/endpoints/indicators)
     Endpoint: /v1/metrics/indicators/reserve_risk
     """
-    logger.warning("Using stub Reserve Risk data - replace with real on-chain data source (Glassnode API recommended)")
-    
     dates = df.index
-    n = len(dates)
+    start_date = dates.min()
+    end_date = dates.max()
     
-    # Reserve Risk typically ranges from 0.001 to 0.1
-    # Low values indicate undervalued conditions
+    # Try to fetch from Glassnode
+    try:
+        client = get_glassnode_client()
+        reserve_risk_data = client.get_reserve_risk("BTC", start_date, end_date, use_cache=True)
+        
+        if len(reserve_risk_data) > 0:
+            # Align with DataFrame index
+            aligned = reserve_risk_data.reindex(dates, method='ffill')
+            aligned = aligned.bfill()
+            
+            # Validate data
+            if aligned.notna().sum() > len(dates) * 0.5:
+                logger.info(f"Using real Reserve Risk data from Glassnode: {len(reserve_risk_data)} data points")
+                return aligned.fillna(0.02)
+            else:
+                logger.warning("Glassnode Reserve Risk data has too many gaps, falling back to stub data")
+        else:
+            logger.warning("No Reserve Risk data from Glassnode, falling back to stub data")
+    except Exception as e:
+        logger.warning(f"Error fetching Reserve Risk from Glassnode: {e}. Using stub data.")
+    
+    # Fallback to stub data
+    logger.warning("Using stub Reserve Risk data - Glassnode API unavailable or no API key")
+    n = len(dates)
     trend = np.sin(np.linspace(0, 2.5 * np.pi, n))
     noise = np.random.normal(0, 0.01, n)
     reserve_risk_values = 0.02 + trend * 0.015 + noise
-    
-    # Ensure values stay in reasonable range
     reserve_risk_values = np.clip(reserve_risk_values, 0.001, 0.1)
     
     return pd.Series(reserve_risk_values, index=dates, name='Reserve_Risk')
@@ -238,21 +330,38 @@ def calculate_bitcoin_days_destroyed(df: pd.DataFrame) -> pd.Series:
         df: DataFrame with OHLCV data and Date index
         
     Returns:
-        Pandas Series with Bitcoin Days Destroyed values (stub - returns mock data)
-        
-    TODO: Replace with real Bitcoin Days Destroyed calculation from on-chain data.
-    Recommended API: Glassnode (https://docs.glassnode.com/basic-api/endpoints/indicators)
-    Endpoint: /v1/metrics/indicators/bitcoin_days_destroyed
+        Pandas Series with Bitcoin Days Destroyed values from Glassnode API (or stub data if API unavailable)
     """
-    logger.warning("Using stub Bitcoin Days Destroyed data - replace with real on-chain data source (Glassnode API recommended)")
-    
     dates = df.index
-    n = len(dates)
+    start_date = dates.min()
+    end_date = dates.max()
     
-    # BDD has spikes during capitulation events
-    # Generate base level with occasional spikes
-    base_level = np.random.exponential(1000000, n)  # Base level in coin-days
-    spikes = np.random.choice([0, 1], size=n, p=[0.95, 0.05])  # 5% chance of spike
+    # Try to fetch from Glassnode
+    try:
+        client = get_glassnode_client()
+        bdd_data = client.get_days_destroyed("BTC", start_date, end_date, use_cache=True)
+        
+        if len(bdd_data) > 0:
+            # Align with DataFrame index
+            aligned = bdd_data.reindex(dates, method='ffill')
+            aligned = aligned.bfill()
+            
+            # Validate data
+            if aligned.notna().sum() > len(dates) * 0.5:
+                logger.info(f"Using real Bitcoin Days Destroyed data from Glassnode: {len(bdd_data)} data points")
+                return aligned.fillna(0.0)
+            else:
+                logger.warning("Glassnode BDD data has too many gaps, falling back to stub data")
+        else:
+            logger.warning("No BDD data from Glassnode, falling back to stub data")
+    except Exception as e:
+        logger.warning(f"Error fetching BDD from Glassnode: {e}. Using stub data.")
+    
+    # Fallback to stub data
+    logger.warning("Using stub Bitcoin Days Destroyed data - Glassnode API unavailable or no API key")
+    n = len(dates)
+    base_level = np.random.exponential(1000000, n)
+    spikes = np.random.choice([0, 1], size=n, p=[0.95, 0.05])
     spike_multiplier = 1 + spikes * np.random.uniform(2, 5, n)
     bdd_values = base_level * spike_multiplier
     
@@ -276,13 +385,34 @@ def calculate_exchange_net_position(df: pd.DataFrame) -> pd.Series:
     Recommended API: Glassnode or CryptoQuant
     Endpoint: Glassnode /v1/metrics/distribution/exchange_net_position_change
     """
-    logger.warning("Using stub Exchange Net Position data - replace with real on-chain data source (Glassnode/CryptoQuant API recommended)")
-    
     dates = df.index
-    n = len(dates)
+    start_date = dates.min()
+    end_date = dates.max()
     
-    # Exchange net position can be positive (distribution) or negative (accumulation)
-    # Generate oscillating pattern around zero
+    # Try to fetch from Glassnode
+    try:
+        client = get_glassnode_client()
+        exchange_data = client.get_exchange_netflows("BTC", start_date, end_date, use_cache=True)
+        
+        if len(exchange_data) > 0:
+            # Align with DataFrame index
+            aligned = exchange_data.reindex(dates, method='ffill')
+            aligned = aligned.bfill()
+            
+            # Validate data
+            if aligned.notna().sum() > len(dates) * 0.5:
+                logger.info(f"Using real Exchange Net Position data from Glassnode: {len(exchange_data)} data points")
+                return aligned.fillna(0.0)
+            else:
+                logger.warning("Glassnode Exchange Net Position data has too many gaps, falling back to stub data")
+        else:
+            logger.warning("No Exchange Net Position data from Glassnode, falling back to stub data")
+    except Exception as e:
+        logger.warning(f"Error fetching Exchange Net Position from Glassnode: {e}. Using stub data.")
+    
+    # Fallback to stub data
+    logger.warning("Using stub Exchange Net Position data - Glassnode API unavailable or no API key")
+    n = len(dates)
     trend = np.sin(np.linspace(0, 4 * np.pi, n))
     noise = np.random.normal(0, 500, n)
     exchange_net_values = trend * 2000 + noise

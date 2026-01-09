@@ -84,6 +84,37 @@ See **RAILWAY_DEPLOYMENT.md** for detailed instructions and verification checkli
 ### Architecture
 - **[CODEBASE_OVERVIEW.md](./CODEBASE_OVERVIEW.md)** - Comprehensive codebase structure and architecture documentation
 
+## API Keys & Data Sources
+
+### Required API Keys
+
+The application uses the following APIs for data:
+
+1. **CoinGlass API** (Price & Market Data)
+   - Already configured with API key: `0e38a988ab2641aab8b4dd265eef9f62`
+   - Provides: Historical price data (OHLCV), funding rates, open interest, long/short ratios
+   - Set `COINGLASS_API_KEY` in environment if you need to change it
+
+2. **Glassnode API** (On-Chain Data) - **REQUIRED for Full Cycle Model**
+   - **Required for**: MVRV, NUPL, CVDD, SOPR, Bitcoin Thermocap, Puell Multiple, Reserve Risk, Bitcoin Days Destroyed, Exchange Net Position
+   - **Get API Key**: Sign up at https://glassnode.com and generate an API key
+   - **Set Environment Variable**: Add `GLASSNODE_API_KEY=your_key_here` to your `.env` file or `docker-compose.yml`
+   - **Free Tier**: Limited requests/month (check current limits)
+   - **Without API Key**: Fundamental indicators will use stub/mock data with warnings
+
+### Setting Up Glassnode API
+
+1. **Sign up**: Create account at https://glassnode.com
+2. **Get API Key**: Navigate to API settings and generate a key
+3. **Configure**: Add to `.env` file:
+   ```
+   GLASSNODE_API_KEY=your_glassnode_api_key_here
+   ```
+4. **Or Docker**: Add to `docker-compose.yml` environment section:
+   ```yaml
+   - GLASSNODE_API_KEY=${GLASSNODE_API_KEY:-}
+   ```
+
 ## Authentication & User Accounts
 
 The application supports Google OAuth for user authentication:

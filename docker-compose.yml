@@ -41,6 +41,7 @@ services:
       - COOKIE_SECURE=${COOKIE_SECURE:-false}
       - COOKIE_SAMESITE=${COOKIE_SAMESITE:-lax}
       - COINGLASS_API_KEY=${COINGLASS_API_KEY:-0e38a988ab2641aab8b4dd265eef9f62}
+      - GLASSNODE_API_KEY=${GLASSNODE_API_KEY:-}
     depends_on:
       db:
         condition: service_healthy

@@ -1619,9 +1619,10 @@ def ensure_full_btc_history(
             data_start = existing_df.index.min()
             data_end = existing_df.index.max()
             
-            # Check if data goes back to target date (with 30-day buffer for flexibility)
+            # Check if data goes back to target date (with 90-day buffer for flexibility)
+            # Increased buffer to account for data availability limitations
             days_from_target = (data_start - target_start_date).days
-            if days_from_target <= 30:
+            if days_from_target <= 90:
                 logger.info(f"BTC data is complete: {len(existing_df)} rows from {data_start.strftime('%Y-%m-%d')} to {data_end.strftime('%Y-%m-%d')}")
                 return existing_df, False
         
