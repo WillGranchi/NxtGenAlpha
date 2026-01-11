@@ -169,9 +169,9 @@ class PriceData(Base):
     # SELECT * FROM price_data WHERE symbol = ? AND exchange = ? AND date BETWEEN ? AND ? ORDER BY date
     # Partial index for recent data (last 30 days) for faster queries on recent data
     # Unique constraint prevents duplicate entries for same symbol/exchange/date combination
+    # Note: Partial index will be created via migration script, not here (to avoid import-time evaluation issues)
     __table_args__ = (
         Index('idx_price_data_symbol_exchange_date', 'symbol', 'exchange', 'date'),
-        Index('idx_price_data_date_recent', 'date', postgresql_where=text("date > NOW() - INTERVAL '30 days'")),
         UniqueConstraint('symbol', 'exchange', 'date', name='uq_price_data_symbol_exchange_date'),
     )
 
