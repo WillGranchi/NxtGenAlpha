@@ -2,11 +2,13 @@
 Fundamental/On-chain indicators module.
 
 This module provides functions for fundamental indicators that require
-external on-chain data sources. Uses Glassnode API for real data with
-fallback to stub data if API is unavailable.
+external on-chain data sources. All indicators require Glassnode API key.
+No mock data fallbacks - indicators will raise errors if API unavailable.
 
-Recommended API: Glassnode (https://docs.glassnode.com/basic-api/endpoints/indicators)
+Required API: Glassnode (https://docs.glassnode.com/basic-api/endpoints/indicators)
 Provides: MVRV, Bitcoin Thermocap, NUPL, CVDD, SOPR, Puell Multiple, Reserve Risk, etc.
+
+Set GLASSNODE_API_KEY environment variable to use these indicators.
 """
 
 import pandas as pd
@@ -31,7 +33,10 @@ def calculate_mvrv(df: pd.DataFrame) -> pd.Series:
         df: DataFrame with OHLCV data and Date index
         
     Returns:
-        Pandas Series with MVRV values from Glassnode API (or stub data if API unavailable)
+        Pandas Series with MVRV values from Glassnode API
+        
+    Raises:
+        ValueError: If Glassnode API is unavailable or API key is missing
     """
     dates = df.index
     start_date = dates.min()
@@ -52,21 +57,16 @@ def calculate_mvrv(df: pd.DataFrame) -> pd.Series:
                 logger.info(f"Using real MVRV data from Glassnode: {len(mvrv_data)} data points")
                 return aligned.fillna(1.0)  # Fill remaining NaN with neutral value
             else:
-                logger.warning("Glassnode MVRV data has too many gaps, falling back to stub data")
+                raise ValueError("Glassnode MVRV data has too many gaps")
         else:
-            logger.warning("No MVRV data from Glassnode, falling back to stub data")
+            raise ValueError("No MVRV data from Glassnode")
+    except ValueError:
+        raise
     except Exception as e:
-        logger.warning(f"Error fetching MVRV from Glassnode: {e}. Using stub data.")
     
-    # Fallback to stub data
-    logger.warning("Using stub MVRV data - Glassnode API unavailable or no API key")
-    n = len(dates)
-    trend = np.sin(np.linspace(0, 4 * np.pi, n))
-    noise = np.random.normal(0, 0.3, n)
-    mvrv_values = 1.0 + trend * 0.5 + noise
-    mvrv_values = np.clip(mvrv_values, 0.3, 4.0)
-    
-    return pd.Series(mvrv_values, index=dates, name='MVRV')
+    # No fallback - require Glassnode API
+    logger.error(f"Error fetching MVRV from Glassnode: {e}")
+    raise ValueError(f"MVRV requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
 
 
 def calculate_nupl(df: pd.DataFrame) -> pd.Series:
@@ -80,7 +80,10 @@ def calculate_nupl(df: pd.DataFrame) -> pd.Series:
         df: DataFrame with OHLCV data and Date index
         
     Returns:
-        Pandas Series with NUPL values from Glassnode API (or stub data if API unavailable)
+        Pandas Series with NUPL values from Glassnode API
+        
+    Raises:
+        ValueError: If Glassnode API is unavailable or API key is missing
     """
     dates = df.index
     start_date = dates.min()
@@ -107,15 +110,9 @@ def calculate_nupl(df: pd.DataFrame) -> pd.Series:
     except Exception as e:
         logger.warning(f"Error fetching NUPL from Glassnode: {e}. Using stub data.")
     
-    # Fallback to stub data
-    logger.warning("Using stub NUPL data - Glassnode API unavailable or no API key")
-    n = len(dates)
-    trend = np.sin(np.linspace(0, 3 * np.pi, n))
-    noise = np.random.normal(0, 0.1, n)
-    nupl_values = trend * 0.3 + noise
-    nupl_values = np.clip(nupl_values, -0.5, 0.75)
-    
-    return pd.Series(nupl_values, index=dates, name='NUPL')
+    # No fallback - require Glassnode API
+    logger.error(f"Error fetching NUPL from Glassnode: {e}")
+    raise ValueError(f"NUPL requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
 
 
 def calculate_bitcoin_thermocap(df: pd.DataFrame) -> pd.Series:
@@ -130,7 +127,10 @@ def calculate_bitcoin_thermocap(df: pd.DataFrame) -> pd.Series:
         df: DataFrame with OHLCV data and Date index
         
     Returns:
-        Pandas Series with Bitcoin Thermocap values from Glassnode API (or stub data if API unavailable)
+        Pandas Series with Bitcoin Thermocap values from Glassnode API
+        
+    Raises:
+        ValueError: If Glassnode API is unavailable or API key is missing
     """
     dates = df.index
     start_date = dates.min()
@@ -157,15 +157,9 @@ def calculate_bitcoin_thermocap(df: pd.DataFrame) -> pd.Series:
     except Exception as e:
         logger.warning(f"Error fetching Thermocap from Glassnode: {e}. Using stub data.")
     
-    # Fallback to stub data
-    logger.warning("Using stub Bitcoin Thermocap data - Glassnode API unavailable or no API key")
-    n = len(dates)
-    base_growth = np.linspace(1, 10, n)
-    daily_values = base_growth * np.random.exponential(0.5, n)
-    thermocap_values = np.cumsum(daily_values)
-    thermocap_values = (thermocap_values - thermocap_values.min()) / (thermocap_values.max() - thermocap_values.min()) * 1000
-    
-    return pd.Series(thermocap_values, index=dates, name='Bitcoin_Thermocap')
+    # No fallback - require Glassnode API
+    logger.error(f"Error fetching Bitcoin Thermocap from Glassnode: {e}")
+    raise ValueError(f"Bitcoin Thermocap requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
 
 
 def calculate_cvdd(df: pd.DataFrame) -> pd.Series:
@@ -179,7 +173,10 @@ def calculate_cvdd(df: pd.DataFrame) -> pd.Series:
         df: DataFrame with OHLCV data and Date index
         
     Returns:
-        Pandas Series with CVDD values from Glassnode API (or stub data if API unavailable)
+        Pandas Series with CVDD values from Glassnode API
+        
+    Raises:
+        ValueError: If Glassnode API is unavailable or API key is missing
     """
     dates = df.index
     start_date = dates.min()
@@ -206,14 +203,9 @@ def calculate_cvdd(df: pd.DataFrame) -> pd.Series:
     except Exception as e:
         logger.warning(f"Error fetching CVDD from Glassnode: {e}. Using stub data.")
     
-    # Fallback to stub data
-    logger.warning("Using stub CVDD data - Glassnode API unavailable or no API key")
-    n = len(dates)
-    daily_values = np.random.exponential(0.1, n)
-    cvdd_values = np.cumsum(daily_values)
-    cvdd_values = (cvdd_values - cvdd_values.min()) / (cvdd_values.max() - cvdd_values.min()) * 100
-    
-    return pd.Series(cvdd_values, index=dates, name='CVDD')
+    # No fallback - require Glassnode API
+    logger.error(f"Error fetching CVDD from Glassnode: {e}")
+    raise ValueError(f"CVDD requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
 
 
 def calculate_puell_multiple(df: pd.DataFrame) -> pd.Series:
@@ -228,7 +220,10 @@ def calculate_puell_multiple(df: pd.DataFrame) -> pd.Series:
         df: DataFrame with OHLCV data and Date index
         
     Returns:
-        Pandas Series with Puell Multiple values from Glassnode API (or stub data if API unavailable)
+        Pandas Series with Puell Multiple values from Glassnode API
+        
+    Raises:
+        ValueError: If Glassnode API is unavailable or API key is missing
     """
     dates = df.index
     start_date = dates.min()
@@ -255,15 +250,9 @@ def calculate_puell_multiple(df: pd.DataFrame) -> pd.Series:
     except Exception as e:
         logger.warning(f"Error fetching Puell Multiple from Glassnode: {e}. Using stub data.")
     
-    # Fallback to stub data
-    logger.warning("Using stub Puell Multiple data - Glassnode API unavailable or no API key")
-    n = len(dates)
-    trend = np.sin(np.linspace(0, 3 * np.pi, n))
-    noise = np.random.normal(0, 0.2, n)
-    puell_values = 1.0 + trend * 0.8 + noise
-    puell_values = np.clip(puell_values, 0.3, 4.0)
-    
-    return pd.Series(puell_values, index=dates, name='Puell_Multiple')
+    # No fallback - require Glassnode API
+    logger.error(f"Error fetching Puell Multiple from Glassnode: {e}")
+    raise ValueError(f"Puell Multiple requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
 
 
 def calculate_reserve_risk(df: pd.DataFrame) -> pd.Series:
@@ -277,11 +266,10 @@ def calculate_reserve_risk(df: pd.DataFrame) -> pd.Series:
         df: DataFrame with OHLCV data and Date index
         
     Returns:
-        Pandas Series with Reserve Risk values (stub - returns mock data)
+        Pandas Series with Reserve Risk values from Glassnode API
         
-    TODO: Replace with real Reserve Risk calculation from on-chain data.
-    Recommended API: Glassnode (https://docs.glassnode.com/basic-api/endpoints/indicators)
-    Endpoint: /v1/metrics/indicators/reserve_risk
+    Raises:
+        ValueError: If Glassnode API is unavailable or API key is missing
     """
     dates = df.index
     start_date = dates.min()
@@ -308,15 +296,9 @@ def calculate_reserve_risk(df: pd.DataFrame) -> pd.Series:
     except Exception as e:
         logger.warning(f"Error fetching Reserve Risk from Glassnode: {e}. Using stub data.")
     
-    # Fallback to stub data
-    logger.warning("Using stub Reserve Risk data - Glassnode API unavailable or no API key")
-    n = len(dates)
-    trend = np.sin(np.linspace(0, 2.5 * np.pi, n))
-    noise = np.random.normal(0, 0.01, n)
-    reserve_risk_values = 0.02 + trend * 0.015 + noise
-    reserve_risk_values = np.clip(reserve_risk_values, 0.001, 0.1)
-    
-    return pd.Series(reserve_risk_values, index=dates, name='Reserve_Risk')
+    # No fallback - require Glassnode API
+    logger.error(f"Error fetching Reserve Risk from Glassnode: {e}")
+    raise ValueError(f"Reserve Risk requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
 
 
 def calculate_bitcoin_days_destroyed(df: pd.DataFrame) -> pd.Series:
@@ -330,7 +312,10 @@ def calculate_bitcoin_days_destroyed(df: pd.DataFrame) -> pd.Series:
         df: DataFrame with OHLCV data and Date index
         
     Returns:
-        Pandas Series with Bitcoin Days Destroyed values from Glassnode API (or stub data if API unavailable)
+        Pandas Series with Bitcoin Days Destroyed values from Glassnode API
+        
+    Raises:
+        ValueError: If Glassnode API is unavailable or API key is missing
     """
     dates = df.index
     start_date = dates.min()
@@ -357,15 +342,9 @@ def calculate_bitcoin_days_destroyed(df: pd.DataFrame) -> pd.Series:
     except Exception as e:
         logger.warning(f"Error fetching BDD from Glassnode: {e}. Using stub data.")
     
-    # Fallback to stub data
-    logger.warning("Using stub Bitcoin Days Destroyed data - Glassnode API unavailable or no API key")
-    n = len(dates)
-    base_level = np.random.exponential(1000000, n)
-    spikes = np.random.choice([0, 1], size=n, p=[0.95, 0.05])
-    spike_multiplier = 1 + spikes * np.random.uniform(2, 5, n)
-    bdd_values = base_level * spike_multiplier
-    
-    return pd.Series(bdd_values, index=dates, name='Bitcoin_Days_Destroyed')
+    # No fallback - require Glassnode API
+    logger.error(f"Error fetching Bitcoin Days Destroyed from Glassnode: {e}")
+    raise ValueError(f"Bitcoin Days Destroyed requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
 
 
 def calculate_exchange_net_position(df: pd.DataFrame) -> pd.Series:
@@ -379,11 +358,10 @@ def calculate_exchange_net_position(df: pd.DataFrame) -> pd.Series:
         df: DataFrame with OHLCV data and Date index
         
     Returns:
-        Pandas Series with Exchange Net Position values (stub - returns mock data)
+        Pandas Series with Exchange Net Position values from Glassnode API
         
-    TODO: Replace with real Exchange Net Position calculation from on-chain data.
-    Recommended API: Glassnode or CryptoQuant
-    Endpoint: Glassnode /v1/metrics/distribution/exchange_net_position_change
+    Raises:
+        ValueError: If Glassnode API is unavailable or API key is missing
     """
     dates = df.index
     start_date = dates.min()
@@ -410,45 +388,9 @@ def calculate_exchange_net_position(df: pd.DataFrame) -> pd.Series:
     except Exception as e:
         logger.warning(f"Error fetching Exchange Net Position from Glassnode: {e}. Using stub data.")
     
-    # Fallback to stub data
-    logger.warning("Using stub Exchange Net Position data - Glassnode API unavailable or no API key")
-    n = len(dates)
-    trend = np.sin(np.linspace(0, 4 * np.pi, n))
-    noise = np.random.normal(0, 500, n)
-    exchange_net_values = trend * 2000 + noise
-    
-    return pd.Series(exchange_net_values, index=dates, name='Exchange_Net_Position')
-
-
-def calculate_nvts(df: pd.DataFrame) -> pd.Series:
-    """
-    Calculate Network Value to Transactions (NVTS) ratio.
-    
-    NVTS compares market cap to transaction volume, indicating whether
-    Bitcoin is overvalued relative to its usage.
-    
-    Args:
-        df: DataFrame with OHLCV data and Date index
-        
-    Returns:
-        Pandas Series with NVTS values (stub - returns mock data)
-        
-    TODO: Replace with real NVTS calculation from transaction volume data
-    """
-    logger.warning("Using stub NVTS data - replace with real transaction volume data source")
-    
-    dates = df.index
-    n = len(dates)
-    
-    # NVTS typically ranges from 10 to 200
-    trend = np.sin(np.linspace(0, 2 * np.pi, n))
-    noise = np.random.normal(0, 20, n)
-    nvts_values = 50 + trend * 30 + noise
-    
-    # Ensure values stay in reasonable range
-    nvts_values = np.clip(nvts_values, 10, 200)
-    
-    return pd.Series(nvts_values, index=dates, name='NVTS')
+    # No fallback - require Glassnode API
+    logger.error(f"Error fetching Exchange Net Position from Glassnode: {e}")
+    raise ValueError(f"Exchange Net Position requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
 
 
 def calculate_sopr(df: pd.DataFrame) -> pd.Series:
@@ -462,90 +404,37 @@ def calculate_sopr(df: pd.DataFrame) -> pd.Series:
         df: DataFrame with OHLCV data and Date index
         
     Returns:
-        Pandas Series with SOPR values (stub - returns mock data)
-        
-    TODO: Replace with real SOPR calculation from UTXO data
+        Pandas Series with SOPR values from Glassnode API (or raises error if API unavailable)
     """
-    logger.warning("Using stub SOPR data - replace with real UTXO data source")
-    
     dates = df.index
-    n = len(dates)
+    start_date = dates.min()
+    end_date = dates.max()
     
-    # SOPR typically ranges from 0.8 to 1.2
-    # Values > 1.0 indicate profit-taking, < 1.0 indicate loss-taking
-    trend = np.sin(np.linspace(0, 4 * np.pi, n))
-    noise = np.random.normal(0, 0.05, n)
-    sopr_values = 1.0 + trend * 0.15 + noise
-    
-    # Ensure values stay in reasonable range
-    sopr_values = np.clip(sopr_values, 0.8, 1.2)
-    
-    return pd.Series(sopr_values, index=dates, name='SOPR')
-
-
-def calculate_realized_pnl_momentum(df: pd.DataFrame) -> pd.Series:
-    """
-    Calculate Realized Profit/Loss Momentum.
-    
-    Measures the momentum of realized profits/losses, indicating trend
-    changes in profit-taking behavior.
-    
-    Args:
-        df: DataFrame with OHLCV data and Date index
+    # Fetch from Glassnode
+    try:
+        client = get_glassnode_client()
+        sopr_data = client.get_sopr("BTC", start_date, end_date, use_cache=True)
         
-    Returns:
-        Pandas Series with Realized PnL Momentum values (stub - returns mock data)
-        
-    TODO: Replace with real Realized PnL Momentum calculation from on-chain data
-    """
-    logger.warning("Using stub Realized PnL Momentum data - replace with real on-chain data source")
-    
-    dates = df.index
-    n = len(dates)
-    
-    # Momentum can be positive or negative
-    trend = np.sin(np.linspace(0, 5 * np.pi, n))
-    noise = np.random.normal(0, 0.2, n)
-    momentum_values = trend * 0.5 + noise
-    
-    # Clip to reasonable range
-    momentum_values = np.clip(momentum_values, -2.0, 2.0)
-    
-    return pd.Series(momentum_values, index=dates, name='Realized_PnL_Momentum')
-
-
-def calculate_pi_cycle_top_risk(df: pd.DataFrame) -> pd.Series:
-    """
-    Calculate Pi-Cycle Top Risk indicator.
-    
-    A long-term indicator that uses moving averages to identify potential
-    cycle tops based on the mathematical constant Pi.
-    
-    Args:
-        df: DataFrame with OHLCV data and Date index
-        
-    Returns:
-        Pandas Series with Pi-Cycle Top Risk values (stub - returns mock data)
-        
-    TODO: Replace with real Pi-Cycle Top Risk calculation
-    """
-    logger.warning("Using stub Pi-Cycle Top Risk data - replace with real calculation")
-    
-    dates = df.index
-    n = len(dates)
-    
-    # Pi-Cycle Top Risk typically ranges from -2 to 2
-    trend = np.sin(np.linspace(0, 2 * np.pi, n))
-    noise = np.random.normal(0, 0.3, n)
-    risk_values = trend * 1.0 + noise
-    
-    # Clip to reasonable range
-    risk_values = np.clip(risk_values, -2.0, 2.0)
-    
-    return pd.Series(risk_values, index=dates, name='Pi_Cycle_Top_Risk')
+        if len(sopr_data) > 0:
+            # Align with DataFrame index
+            aligned = sopr_data.reindex(dates, method='ffill')
+            aligned = aligned.bfill()
+            
+            # Validate data
+            if aligned.notna().sum() > len(dates) * 0.5:
+                logger.info(f"Using real SOPR data from Glassnode: {len(sopr_data)} data points")
+                return aligned.fillna(1.0)  # Neutral value
+            else:
+                raise ValueError("Glassnode SOPR data has too many gaps")
+        else:
+            raise ValueError("No SOPR data from Glassnode")
+    except Exception as e:
+        logger.error(f"Error fetching SOPR from Glassnode: {e}")
+        raise ValueError(f"SOPR requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
 
 
 # Mapping of indicator IDs to calculation functions
+# All indicators require Glassnode API key - no mock data fallbacks
 FUNDAMENTAL_INDICATORS = {
     'mvrv': calculate_mvrv,
     'bitcoin_thermocap': calculate_bitcoin_thermocap,
@@ -555,10 +444,7 @@ FUNDAMENTAL_INDICATORS = {
     'reserve_risk': calculate_reserve_risk,
     'bitcoin_days_destroyed': calculate_bitcoin_days_destroyed,
     'exchange_net_position': calculate_exchange_net_position,
-    'nvts': calculate_nvts,
     'sopr': calculate_sopr,
-    'realized_pnl_momentum': calculate_realized_pnl_momentum,
-    'pi_cycle_top_risk': calculate_pi_cycle_top_risk,
 }
 
 

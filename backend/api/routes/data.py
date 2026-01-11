@@ -13,6 +13,7 @@ from backend.core.data_loader import (
     ensure_full_btc_history
 )
 from backend.core.data_quality import validate_data_quality
+from backend.core.query_optimization import verify_price_data_indexes, get_index_statistics
 from backend.api.models.backtest_models import DataInfoResponse, ErrorResponse
 from datetime import datetime
 
@@ -806,4 +807,37 @@ async def ensure_btc_history(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to ensure BTC history: {str(e)}"
+        )
+
+
+@router.get("/verify-indexes")
+async def verify_database_indexes(
+    symbol: Optional[str] = Query(default="BTCUSDT", description="Symbol to test"),
+    exchange: Optional[str] = Query(default="Binance", description="Exchange to test")
+) -> Dict[str, Any]:
+    """
+    Verify that database indexes are being used for price_data queries.
+    Uses EXPLAIN ANALYZE to check query execution plans.
+    
+    Args:
+        symbol: Trading pair symbol to test
+        exchange: Exchange name to test
+        
+    Returns:
+        Dict with index verification results and recommendations
+    """
+    try:
+        verification_results = verify_price_data_indexes(symbol=symbol, exchange=exchange)
+        index_stats = get_index_statistics()
+        
+        return {
+            "success": True,
+            "verification": verification_results,
+            "index_statistics": index_stats
+        }
+    except Exception as e:
+        logger.error(f"Error verifying indexes: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to verify indexes: {str(e)}"
         )

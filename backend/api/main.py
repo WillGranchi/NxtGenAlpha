@@ -219,18 +219,57 @@ async def startup_event():
         # This allows the app to start even if DB isn't ready yet (e.g., during Railway deployment)
         logger.warning("Application will continue without database initialization. Database operations may fail until connection is established.")
     
-    # Start scheduler for frequent data updates (every 6 hours)
+    # Start scheduler for data updates
     try:
-        # Update every 6 hours to keep data fresh
+        # Daily full update at midnight UTC
         scheduler.add_job(
             scheduled_data_update,
             trigger=CronTrigger(hour=0, minute=0),  # Daily at midnight UTC
-            id='frequent_data_update',
-            name='Frequent Bitcoin Data Update',
+            id='daily_data_update',
+            name='Daily Data Update',
             replace_existing=True
         )
+        
+        # Hourly pre-fetch for common symbols (last 30 days only - incremental update)
+        async def hourly_prefetch():
+            """Pre-fetch recent data (last 30 days) for common symbols every hour."""
+            try:
+                from backend.core.data_loader import update_crypto_data
+                from datetime import datetime, timedelta
+                
+                symbols = ["BTCUSDT", "ETHUSDT"]
+                logger.info(f"Running hourly pre-fetch for {len(symbols)} symbols (last 30 days)...")
+                
+                # Only fetch last 30 days (incremental update)
+                end_date = datetime.now()
+                start_date = end_date - timedelta(days=30)
+                
+                for symbol in symbols:
+                    try:
+                        logger.info(f"Pre-fetching {symbol} data (last 30 days)...")
+                        # Use incremental update (force=False, start_date=30 days ago)
+                        update_crypto_data(
+                            symbol=symbol,
+                            force=False,  # Use incremental update
+                            start_date=start_date
+                        )
+                        logger.info(f"✓ Pre-fetched {symbol} data successfully")
+                    except Exception as e:
+                        logger.warning(f"Failed to pre-fetch {symbol} data: {e}")
+                        
+            except Exception as e:
+                logger.error(f"Error in hourly pre-fetch task: {e}", exc_info=True)
+        
+        scheduler.add_job(
+            hourly_prefetch,
+            trigger=CronTrigger(minute=0),  # Every hour at minute 0
+            id='hourly_prefetch',
+            name='Hourly Pre-fetch (Last 30 Days)',
+            replace_existing=True
+        )
+        
         scheduler.start()
-        logger.info("Scheduler started for data updates (every 6 hours)")
+        logger.info("Scheduler started for data updates (daily full update + hourly pre-fetch)")
         
         # Skip immediate data update on startup to prevent blocking server startup
         # Data updates will be handled by scheduled daily jobs or manual refresh endpoint

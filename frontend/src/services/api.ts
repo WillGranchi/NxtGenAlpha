@@ -100,6 +100,49 @@ api.interceptors.response.use(
   }
 );
 
+// Request deduplication: Track in-flight requests to prevent duplicate API calls
+const inFlightRequests = new Map<string, Promise<any>>();
+
+/**
+ * Generate a cache key for request deduplication.
+ * Uses method, URL, and serialized params/body.
+ */
+function generateRequestKey(method: string, url: string, params?: any, data?: any): string {
+  const keyParts = [method, url];
+  if (params) {
+    keyParts.push(JSON.stringify(params));
+  }
+  if (data) {
+    keyParts.push(JSON.stringify(data));
+  }
+  return keyParts.join('|');
+}
+
+/**
+ * Get or create a request, preventing duplicates.
+ * If the same request is already in flight, returns the existing promise.
+ */
+function getOrCreateRequest<T>(
+  key: string,
+  requestFn: () => Promise<T>
+): Promise<T> {
+  // Check if request is already in flight
+  if (inFlightRequests.has(key)) {
+    console.debug(`[API] Request deduplication: reusing in-flight request for key: ${key.substring(0, 50)}...`);
+    return inFlightRequests.get(key)!;
+  }
+  
+  // Create new request
+  const promise = requestFn()
+    .finally(() => {
+      // Remove from in-flight requests when done
+      inFlightRequests.delete(key);
+    });
+  
+  inFlightRequests.set(key, promise);
+  return promise;
+}
+
 // Types
 export interface DataInfo {
   total_records: number;
@@ -421,12 +464,16 @@ export class TradingAPI {
     if (start_date) {
       params.start_date = start_date;
     }
-    // Use extended timeout for data refresh (CoinGlass API can be slow)
-    const response: AxiosResponse<DataRefreshResponse> = await api.post('/api/data/refresh', null, { 
-      params,
-      timeout: 180000, // 3 minutes for CoinGlass API calls
+    const key = generateRequestKey('POST', '/api/data/refresh', params, null);
+    
+    return getOrCreateRequest(key, async () => {
+      // Use extended timeout for data refresh (CoinGlass API can be slow)
+      const response: AxiosResponse<DataRefreshResponse> = await api.post('/api/data/refresh', null, { 
+        params,
+        timeout: 180000, // 3 minutes for CoinGlass API calls
+      });
+      return response.data;
     });
-    return response.data;
   }
 
   /**
@@ -908,8 +955,12 @@ export class TradingAPI {
       indicators: Record<string, number>;
     }>;
   }> {
-    const response: AxiosResponse<any> = await api.get('/api/valuation/data', { params });
-    return response.data;
+    const key = generateRequestKey('GET', '/api/valuation/data', params, null);
+    
+    return getOrCreateRequest(key, async () => {
+      const response: AxiosResponse<any> = await api.get('/api/valuation/data', { params });
+      return response.data;
+    });
   }
 
   // Full Cycle Methods
@@ -963,11 +1014,15 @@ export class TradingAPI {
     indicators_requested?: number;
     warnings?: string[] | null;
   }> {
-    // Use extended timeout for Full Cycle calculations (3 minutes)
-    const response: AxiosResponse<any> = await api.post('/api/fullcycle/zscores', request, {
-      timeout: 180000, // 3 minutes for CoinGlass API calls
+    const key = generateRequestKey('POST', '/api/fullcycle/zscores', null, request);
+    
+    return getOrCreateRequest(key, async () => {
+      // Use extended timeout for Full Cycle calculations (3 minutes)
+      const response: AxiosResponse<any> = await api.post('/api/fullcycle/zscores', request, {
+        timeout: 180000, // 3 minutes for CoinGlass API calls
+      });
+      return response.data;
     });
-    return response.data;
   }
 
   // Full Cycle Preset CRUD Methods

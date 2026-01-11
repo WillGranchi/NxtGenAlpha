@@ -25,9 +25,188 @@ except ImportError:
 from .data_quality import validate_data_quality, cross_validate_sources, calculate_quality_score
 from .coinglass_client import get_coinglass_client
 
+# Database imports for price data
+try:
+    from backend.core.database import SessionLocal
+    from backend.api.models.db_models import PriceData
+    from sqlalchemy import and_, func, text
+    DATABASE_AVAILABLE = True
+except ImportError:
+    DATABASE_AVAILABLE = False
+    logger = logging.getLogger(__name__)
+    logger.warning("Database imports not available, will use CSV fallback only")
+
 
 # Global variable to track last update time per symbol
 _last_update_time: Dict[str, datetime] = {}
+
+# Database query result cache: {cache_key: (dataframe, timestamp)}
+# TTL: 30 minutes for database queries (shorter than API cache since DB is fast)
+_db_query_cache: Dict[str, Tuple[pd.DataFrame, float]] = {}
+DB_QUERY_CACHE_TTL = 1800  # 30 minutes
+
+
+def _get_db_query_cache_key(symbol: str, exchange: str, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None) -> str:
+    """Generate cache key for database query."""
+    key_parts = [
+        symbol,
+        exchange,
+        start_date.isoformat() if start_date else "none",
+        end_date.isoformat() if end_date else "none"
+    ]
+    return "|".join(key_parts)
+
+
+def _get_cached_db_query(cache_key: str) -> Optional[pd.DataFrame]:
+    """Get cached database query result if available and not expired."""
+    logger = logging.getLogger(__name__)
+    
+    if cache_key not in _db_query_cache:
+        return None
+    
+    df, cached_time = _db_query_cache[cache_key]
+    current_time = time.time()
+    age = current_time - cached_time
+    
+    if age > DB_QUERY_CACHE_TTL:
+        # Cache expired, remove it
+        logger.debug(f"Database query cache expired for key {cache_key[:16]}... (age: {age:.1f}s)")
+        del _db_query_cache[cache_key]
+        return None
+    
+    logger.debug(f"Database query cache hit for key {cache_key[:16]}... (age: {age:.1f}s)")
+    return df
+
+
+def _store_db_query_cache(cache_key: str, df: pd.DataFrame):
+    """Store database query result in cache."""
+    _db_query_cache[cache_key] = (df, time.time())
+    
+    # Clean expired cache entries periodically (every 100 cache writes)
+    if len(_db_query_cache) > 100:
+        current_time = time.time()
+        expired_keys = [
+            key for key, (_, cached_time) in _db_query_cache.items()
+            if current_time - cached_time > DB_QUERY_CACHE_TTL
+        ]
+        for key in expired_keys:
+            del _db_query_cache[key]
+
+
+def get_latest_data_date(symbol: str = "BTCUSDT", exchange: str = "Binance") -> Optional[datetime]:
+    """
+    Get the latest date for which price data exists in the database.
+    
+    Args:
+        symbol: Trading pair symbol (e.g., "BTCUSDT")
+        exchange: Exchange name (e.g., "Binance")
+        
+    Returns:
+        Latest date in database, or None if no data exists
+    """
+    if not DATABASE_AVAILABLE:
+        return None
+    
+    logger = logging.getLogger(__name__)
+    
+    try:
+        with SessionLocal() as session:
+            # Query for the maximum date
+            result = session.query(func.max(PriceData.date)).filter(
+                PriceData.symbol == symbol,
+                PriceData.exchange == exchange
+            ).scalar()
+            
+            if result:
+                logger.debug(f"Latest data date for {symbol} on {exchange}: {result}")
+                return result
+            else:
+                logger.debug(f"No data found in database for {symbol} on {exchange}")
+                return None
+                
+    except Exception as e:
+        logger.warning(f"Error getting latest data date for {symbol} on {exchange}: {e}")
+        return None
+
+
+def load_crypto_data_from_database(
+    symbol: str = "BTCUSDT",
+    exchange: str = "Binance",
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None
+) -> Optional[pd.DataFrame]:
+    """
+    Load cryptocurrency historical data from PostgreSQL database.
+    
+    Args:
+        symbol: Trading pair symbol (e.g., "BTCUSDT")
+        exchange: Exchange name (e.g., "Binance")
+        start_date: Optional start date filter
+        end_date: Optional end date filter
+        
+    Returns:
+        DataFrame with OHLCV data, or None if database query fails or no data found
+    """
+    if not DATABASE_AVAILABLE:
+        return None
+    
+    logger = logging.getLogger(__name__)
+    
+    # Check cache first
+    cache_key = _get_db_query_cache_key(symbol, exchange, start_date, end_date)
+    cached_df = _get_cached_db_query(cache_key)
+    if cached_df is not None:
+        return cached_df
+    
+    try:
+        with SessionLocal() as session:
+            # Build query
+            query = session.query(PriceData).filter(
+                PriceData.symbol == symbol,
+                PriceData.exchange == exchange
+            )
+            
+            # Apply date filters if provided
+            if start_date:
+                query = query.filter(PriceData.date >= start_date)
+            if end_date:
+                query = query.filter(PriceData.date <= end_date)
+            
+            # Order by date
+            query = query.order_by(PriceData.date)
+            
+            # Execute query
+            results = query.all()
+            
+            if not results:
+                logger.debug(f"No data found in database for {symbol} on {exchange}")
+                return None
+            
+            # Convert to DataFrame
+            data = []
+            for row in results:
+                data.append({
+                    'Date': row.date,
+                    'Open': row.open,
+                    'High': row.high,
+                    'Low': row.low,
+                    'Close': row.close,
+                    'Volume': row.volume if row.volume is not None else 0.0
+                })
+            
+            df = pd.DataFrame(data)
+            df.set_index('Date', inplace=True)
+            
+            logger.info(f"Loaded {len(df)} rows of {symbol} data from database (exchange: {exchange})")
+            
+            # Cache the result
+            _store_db_query_cache(cache_key, df)
+            
+            return df
+            
+    except Exception as e:
+        logger.warning(f"Error loading {symbol} data from database: {e}")
+        return None
 
 def fetch_crypto_data_from_binance(symbol: str = "BTCUSDT", days: int = 1825, start_date: Optional[datetime] = None, fallback_to_coingecko: bool = True) -> pd.DataFrame:
     """
@@ -1238,9 +1417,167 @@ def fetch_crypto_data_smart(
         raise Exception(f"{error_msg} Please check: 1) CoinGlass API key is set, 2) API key is valid, 3) Network connectivity, 4) CoinGlass API status.")
 
 
+def save_data_to_database(
+    df: pd.DataFrame,
+    symbol: str = "BTCUSDT",
+    exchange: str = "Binance",
+    batch_size: int = 1000,
+    also_save_csv: bool = True
+) -> Dict[str, Any]:
+    """
+    Save DataFrame to PostgreSQL database using bulk insert/update operations.
+    Also saves to CSV file for backward compatibility if also_save_csv is True.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to save (must have Date as index and OHLCV columns)
+        symbol (str): Cryptocurrency symbol (e.g., "BTCUSDT")
+        exchange (str): Exchange name (e.g., "Binance")
+        batch_size (int): Number of records to insert per batch
+        also_save_csv (bool): Whether to also save to CSV file for backward compatibility
+        
+    Returns:
+        Dict with save results: {
+            'success': bool,
+            'database': {'inserted': int, 'updated': int},
+            'csv_path': str (if also_save_csv is True)
+        }
+    """
+    logger = logging.getLogger(__name__)
+    
+    result = {
+        'success': False,
+        'database': {'inserted': 0, 'updated': 0},
+        'csv_path': None
+    }
+    
+    # Ensure DataFrame has Date as index
+    if df.index.name != 'Date' and 'Date' not in df.columns:
+        # Try to reset index if Date is in index
+        if isinstance(df.index, pd.DatetimeIndex):
+            df_save = df.reset_index()
+            df_save.rename(columns={df_save.columns[0]: 'Date'}, inplace=True)
+        else:
+            raise ValueError("DataFrame must have Date as index or column")
+    else:
+        df_save = df.reset_index() if df.index.name == 'Date' else df.copy()
+    
+    # Ensure Date column exists and is datetime
+    if 'Date' not in df_save.columns:
+        raise ValueError("Date column not found in DataFrame")
+    
+    df_save['Date'] = pd.to_datetime(df_save['Date'])
+    
+    # Ensure required columns exist
+    required_columns = ['Open', 'High', 'Low', 'Close']
+    missing_columns = [col for col in required_columns if col not in df_save.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    # Save to database if available
+    if DATABASE_AVAILABLE:
+        try:
+            with SessionLocal() as session:
+                total_records = len(df_save)
+                inserted = 0
+                
+                # Process in batches
+                for i in range(0, total_records, batch_size):
+                    batch = df_save.iloc[i:i + batch_size]
+                    
+                    # Prepare batch data
+                    records = []
+                    for _, row in batch.iterrows():
+                        try:
+                            record = {
+                                'symbol': symbol,
+                                'exchange': exchange,
+                                'date': row['Date'],
+                                'open': float(row['Open']),
+                                'high': float(row['High']),
+                                'low': float(row['Low']),
+                                'close': float(row['Close']),
+                                'volume': float(row['Volume']) if 'Volume' in row and pd.notna(row.get('Volume')) else None,
+                            }
+                            records.append(record)
+                        except Exception as e:
+                            logger.warning(f"Error preparing record for date {row.get('Date')}: {e}")
+                            continue
+                    
+                    if not records:
+                        continue
+                    
+                    # Use bulk insert with ON CONFLICT DO UPDATE
+                    # SQLAlchemy bulk_insert_mappings doesn't support ON CONFLICT directly,
+                    # so we use raw SQL for better performance
+                    try:
+                        values_list = []
+                        for record in records:
+                            date_str = record['date'].strftime('%Y-%m-%d %H:%M:%S')
+                            volume_val = record['volume'] if record['volume'] is not None else 'NULL'
+                            values_list.append(
+                                f"('{symbol}', '{exchange}', '{date_str}', "
+                                f"{record['open']}, {record['high']}, {record['low']}, "
+                                f"{record['close']}, {volume_val})"
+                            )
+                        
+                        values_sql = ', '.join(values_list)
+                        
+                        sql = f"""
+                            INSERT INTO price_data (symbol, exchange, date, open, high, low, close, volume, updated_at)
+                            VALUES {values_sql}
+                            ON CONFLICT (symbol, exchange, date) 
+                            DO UPDATE SET
+                                open = EXCLUDED.open,
+                                high = EXCLUDED.high,
+                                low = EXCLUDED.low,
+                                close = EXCLUDED.close,
+                                volume = EXCLUDED.volume,
+                                updated_at = CURRENT_TIMESTAMP
+                        """
+                        
+                        session.execute(text(sql))
+                        session.commit()
+                        
+                        inserted += len(records)
+                        
+                        # Clear database query cache for this symbol/exchange
+                        cache_keys_to_remove = [
+                            key for key in _db_query_cache.keys()
+                            if key.startswith(f"{symbol}|{exchange}|")
+                        ]
+                        for key in cache_keys_to_remove:
+                            del _db_query_cache[key]
+                        
+                    except Exception as e:
+                        logger.error(f"Error inserting batch starting at index {i}: {e}")
+                        session.rollback()
+                        raise
+                
+                result['database']['inserted'] = inserted
+                result['database']['updated'] = 0  # PostgreSQL doesn't distinguish in ON CONFLICT
+                logger.info(f"Saved {inserted} records to database for {symbol} on {exchange}")
+                
+        except Exception as e:
+            logger.error(f"Error saving {symbol} data to database: {e}")
+            if not also_save_csv:
+                raise
+    
+    # Also save to CSV for backward compatibility
+    if also_save_csv:
+        try:
+            csv_path = save_data_to_csv(df, symbol=symbol)
+            result['csv_path'] = csv_path
+        except Exception as e:
+            logger.warning(f"Error saving {symbol} data to CSV: {e}")
+    
+    result['success'] = True
+    return result
+
+
 def save_data_to_csv(df: pd.DataFrame, file_path: Optional[str] = None, symbol: str = "BTCUSDT") -> str:
     """
-    Save DataFrame to CSV file.
+    Save DataFrame to CSV file (backward compatibility function).
+    For new code, use save_data_to_database() instead.
     
     Args:
         df (pd.DataFrame): DataFrame to save
@@ -1342,10 +1679,27 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
     
     logger = logging.getLogger(__name__)
     
-    # Calculate historical range (all available data from token launch by default)
-    if start_date is None:
-        start_date, _ = calculate_historical_range(symbol, years=None)
-        logger.info(f"Using calculated start date: {start_date.strftime('%Y-%m-%d')} (from token launch - fetching all available data)")
+    # Determine exchange (default to Binance)
+    exchange = "Binance"  # Can be made configurable later
+    
+    # Check for incremental update: if data exists in database, only fetch new data
+    latest_db_date = get_latest_data_date(symbol=symbol, exchange=exchange)
+    
+    if latest_db_date and not force:
+        # Incremental update: fetch data from day after latest date
+        # Add 1 day to avoid duplicate on the latest date (in case of partial day data)
+        start_date = latest_db_date + timedelta(days=1)
+        logger.info(f"Incremental update: Latest data in database is {latest_db_date.strftime('%Y-%m-%d')}, fetching from {start_date.strftime('%Y-%m-%d')}")
+        
+        # If start_date is in the future (data is already up to date), return existing data
+        if start_date > datetime.now():
+            logger.info(f"{symbol} data is already up to date (latest: {latest_db_date.strftime('%Y-%m-%d')})")
+            return load_crypto_data(symbol=symbol, exchange=exchange)
+    else:
+        # Full update: calculate historical range (all available data from token launch by default)
+        if start_date is None:
+            start_date, _ = calculate_historical_range(symbol, years=None)
+            logger.info(f"Full update: Using calculated start date: {start_date.strftime('%Y-%m-%d')} (from token launch - fetching all available data)")
     
     # Check if we need to update (every 24 hours for daily updates)
     if not force and symbol in _last_update_time:
@@ -1371,9 +1725,13 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
         fetch_days = (end_date - start_date).days
         logger.info(f"Fetching {symbol} data from CoinGlass ONLY from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')} ({fetch_days} days)...")
         
+        # Determine exchange (default to Binance)
+        exchange = "Binance"  # Can be made configurable later
+        
         # Use CoinGlass ONLY (no fallbacks)
         df, data_source, quality_metrics = fetch_crypto_data_smart(
             symbol=symbol,
+            exchange=exchange,
             start_date=start_date,
             end_date=end_date,
             use_cache=False,  # Force fresh fetch
@@ -1396,20 +1754,43 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
         if days_available < 365:
             logger.warning(f"Only {days_available} days fetched (< 1 year). This may indicate limited historical data for {symbol}.")
         
-        # Save to CSV
-        csv_path = save_data_to_csv(df, symbol=symbol)
-        logger.info(f"Data saved to CSV: {csv_path}")
+        # Save to database (and CSV for backward compatibility)
+        save_result = save_data_to_database(
+            df=df,
+            symbol=symbol,
+            exchange=exchange,
+            also_save_csv=True  # Keep CSV for backward compatibility during transition
+        )
         
-        # Clear cache BEFORE updating timestamp to ensure fresh data is loaded
-        cache_key = f"{symbol}_{csv_path}"
-        if cache_key in _dataframe_cache:
-            del _dataframe_cache[cache_key]
+        if save_result['success']:
+            logger.info(f"Data saved to database: {save_result['database']['inserted']} records")
+            if save_result.get('csv_path'):
+                logger.info(f"Data also saved to CSV: {save_result['csv_path']}")
+        else:
+            logger.warning(f"Failed to save {symbol} data to database, CSV may still be available")
+        
+        # Clear caches BEFORE updating timestamp to ensure fresh data is loaded
+        # Clear database query cache
+        cache_keys_to_remove = [
+            key for key in _db_query_cache.keys()
+            if key.startswith(f"{symbol}|{exchange}|")
+        ]
+        for key in cache_keys_to_remove:
+            del _db_query_cache[key]
+        
+        # Clear CSV cache if CSV was saved
+        if save_result.get('csv_path'):
+            csv_path = save_result['csv_path']
+            cache_key = f"{symbol}_{csv_path}"
+            if cache_key in _dataframe_cache:
+                del _dataframe_cache[cache_key]
+            
+            # Update file modification time cache
+            import os
+            if os.path.exists(csv_path):
+                _file_mtime_cache[cache_key] = os.path.getmtime(csv_path)
+        
         logger.debug(f"Cache cleared after saving {symbol} data")
-        
-        # Update file modification time cache
-        import os
-        if os.path.exists(csv_path):
-            _file_mtime_cache[cache_key] = os.path.getmtime(csv_path)
         
         _last_update_time[symbol] = datetime.now()
         
@@ -1679,15 +2060,17 @@ _file_mtime_cache: Dict[str, float] = {}
 # Simple cache for DataFrames (will be cleared when files change)
 _dataframe_cache: Dict[str, Tuple[pd.DataFrame, float]] = {}
 
-def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None) -> pd.DataFrame:
+def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None, exchange: str = "Binance", use_database: bool = True) -> pd.DataFrame:
     """
-    Load cryptocurrency historical data from CSV file with intelligent caching.
-    Automatically fetches data if file doesn't exist or doesn't go back to 2017.
-    Cache is invalidated when CSV file modification time changes.
+    Load cryptocurrency historical data from PostgreSQL database (primary) or CSV file (fallback).
+    Automatically fetches data if file doesn't exist or doesn't go back to token launch date.
+    Cache is invalidated when CSV file modification time changes or database is updated.
     
     Args:
         symbol (str): Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
         file_path (str, optional): Path to the CSV file. Auto-generated if not provided.
+        exchange (str): Exchange name (e.g., "Binance"). Defaults to "Binance".
+        use_database (bool): Whether to try database first. Defaults to True.
         
     Returns:
         pd.DataFrame: Cleaned DataFrame with datetime index and numeric columns
@@ -1697,6 +2080,19 @@ def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None) -
     """
     logger = logging.getLogger(__name__)
     
+    # Try database first if enabled and available
+    if use_database and DATABASE_AVAILABLE:
+        try:
+            df = load_crypto_data_from_database(symbol=symbol, exchange=exchange)
+            if df is not None and not df.empty:
+                logger.info(f"Loaded {len(df)} rows of {symbol} data from database")
+                return df
+            else:
+                logger.debug(f"No data found in database for {symbol}, falling back to CSV")
+        except Exception as e:
+            logger.warning(f"Error loading {symbol} from database, falling back to CSV: {e}")
+    
+    # Fallback to CSV file
     if file_path is None:
         import os
         data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
@@ -1721,7 +2117,7 @@ def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None) -
     if cache_key in _dataframe_cache:
         cached_df, cached_mtime = _dataframe_cache[cache_key]
         if cached_mtime == file_mtime and file_exists:
-            logger.debug(f"Returning cached data for {symbol} (file unchanged)")
+            logger.debug(f"Returning cached CSV data for {symbol} (file unchanged)")
             return cached_df
         else:
             logger.debug(f"Cache invalidated for {symbol} (file modified or missing)")
@@ -1735,7 +2131,7 @@ def load_crypto_data(symbol: str = "BTCUSDT", file_path: Optional[str] = None) -
         df = pd.read_csv(file_path)
         
         # Log basic info about the loaded data
-        logger.info(f"Loaded {len(df)} rows of {symbol} data from {file_path}")
+        logger.info(f"Loaded {len(df)} rows of {symbol} data from CSV file: {file_path}")
         logger.debug(f"Columns: {list(df.columns)}")
         
         # Clean and preprocess the data

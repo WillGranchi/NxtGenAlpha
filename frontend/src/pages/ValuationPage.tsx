@@ -107,20 +107,26 @@ const ValuationPage: React.FC = () => {
 
   const [initialLoadAttempted, setInitialLoadAttempted] = useState<boolean>(false);
 
-  // Load price data for the top chart
+  // Load price data for the top chart with optimistic UI
   const loadPriceData = useCallback(async (forceRefresh: boolean = false) => {
-    setPriceDataLoading(true);
+    // Optimistic UI: Don't set loading immediately if we have cached data
+    // Only show loading on initial load or if no data exists
+    const shouldShowLoading = priceData.length === 0;
+    if (shouldShowLoading) {
+      setPriceDataLoading(true);
+    }
+    
     try {
-      // If force refresh is requested, refresh data from Yahoo Finance first
+      // If force refresh is requested, refresh data in background (optimistic UI)
       if (forceRefresh) {
-        try {
-          await TradingAPI.refreshData(symbol, true);
-        } catch (refreshErr) {
-          console.warn('Failed to refresh data:', refreshErr);
-          // Continue to load existing data even if refresh fails
-        }
+        // Don't await - let it run in background while showing cached data
+        TradingAPI.refreshData(symbol, true)
+          .catch((refreshErr) => {
+            console.warn('Failed to refresh data:', refreshErr);
+          });
       }
 
+      // Load data (will use cached if available, or fetch fresh)
       const response = await TradingAPI.getValuationData({
         symbol,
         indicators: [], // No indicators, just price
@@ -142,9 +148,11 @@ const ValuationPage: React.FC = () => {
     } catch (err) {
       console.error('Failed to load price data:', err);
     } finally {
-      setPriceDataLoading(false);
+      if (shouldShowLoading) {
+        setPriceDataLoading(false);
+      }
     }
-  }, [symbol, startDate, endDate]);
+  }, [symbol, startDate, endDate, priceData.length]);
 
   // Auto-load Yahoo Finance data on initial page load
   useEffect(() => {

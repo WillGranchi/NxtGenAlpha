@@ -192,17 +192,21 @@ export const useFullCycle = (): UseFullCycleReturn => {
     }
   }, [selectedIndicators.length]);
   
-  // Calculate z-scores
+  // Calculate z-scores with optimistic UI (keep showing cached data while fetching)
   const calculateZScores = useCallback(async () => {
     if (selectedIndicators.length === 0) {
       setZscoreData([]);
       return;
     }
     
-    try {
+    // Optimistic UI: Only show loading if we don't have existing data
+    const hasExistingData = zscoreData.length > 0;
+    if (!hasExistingData) {
       setZscoresLoading(true);
-      setZscoresError(null);
-      
+    }
+    setZscoresError(null);
+    
+    try {
       // Build indicator_params object from indicatorParameters state
       const indicatorParams: Record<string, Record<string, number>> = {};
       selectedIndicators.forEach((indicatorId: string) => {
@@ -233,14 +237,19 @@ export const useFullCycle = (): UseFullCycleReturn => {
       console.error('Failed to calculate full cycle z-scores:', err);
       const errorMsg = err?.response?.data?.detail || err?.message || 'Failed to calculate z-scores';
       setZscoresError(errorMsg);
-      setZscoreData([]);
-      setDataWarnings([]);
-      setIndicatorsCalculated(0);
-      setIndicatorsRequested(selectedIndicators.length);
+      // Only clear data if this was the initial load (optimistic UI: keep showing cached data on error)
+      if (!hasExistingData) {
+        setZscoreData([]);
+        setDataWarnings([]);
+        setIndicatorsCalculated(0);
+        setIndicatorsRequested(selectedIndicators.length);
+      }
     } finally {
-      setZscoresLoading(false);
+      if (!hasExistingData) {
+        setZscoresLoading(false);
+      }
     }
-    }, [selectedIndicators, indicatorParameters, startDate, endDate, rocDays, sdcaIn, sdcaOut]);
+    }, [selectedIndicators, indicatorParameters, startDate, endDate, rocDays, sdcaIn, sdcaOut, zscoreData.length]);
   
   // Toggle indicator visibility
   const toggleIndicatorVisibility = useCallback((indicatorId: string) => {
@@ -311,10 +320,11 @@ export const useFullCycle = (): UseFullCycleReturn => {
       return;
     }
     
+    // Optimistic UI: Don't clear existing data, keep showing it while refreshing
+    // Only show loading indicator, don't block UI
+    setZscoresError(null);
+    
     try {
-      setZscoresLoading(true);
-      setZscoresError(null);
-      
       // Build indicator_params object from indicatorParameters state
       const indicatorParams: Record<string, Record<string, number>> = {};
       selectedIndicators.forEach((indicatorId: string) => {
@@ -323,7 +333,7 @@ export const useFullCycle = (): UseFullCycleReturn => {
         }
       });
       
-      // Force refresh from API
+      // Force refresh from API (optimistic: show existing data while fetching)
       const response = await TradingAPI.calculateFullCycleZScores({
         indicators: selectedIndicators,
         indicator_params: Object.keys(indicatorParams).length > 0 ? indicatorParams : undefined,
@@ -346,11 +356,7 @@ export const useFullCycle = (): UseFullCycleReturn => {
       console.error('Failed to refresh full cycle z-scores:', err);
       const errorMsg = err?.response?.data?.detail || err?.message || 'Failed to refresh data';
       setZscoresError(errorMsg);
-      setDataWarnings([]);
-      setIndicatorsCalculated(0);
-      setIndicatorsRequested(selectedIndicators.length);
-    } finally {
-      setZscoresLoading(false);
+      // Don't clear data on error (optimistic UI: keep showing cached data)
     }
   }, [selectedIndicators, indicatorParameters, startDate, endDate, rocDays, sdcaIn, sdcaOut]);
   

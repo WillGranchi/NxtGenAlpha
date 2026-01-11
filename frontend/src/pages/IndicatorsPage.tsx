@@ -106,26 +106,87 @@ const IndicatorsPage: React.FC = () => {
     setSettingsExpanded(!isMobile);
   }, [isMobile]);
   
-  // Load base price data for default chart display
-  const loadBasePriceData = useCallback(async (forceRefresh: boolean = false) => {
+  // Load base price data for default chart display with optimistic UI and progressive loading
+  const loadBasePriceData = useCallback(async (forceRefresh: boolean = false, progressive: boolean = false) => {
     try {
       // Convert CoinGlass format to internal format for API calls
       const internalSymbol = symbolToInternal(symbol);
       
-      // If force refresh is requested, refresh data from CoinGlass first
+      // Progressive loading: Load last 30 days first (fast), then full history in background
+      if (progressive && startDate) {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const recentStartDate = thirtyDaysAgo.toISOString().split('T')[0];
+        
+        // Load recent data first (optimistic UI)
+        try {
+          const recentResponse = await TradingAPI.getValuationData({
+            symbol: internalSymbol,
+            indicators: [],
+            start_date: recentStartDate,
+            end_date: endDate || undefined,
+          });
+          
+          if (recentResponse.success && recentResponse.data) {
+            const recentData = recentResponse.data.map((d) => ({
+              Date: d.date,
+              Price: d.price,
+              Position: 0,
+              Portfolio_Value: d.price,
+              Capital: 0,
+              Shares: 0,
+            }));
+            setBasePriceData(recentData);
+            setError(null);
+          }
+        } catch (recentErr) {
+          console.warn('Failed to load recent data:', recentErr);
+        }
+        
+        // Then load full history in background (non-blocking)
+        setTimeout(async () => {
+          try {
+            const fullResponse = await TradingAPI.getValuationData({
+              symbol: internalSymbol,
+              indicators: [],
+              start_date: startDate || undefined,
+              end_date: endDate || undefined,
+            });
+            
+            if (fullResponse.success && fullResponse.data) {
+              const fullData = fullResponse.data.map((d) => ({
+                Date: d.date,
+                Price: d.price,
+                Position: 0,
+                Portfolio_Value: d.price,
+                Capital: 0,
+                Shares: 0,
+              }));
+              setBasePriceData(fullData);
+            }
+          } catch (fullErr) {
+            console.warn('Failed to load full history:', fullErr);
+          }
+        }, 100);
+        
+        return;
+      }
+      
+      // If force refresh is requested, refresh data from CoinGlass in background
+      // Show cached data immediately (optimistic UI)
       if (forceRefresh) {
         setIsRefreshingData(true);
-        try {
-          await TradingAPI.refreshData(internalSymbol, true);
-        } catch (refreshErr) {
-          console.warn('Failed to refresh data from CoinGlass:', refreshErr);
-          // Continue to load existing data even if refresh fails
-        } finally {
-          setIsRefreshingData(false);
-        }
+        // Don't await - let it run in background while showing cached data
+        TradingAPI.refreshData(internalSymbol, true)
+          .catch((refreshErr) => {
+            console.warn('Failed to refresh data from CoinGlass:', refreshErr);
+          })
+          .finally(() => {
+            setIsRefreshingData(false);
+          });
       }
 
-      // Use the already converted internal symbol for API call
+      // Load data (will use cached if available, or fetch fresh)
       const response = await TradingAPI.getValuationData({
         symbol: internalSymbol,
         indicators: [], // No indicators, just price
@@ -151,12 +212,12 @@ const IndicatorsPage: React.FC = () => {
       }
   }, [symbol, startDate, endDate]);
 
-  // Auto-load CoinGlass data on initial page load
+  // Auto-load CoinGlass data on initial page load with progressive loading
   useEffect(() => {
     if (!initialLoadAttempted) {
       setInitialLoadAttempted(true);
-      // Automatically refresh and load data on first page load
-      loadBasePriceData(true);
+      // Use progressive loading: show last 30 days immediately, then load full history
+      loadBasePriceData(false, true);
     }
   }, []); // Only run once on mount
 

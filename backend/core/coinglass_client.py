@@ -16,6 +16,8 @@ import pandas as pd
 import numpy as np
 import hashlib
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
 
 logger = logging.getLogger(__name__)
 
@@ -32,42 +34,44 @@ RATE_LIMIT_WINDOW = 60  # seconds
 
 
 class RateLimiter:
-    """Token bucket rate limiter for CoinGlass API requests."""
+    """Token bucket rate limiter for CoinGlass API requests (thread-safe)."""
     
     def __init__(self, max_requests: int = RATE_LIMIT_REQUESTS, window_seconds: int = RATE_LIMIT_WINDOW):
         self.max_requests = max_requests
         self.window_seconds = window_seconds
         self.request_times = deque()
-        self.lock = False
+        self.lock = Lock()  # Thread-safe lock for concurrent requests
     
     def wait_if_needed(self):
-        """Wait if rate limit would be exceeded."""
-        now = time.time()
-        
-        # Remove requests outside the time window
-        while self.request_times and self.request_times[0] < now - self.window_seconds:
-            self.request_times.popleft()
-        
-        # If we're at the limit, wait until the oldest request expires
-        if len(self.request_times) >= self.max_requests:
-            wait_time = self.window_seconds - (now - self.request_times[0]) + 0.1
-            if wait_time > 0:
-                logger.warning(f"Rate limit reached ({self.max_requests} requests/minute). Waiting {wait_time:.2f} seconds...")
-                time.sleep(wait_time)
-                # Clean up again after waiting
-                now = time.time()
-                while self.request_times and self.request_times[0] < now - self.window_seconds:
-                    self.request_times.popleft()
-        
-        # Record this request
-        self.request_times.append(time.time())
+        """Wait if rate limit would be exceeded (thread-safe)."""
+        with self.lock:
+            now = time.time()
+            
+            # Remove requests outside the time window
+            while self.request_times and self.request_times[0] < now - self.window_seconds:
+                self.request_times.popleft()
+            
+            # If we're at the limit, wait until the oldest request expires
+            if len(self.request_times) >= self.max_requests:
+                wait_time = self.window_seconds - (now - self.request_times[0]) + 0.1
+                if wait_time > 0:
+                    logger.warning(f"Rate limit reached ({self.max_requests} requests/minute). Waiting {wait_time:.2f} seconds...")
+                    time.sleep(wait_time)
+                    # Clean up again after waiting
+                    now = time.time()
+                    while self.request_times and self.request_times[0] < now - self.window_seconds:
+                        self.request_times.popleft()
+            
+            # Record this request
+            self.request_times.append(time.time())
     
     def get_remaining_requests(self) -> int:
-        """Get number of remaining requests in current window."""
-        now = time.time()
-        while self.request_times and self.request_times[0] < now - self.window_seconds:
-            self.request_times.popleft()
-        return max(0, self.max_requests - len(self.request_times))
+        """Get number of remaining requests in current window (thread-safe)."""
+        with self.lock:
+            now = time.time()
+            while self.request_times and self.request_times[0] < now - self.window_seconds:
+                self.request_times.popleft()
+            return max(0, self.max_requests - len(self.request_times))
 
 
 # Global rate limiter instance
@@ -75,10 +79,10 @@ _rate_limiter = RateLimiter()
 
 # In-memory cache for CoinGlass API responses
 # Structure: {cache_key: (dataframe, timestamp)}
-# TTL: 10 minutes for recent data, 1 hour for historical data
+# TTL: 1 hour for recent data, 24 hours for historical data (extended for better performance)
 _coinglass_cache: Dict[str, Tuple[pd.DataFrame, float]] = {}
-CACHE_TTL_RECENT = 600  # 10 minutes for recent data (last 7 days)
-CACHE_TTL_HISTORICAL = 3600  # 1 hour for historical data (older than 7 days)
+CACHE_TTL_RECENT = 3600  # 1 hour for recent data (last 7 days) - was 10 minutes
+CACHE_TTL_HISTORICAL = 86400  # 24 hours for historical data (older than 7 days) - was 1 hour
 
 
 def _generate_cache_key(
@@ -596,53 +600,64 @@ class CoinGlassClient:
         
         return df
     
-    def _fetch_price_history_paginated(
-        self,
-        symbol: str,
-        interval: str,
-        start_date: datetime,
-        end_date: datetime,
-        exchange: str,
-        use_cache: bool = True
-    ) -> pd.DataFrame:
+    def _calculate_smart_chunk_size(self, chunk_start: datetime, chunk_end: datetime, interval: str) -> int:
         """
-        Fetch price history using pagination for large date ranges.
-        CoinGlass API limit is 1000 records per request.
+        Calculate adaptive chunk size based on date range.
+        Recent data (last 30 days): 1-day chunks (more granular)
+        Medium-term (30-365 days): 30-day chunks
+        Historical (365+ days): 365-day chunks
         
         Args:
-            symbol: Trading pair symbol (e.g., "BTCUSDT")
+            chunk_start: Start date of chunk
+            chunk_end: End date of chunk
             interval: Time interval
-            start_date: Start date
-            end_date: End date
-            exchange: Exchange name
-            use_cache: Whether to use cache
             
         Returns:
-            DataFrame with all paginated data combined
+            Number of days for this chunk
         """
-        logger.info(f"Fetching paginated price history for {symbol} on {exchange} ({start_date} to {end_date})")
+        now = datetime.now()
+        days_from_now = (now - chunk_start).days
         
         # Calculate interval hours to estimate records per day
         interval_hours = {"1d": 24, "4h": 4, "6h": 6, "8h": 8, "12h": 12, "1w": 168}.get(interval, 24)
         records_per_day = 24 / interval_hours
-        days_per_request = int(1000 / records_per_day)  # How many days fit in 1000 records
+        max_days_per_1000_records = int(1000 / records_per_day)
         
-        all_dfs = []
-        current_start = start_date
-        endpoints_to_try = ["/api/spot/price/history"]
-        base_urls_to_try = [self.base_url, COINGLASS_BASE_URL_ALT]
+        # Adaptive chunking based on how recent the data is
+        if days_from_now <= 30:
+            # Recent data: 1-day chunks for granularity
+            chunk_days = 1
+        elif days_from_now <= 365:
+            # Medium-term: 30-day chunks
+            chunk_days = min(30, max_days_per_1000_records)
+        else:
+            # Historical: 365-day chunks (or max allowed by API limit)
+            chunk_days = min(365, max_days_per_1000_records)
         
-        while current_start < end_date:
-            # Calculate end date for this chunk (ensure we don't exceed end_date)
-            current_end = min(current_start + timedelta(days=days_per_request), end_date)
-            
-            logger.info(f"Fetching page: {current_start.strftime('%Y-%m-%d')} to {current_end.strftime('%Y-%m-%d')}")
-            
+        return chunk_days
+    
+    def _fetch_single_chunk(
+        self,
+        symbol: str,
+        interval: str,
+        chunk_start: datetime,
+        chunk_end: datetime,
+        exchange: str,
+        use_cache: bool = True
+    ) -> Tuple[datetime, datetime, Optional[pd.DataFrame]]:
+        """
+        Fetch a single chunk of price history data.
+        Used by parallel pagination.
+        
+        Returns:
+            Tuple of (chunk_start, chunk_end, DataFrame or None)
+        """
+        try:
             # Check cache for this chunk
             chunk_df = None
             if use_cache:
-                is_recent = _is_recent_data(current_start, current_end)
-                cache_key = _generate_cache_key(symbol, exchange, interval, current_start, current_end)
+                is_recent = _is_recent_data(chunk_start, chunk_end)
+                cache_key = _generate_cache_key(symbol, exchange, interval, chunk_start, chunk_end)
                 chunk_df = _get_cached_response(cache_key, is_recent)
             
             if chunk_df is None:
@@ -652,20 +667,22 @@ class CoinGlassClient:
                     "interval": interval,
                     "exchange": exchange,
                     "limit": "1000",
-                    "start_time": int(current_start.timestamp() * 1000),
-                    "end_time": int(current_end.timestamp() * 1000)
+                    "start_time": int(chunk_start.timestamp() * 1000),
+                    "end_time": int(chunk_end.timestamp() * 1000)
                 }
                 
-                # Make API request
+                # Make API request (rate limiter is thread-safe)
                 chunk_data = None
                 original_base = self.base_url
+                endpoints_to_try = ["/api/spot/price/history"]
+                base_urls_to_try = [self.base_url, COINGLASS_BASE_URL_ALT]
                 
                 for base_url in base_urls_to_try:
                     self.base_url = base_url
                     for endpoint in endpoints_to_try:
                         try:
                             chunk_data = self._make_request(endpoint, params)
-                            logger.info(f"✓ Successfully fetched chunk data from {base_url}{endpoint}")
+                            logger.debug(f"✓ Successfully fetched chunk from {base_url}{endpoint}: {chunk_start.strftime('%Y-%m-%d')} to {chunk_end.strftime('%Y-%m-%d')}")
                             break
                         except Exception as e:
                             logger.debug(f"Endpoint {base_url}{endpoint} failed for chunk: {e}")
@@ -682,23 +699,108 @@ class CoinGlassClient:
                     
                     # Cache this chunk
                     if use_cache and not chunk_df.empty:
-                        is_recent = _is_recent_data(current_start, current_end)
-                        cache_key = _generate_cache_key(symbol, exchange, interval, current_start, current_end)
+                        is_recent = _is_recent_data(chunk_start, chunk_end)
+                        cache_key = _generate_cache_key(symbol, exchange, interval, chunk_start, chunk_end)
                         _store_cached_response(cache_key, chunk_df)
             
-            if chunk_df is not None and not chunk_df.empty:
-                all_dfs.append(chunk_df)
-                logger.info(f"✓ Fetched {len(chunk_df)} records for chunk")
+            return (chunk_start, chunk_end, chunk_df)
             
-            # Move to next chunk
+        except Exception as e:
+            logger.error(f"Error fetching chunk {chunk_start.strftime('%Y-%m-%d')} to {chunk_end.strftime('%Y-%m-%d')}: {e}")
+            return (chunk_start, chunk_end, None)
+    
+    def _fetch_price_history_paginated(
+        self,
+        symbol: str,
+        interval: str,
+        start_date: datetime,
+        end_date: datetime,
+        exchange: str,
+        use_cache: bool = True,
+        max_workers: int = 5
+    ) -> pd.DataFrame:
+        """
+        Fetch price history using parallel pagination with smart chunking.
+        CoinGlass API limit is 1000 records per request.
+        
+        Uses adaptive chunk sizes:
+        - Recent data (last 30 days): 1-day chunks
+        - Medium-term (30-365 days): 30-day chunks
+        - Historical (365+ days): 365-day chunks
+        
+        Fetches multiple chunks in parallel while respecting rate limits.
+        
+        Args:
+            symbol: Trading pair symbol (e.g., "BTCUSDT")
+            interval: Time interval
+            start_date: Start date
+            end_date: End date
+            exchange: Exchange name
+            use_cache: Whether to use cache
+            max_workers: Maximum number of parallel workers (default: 5 to respect rate limits)
+            
+        Returns:
+            DataFrame with all paginated data combined
+        """
+        logger.info(f"Fetching paginated price history for {symbol} on {exchange} ({start_date} to {end_date}) with parallel pagination")
+        
+        # Generate list of chunks using smart chunking
+        chunks = []
+        current_start = start_date
+        
+        while current_start < end_date:
+            # Calculate adaptive chunk size
+            chunk_days = self._calculate_smart_chunk_size(current_start, end_date, interval)
+            current_end = min(current_start + timedelta(days=chunk_days), end_date)
+            
+            chunks.append((current_start, current_end))
             current_start = current_end + timedelta(days=1)
         
-        # Combine all chunks
-        if all_dfs:
+        logger.info(f"Generated {len(chunks)} chunks for parallel fetching")
+        
+        # Fetch chunks in parallel
+        all_dfs = []
+        chunk_results = {}  # Store results by chunk start date for ordering
+        
+        # Use ThreadPoolExecutor for parallel fetching
+        # Limit workers to respect rate limits (30 req/min = 0.5 req/sec, so 5 workers max)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all chunk fetch tasks
+            future_to_chunk = {
+                executor.submit(
+                    self._fetch_single_chunk,
+                    symbol,
+                    interval,
+                    chunk_start,
+                    chunk_end,
+                    exchange,
+                    use_cache
+                ): (chunk_start, chunk_end)
+                for chunk_start, chunk_end in chunks
+            }
+            
+            # Process completed tasks as they finish
+            completed = 0
+            for future in as_completed(future_to_chunk):
+                chunk_start, chunk_end, chunk_df = future.result()
+                completed += 1
+                
+                if chunk_df is not None and not chunk_df.empty:
+                    chunk_results[chunk_start] = chunk_df
+                    logger.info(f"✓ Fetched chunk {completed}/{len(chunks)}: {len(chunk_df)} records ({chunk_start.strftime('%Y-%m-%d')} to {chunk_end.strftime('%Y-%m-%d')})")
+                else:
+                    logger.warning(f"✗ Chunk {completed}/{len(chunks)} returned no data ({chunk_start.strftime('%Y-%m-%d')} to {chunk_end.strftime('%Y-%m-%d')})")
+        
+        # Combine all chunks in chronological order
+        if chunk_results:
+            # Sort by chunk start date
+            sorted_chunks = sorted(chunk_results.items())
+            all_dfs = [df for _, df in sorted_chunks]
+            
             df = pd.concat(all_dfs)
             df = df.sort_index()
             df = df[~df.index.duplicated(keep='first')]  # Remove duplicates
-            logger.info(f"✓ Combined {len(all_dfs)} pages into {len(df)} total records")
+            logger.info(f"✓ Combined {len(all_dfs)} chunks into {len(df)} total records")
             
             # Filter to exact date range
             if start_date and end_date:

@@ -2,10 +2,10 @@
 Database models for user accounts and saved strategies.
 """
 
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, JSON, Boolean, Float
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, JSON, Boolean, Float, Index, text, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timedelta
 
 Base = declarative_base()
 
@@ -141,4 +141,37 @@ class FullCyclePreset(Base):
     
     # Relationships
     user = relationship("User", back_populates="fullcycle_presets")
+
+
+class PriceData(Base):
+    """Cryptocurrency price data model for storing OHLCV data."""
+    
+    __tablename__ = "price_data"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    symbol = Column(String(20), nullable=False, index=True)  # e.g., "BTCUSDT"
+    exchange = Column(String(50), nullable=False, index=True, default="Binance")  # e.g., "Binance"
+    date = Column(DateTime, nullable=False, index=True)  # Date/timestamp for the price data
+    
+    # OHLCV data
+    open = Column(Float, nullable=False)
+    high = Column(Float, nullable=False)
+    low = Column(Float, nullable=False)
+    close = Column(Float, nullable=False)
+    volume = Column(Float, nullable=True)  # Volume may be null for some sources
+    
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Composite index for fast range queries: (symbol, exchange, date)
+    # This index enables efficient queries like:
+    # SELECT * FROM price_data WHERE symbol = ? AND exchange = ? AND date BETWEEN ? AND ? ORDER BY date
+    # Partial index for recent data (last 30 days) for faster queries on recent data
+    # Unique constraint prevents duplicate entries for same symbol/exchange/date combination
+    __table_args__ = (
+        Index('idx_price_data_symbol_exchange_date', 'symbol', 'exchange', 'date'),
+        Index('idx_price_data_date_recent', 'date', postgresql_where=text("date > NOW() - INTERVAL '30 days'")),
+        UniqueConstraint('symbol', 'exchange', 'date', name='uq_price_data_symbol_exchange_date'),
+    )
 
