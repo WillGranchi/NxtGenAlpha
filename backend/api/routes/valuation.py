@@ -447,7 +447,8 @@ async def get_valuation_data(
     symbol: str = Query(default="BTCUSDT", description="Trading pair symbol"),
     indicators: Optional[List[str]] = Query(default=None, description="List of indicator IDs"),
     start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD)"),
-    end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)")
+    end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)"),
+    exchange: Optional[str] = Query(default="Binance", description="Exchange name (e.g., Binance, Coinbase)")
 ) -> ValuationDataResponse:
     """
     Get price data with indicator values (without z-scores).
@@ -470,6 +471,7 @@ async def get_valuation_data(
                 symbol=symbol,
                 start_date=start_date_dt,
                 end_date=end_date_dt,
+                exchange=exchange,
                 use_cache=True,  # Use cache if available
                 cross_validate=False
             )
@@ -477,7 +479,7 @@ async def get_valuation_data(
         except Exception as e:
             logger.warning(f"Failed to fetch from CoinGlass API, falling back to CSV: {e}")
             # Fallback to CSV if CoinGlass API fails
-            df = load_crypto_data(symbol=symbol)
+            df = load_crypto_data(symbol=symbol, exchange=exchange)
             
             # Filter by date range if provided
             if start_date:

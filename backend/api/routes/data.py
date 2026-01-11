@@ -214,6 +214,7 @@ async def refresh_data(
     symbol: Optional[str] = Query(default="BTCUSDT", description="Cryptocurrency symbol to refresh"),
     force: bool = Query(default=False, description="Force refresh even if data is fresh"),
     start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD) to fetch historical data from (e.g., 2016-01-01)"),
+    exchange: Optional[str] = Query(default="Binance", description="Exchange name (e.g., Binance, Coinbase)"),
     include_additional_metrics: bool = Query(default=False, description="Include additional metrics from CoinGlass (funding rates, open interest, etc.)")
 ) -> Dict[str, Any]:
     """
@@ -250,8 +251,8 @@ async def refresh_data(
                     detail=f"Invalid start_date format. Use YYYY-MM-DD (e.g., 2016-01-01)"
                 )
         
-        logger.info(f"Manual data refresh requested for {symbol} (force={force}, start_date={start_date}, include_additional_metrics={include_additional_metrics})")
-        df = update_crypto_data(symbol=symbol, force=force, start_date=start_dt, include_additional_metrics=include_additional_metrics)
+        logger.info(f"Manual data refresh requested for {symbol} on {exchange} (force={force}, start_date={start_date}, include_additional_metrics={include_additional_metrics})")
+        df = update_crypto_data(symbol=symbol, force=force, start_date=start_dt, exchange=exchange, include_additional_metrics=include_additional_metrics)
         
         # Clear cache AFTER refresh to ensure fresh data is available
         keys_to_remove = [k for k in _dataframe_cache.keys() if k.startswith(f"{symbol}_")]

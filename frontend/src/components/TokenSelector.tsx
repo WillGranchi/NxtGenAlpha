@@ -17,6 +17,7 @@ interface TokenInfo {
 interface TokenSelectorProps {
   selectedSymbol: string; // Can be either format (CoinGlass or internal)
   onSymbolChange: (symbol: string) => void; // Will receive CoinGlass format
+  selectedExchange?: string; // "All Exchanges" or specific exchange name
   className?: string;
 }
 
@@ -52,6 +53,7 @@ function internalToCoinglass(symbol: string): string {
 export const TokenSelector: React.FC<TokenSelectorProps> = ({
   selectedSymbol,
   onSymbolChange,
+  selectedExchange = 'All Exchanges',
   className = '',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -125,30 +127,57 @@ export const TokenSelector: React.FC<TokenSelectorProps> = ({
     fetchTokens();
   }, []);
 
-  // Filter tokens based on search query
+  // Filter tokens based on search query and exchange
   const filteredTokens = useMemo(() => {
-    if (!searchQuery.trim()) return tokens;
+    let filtered = tokens;
     
-    const query = searchQuery.toLowerCase();
-    return tokens.filter(
-      (token) =>
-        token.symbol.toLowerCase().includes(query) ||
-        token.name.toLowerCase().includes(query) ||
-        token.chain.toLowerCase().includes(query)
-    );
-  }, [tokens, searchQuery]);
+    // Filter by exchange if not "All Exchanges"
+    if (selectedExchange && selectedExchange !== 'All Exchanges') {
+      filtered = filtered.filter(
+        (token) => token.exchange === selectedExchange
+      );
+    }
+    
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (token) =>
+          token.symbol.toLowerCase().includes(query) ||
+          token.name.toLowerCase().includes(query) ||
+          token.chain.toLowerCase().includes(query) ||
+          (token.exchange && token.exchange.toLowerCase().includes(query))
+      );
+    }
+    
+    return filtered;
+  }, [tokens, searchQuery, selectedExchange]);
 
-  // Group tokens by chain
+  // Group tokens by exchange (if "All Exchanges") or by chain (if specific exchange)
   const groupedTokens = useMemo(() => {
     const groups: Record<string, TokenInfo[]> = {};
-    filteredTokens.forEach((token) => {
-      if (!groups[token.chain]) {
-        groups[token.chain] = [];
-      }
-      groups[token.chain].push(token);
-    });
+    
+    if (selectedExchange === 'All Exchanges') {
+      // Group by exchange when showing all exchanges
+      filteredTokens.forEach((token) => {
+        const groupKey = token.exchange || 'Unknown Exchange';
+        if (!groups[groupKey]) {
+          groups[groupKey] = [];
+        }
+        groups[groupKey].push(token);
+      });
+    } else {
+      // Group by chain when specific exchange is selected
+      filteredTokens.forEach((token) => {
+        if (!groups[token.chain]) {
+          groups[token.chain] = [];
+        }
+        groups[token.chain].push(token);
+      });
+    }
+    
     return groups;
-  }, [filteredTokens]);
+  }, [filteredTokens, selectedExchange]);
 
   // Normalize selectedSymbol to CoinGlass format for comparison
   const normalizedSelectedSymbol = selectedSymbol.includes('/') 
@@ -169,7 +198,9 @@ export const TokenSelector: React.FC<TokenSelectorProps> = ({
               {selectedToken ? `${selectedToken.name} (${selectedToken.symbol})` : selectedSymbol}
             </div>
             {selectedToken && (
-              <div className="text-xs text-text-muted truncate">{selectedToken.chain}</div>
+              <div className="text-xs text-text-muted truncate">
+              {selectedToken.exchange ? `${selectedToken.exchange} • ${selectedToken.chain}` : selectedToken.chain}
+            </div>
             )}
           </div>
           <ChevronDown
@@ -209,12 +240,12 @@ export const TokenSelector: React.FC<TokenSelectorProps> = ({
               ) : Object.keys(groupedTokens).length === 0 ? (
                 <div className="p-4 text-center text-text-muted">No tokens found</div>
               ) : (
-                Object.entries(groupedTokens).map(([chain, chainTokens]) => (
-                  <div key={chain}>
+                Object.entries(groupedTokens).map(([groupKey, groupTokens]) => (
+                  <div key={groupKey}>
                     <div className="px-4 py-2 text-xs font-semibold text-text-muted uppercase tracking-wide bg-bg-tertiary sticky top-0">
-                      {chain}
+                      {groupKey}
                     </div>
-                    {chainTokens.map((token) => (
+                    {groupTokens.map((token) => (
                       <button
                         key={token.symbol}
                         onClick={() => {
@@ -231,7 +262,12 @@ export const TokenSelector: React.FC<TokenSelectorProps> = ({
                           <div className="text-sm font-medium text-text-primary">
                             {token.name}
                           </div>
-                          <div className="text-xs text-text-muted">{token.symbol}</div>
+                          <div className="text-xs text-text-muted">
+                            {token.symbol}
+                            {token.exchange && selectedExchange === 'All Exchanges' && (
+                              <span className="ml-2 text-text-muted/70">• {token.exchange}</span>
+                            )}
+                          </div>
                         </div>
                         {token.symbol === selectedSymbol && (
                           <Check className="w-5 h-5 text-primary-400 flex-shrink-0" />

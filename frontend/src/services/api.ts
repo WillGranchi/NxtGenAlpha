@@ -311,6 +311,7 @@ export interface ModularBacktestRequest {
   start_date?: string;
   end_date?: string;
   symbol?: string;  // Trading pair symbol (e.g., BTCUSDT, ETHUSDT)
+  exchange?: string;  // Exchange name (e.g., Binance, Coinbase)
   options?: Record<string, any>;
 }
 
@@ -459,10 +460,13 @@ export class TradingAPI {
     return response.data;
   }
 
-  static async refreshData(symbol?: string, force: boolean = false, start_date?: string): Promise<DataRefreshResponse> {
+  static async refreshData(symbol?: string, force: boolean = false, start_date?: string, exchange?: string): Promise<DataRefreshResponse> {
     const params: any = { ...(symbol ? { symbol } : {}), force };
     if (start_date) {
       params.start_date = start_date;
+    }
+    if (exchange) {
+      params.exchange = exchange;
     }
     const key = generateRequestKey('POST', '/api/data/refresh', params, null);
     
@@ -947,6 +951,7 @@ export class TradingAPI {
     indicators?: string[];
     start_date?: string;
     end_date?: string;
+    exchange?: string;
   }): Promise<{
     success: boolean;
     data: Array<{

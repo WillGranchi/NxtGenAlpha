@@ -11,6 +11,7 @@ import { IndicatorSignalPanel } from '../components/indicators/IndicatorSignalPa
 import { VisualConditionBuilder } from '../components/strategy/VisualConditionBuilder';
 import { DateRangePicker } from '../components/DateRangePicker';
 import { TokenSelector } from '../components/TokenSelector';
+import { ExchangeSelector } from '../components/ExchangeSelector';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { PriceChart } from '../components/charts/PriceChart';
@@ -32,6 +33,7 @@ const IndicatorsPage: React.FC = () => {
   // Settings
   // Store symbol in CoinGlass format (BTC/USDT) for display, convert to internal format (BTCUSDT) for API calls
   const [symbol, setSymbol] = useState<string>('BTC/USDT');
+  const [exchange, setExchange] = useState<string>('Binance');
   
   // Helper function to convert CoinGlass format to internal format for API calls
   const symbolToInternal = (coinglassSymbol: string): string => {
@@ -125,6 +127,7 @@ const IndicatorsPage: React.FC = () => {
             indicators: [],
             start_date: recentStartDate,
             end_date: endDate || undefined,
+            exchange: exchange !== 'All Exchanges' ? exchange : undefined,
           });
           
           if (recentResponse.success && recentResponse.data) {
@@ -151,6 +154,7 @@ const IndicatorsPage: React.FC = () => {
               indicators: [],
               start_date: startDate || undefined,
               end_date: endDate || undefined,
+              exchange: exchange !== 'All Exchanges' ? exchange : undefined,
             });
             
             if (fullResponse.success && fullResponse.data) {
@@ -177,7 +181,7 @@ const IndicatorsPage: React.FC = () => {
       if (forceRefresh) {
         setIsRefreshingData(true);
         // Don't await - let it run in background while showing cached data
-        TradingAPI.refreshData(internalSymbol, true)
+        TradingAPI.refreshData(internalSymbol, true, undefined, exchange !== 'All Exchanges' ? exchange : undefined)
           .catch((refreshErr) => {
             console.warn('Failed to refresh data from CoinGlass:', refreshErr);
           })
@@ -192,6 +196,7 @@ const IndicatorsPage: React.FC = () => {
         indicators: [], // No indicators, just price
         start_date: startDate || undefined,
         end_date: endDate || undefined,
+        exchange: exchange !== 'All Exchanges' ? exchange : undefined,
       });
       
       if (response.success && response.data) {
@@ -226,7 +231,7 @@ const IndicatorsPage: React.FC = () => {
     if (initialLoadAttempted) {
       loadBasePriceData(false);
     }
-  }, [symbol, startDate, endDate, initialLoadAttempted, loadBasePriceData]);
+  }, [symbol, startDate, endDate, exchange, initialLoadAttempted, loadBasePriceData]);
 
 
   // Handle manual data refresh
@@ -237,7 +242,7 @@ const IndicatorsPage: React.FC = () => {
       // Convert to internal format for API call
       const internalSymbol = symbolToInternal(symbol);
       // Force refresh from CoinGlass (will use token launch date automatically)
-      await TradingAPI.refreshData(internalSymbol, true);
+      await TradingAPI.refreshData(internalSymbol, true, undefined, exchange !== 'All Exchanges' ? exchange : undefined);
       // Reload price data after refresh
       await loadBasePriceData();
       setError(null);
@@ -343,6 +348,7 @@ const IndicatorsPage: React.FC = () => {
         start_date: startDate || undefined,
         end_date: endDate || undefined,
         symbol: symbolToInternal(symbol), // Convert to internal format for API
+        exchange: exchange !== 'All Exchanges' ? exchange : undefined,
       });
       
       if (!backtestResponse.success) {
@@ -614,12 +620,27 @@ const IndicatorsPage: React.FC = () => {
             {settingsExpanded && (
               <div className="border-t border-border-default p-6 rounded-b-lg">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                  {/* Exchange */}
+                  <div>
+                    <label className="block text-sm font-medium text-text-secondary mb-2">
+                      Exchange
+                    </label>
+                    <ExchangeSelector 
+                      selectedExchange={exchange} 
+                      onExchangeChange={setExchange} 
+                    />
+                  </div>
+                  
                   {/* Symbol */}
                   <div>
                     <label className="block text-sm font-medium text-text-secondary mb-2">
                       Cryptocurrency
                     </label>
-                    <TokenSelector selectedSymbol={symbol} onSymbolChange={setSymbol} />
+                    <TokenSelector 
+                      selectedSymbol={symbol} 
+                      onSymbolChange={setSymbol}
+                      selectedExchange={exchange}
+                    />
                   </div>
                   
                   {/* Date Range */}
