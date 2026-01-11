@@ -63,10 +63,9 @@ def calculate_mvrv(df: pd.DataFrame) -> pd.Series:
     except ValueError:
         raise
     except Exception as e:
-    
-    # No fallback - require Glassnode API
-    logger.error(f"Error fetching MVRV from Glassnode: {e}")
-    raise ValueError(f"MVRV requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
+        # No fallback - require Glassnode API
+        logger.error(f"Error fetching MVRV from Glassnode: {e}")
+        raise ValueError(f"MVRV requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
 
 
 def calculate_nupl(df: pd.DataFrame) -> pd.Series:
@@ -108,11 +107,9 @@ def calculate_nupl(df: pd.DataFrame) -> pd.Series:
         else:
             logger.warning("No NUPL data from Glassnode, falling back to stub data")
     except Exception as e:
-        logger.warning(f"Error fetching NUPL from Glassnode: {e}. Using stub data.")
-    
-    # No fallback - require Glassnode API
-    logger.error(f"Error fetching NUPL from Glassnode: {e}")
-    raise ValueError(f"NUPL requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
+        # No fallback - require Glassnode API
+        logger.error(f"Error fetching NUPL from Glassnode: {e}")
+        raise ValueError(f"NUPL requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
 
 
 def calculate_bitcoin_thermocap(df: pd.DataFrame) -> pd.Series:
@@ -155,11 +152,9 @@ def calculate_bitcoin_thermocap(df: pd.DataFrame) -> pd.Series:
         else:
             logger.warning("No Thermocap data from Glassnode, falling back to stub data")
     except Exception as e:
-        logger.warning(f"Error fetching Thermocap from Glassnode: {e}. Using stub data.")
-    
-    # No fallback - require Glassnode API
-    logger.error(f"Error fetching Bitcoin Thermocap from Glassnode: {e}")
-    raise ValueError(f"Bitcoin Thermocap requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
+        # No fallback - require Glassnode API
+        logger.error(f"Error fetching Bitcoin Thermocap from Glassnode: {e}")
+        raise ValueError(f"Bitcoin Thermocap requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
 
 
 def calculate_cvdd(df: pd.DataFrame) -> pd.Series:
@@ -201,11 +196,9 @@ def calculate_cvdd(df: pd.DataFrame) -> pd.Series:
         else:
             logger.warning("No CVDD data from Glassnode, falling back to stub data")
     except Exception as e:
-        logger.warning(f"Error fetching CVDD from Glassnode: {e}. Using stub data.")
-    
-    # No fallback - require Glassnode API
-    logger.error(f"Error fetching CVDD from Glassnode: {e}")
-    raise ValueError(f"CVDD requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
+        # No fallback - require Glassnode API
+        logger.error(f"Error fetching CVDD from Glassnode: {e}")
+        raise ValueError(f"CVDD requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
 
 
 def calculate_puell_multiple(df: pd.DataFrame) -> pd.Series:
@@ -248,11 +241,9 @@ def calculate_puell_multiple(df: pd.DataFrame) -> pd.Series:
         else:
             logger.warning("No Puell Multiple data from Glassnode, falling back to stub data")
     except Exception as e:
-        logger.warning(f"Error fetching Puell Multiple from Glassnode: {e}. Using stub data.")
-    
-    # No fallback - require Glassnode API
-    logger.error(f"Error fetching Puell Multiple from Glassnode: {e}")
-    raise ValueError(f"Puell Multiple requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
+        # No fallback - require Glassnode API
+        logger.error(f"Error fetching Puell Multiple from Glassnode: {e}")
+        raise ValueError(f"Puell Multiple requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
 
 
 def calculate_reserve_risk(df: pd.DataFrame) -> pd.Series:
@@ -294,11 +285,9 @@ def calculate_reserve_risk(df: pd.DataFrame) -> pd.Series:
         else:
             logger.warning("No Reserve Risk data from Glassnode, falling back to stub data")
     except Exception as e:
-        logger.warning(f"Error fetching Reserve Risk from Glassnode: {e}. Using stub data.")
-    
-    # No fallback - require Glassnode API
-    logger.error(f"Error fetching Reserve Risk from Glassnode: {e}")
-    raise ValueError(f"Reserve Risk requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
+        # No fallback - require Glassnode API
+        logger.error(f"Error fetching Reserve Risk from Glassnode: {e}")
+        raise ValueError(f"Reserve Risk requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
 
 
 def calculate_bitcoin_days_destroyed(df: pd.DataFrame) -> pd.Series:
@@ -340,11 +329,9 @@ def calculate_bitcoin_days_destroyed(df: pd.DataFrame) -> pd.Series:
         else:
             logger.warning("No BDD data from Glassnode, falling back to stub data")
     except Exception as e:
-        logger.warning(f"Error fetching BDD from Glassnode: {e}. Using stub data.")
-    
-    # No fallback - require Glassnode API
-    logger.error(f"Error fetching Bitcoin Days Destroyed from Glassnode: {e}")
-    raise ValueError(f"Bitcoin Days Destroyed requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
+        # No fallback - require Glassnode API
+        logger.error(f"Error fetching Bitcoin Days Destroyed from Glassnode: {e}")
+        raise ValueError(f"Bitcoin Days Destroyed requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
 
 
 def calculate_exchange_net_position(df: pd.DataFrame) -> pd.Series:
@@ -386,11 +373,9 @@ def calculate_exchange_net_position(df: pd.DataFrame) -> pd.Series:
         else:
             logger.warning("No Exchange Net Position data from Glassnode, falling back to stub data")
     except Exception as e:
-        logger.warning(f"Error fetching Exchange Net Position from Glassnode: {e}. Using stub data.")
-    
-    # No fallback - require Glassnode API
-    logger.error(f"Error fetching Exchange Net Position from Glassnode: {e}")
-    raise ValueError(f"Exchange Net Position requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
+        # No fallback - require Glassnode API
+        logger.error(f"Error fetching Exchange Net Position from Glassnode: {e}")
+        raise ValueError(f"Exchange Net Position requires Glassnode API key. Set GLASSNODE_API_KEY environment variable. Error: {e}")
 
 
 def calculate_sopr(df: pd.DataFrame) -> pd.Series:
