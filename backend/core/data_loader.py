@@ -9,7 +9,7 @@ datetime indexing and data cleaning.
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from typing import Optional, Tuple, Dict, List
+from typing import Optional, Tuple, Dict, List, Any
 from functools import lru_cache
 import logging
 import requests
