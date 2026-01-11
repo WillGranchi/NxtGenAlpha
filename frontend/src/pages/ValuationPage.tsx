@@ -10,6 +10,7 @@ import { ValuationChart } from '../components/valuation/ValuationChart';
 import { ValuationTable } from '../components/valuation/ValuationTable';
 import { SaveValuationModal } from '../components/valuation/SaveValuationModal';
 import { PriceChart } from '../components/charts/PriceChart';
+import { SymbolExchangeControls } from '../components/SymbolExchangeControls';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { useMobile } from '../hooks/useMobile';
 import { useAuth } from '../hooks/useAuth';
@@ -50,6 +51,12 @@ const ValuationPage: React.FC = () => {
     Shares: number;
   }>>([]);
   const [priceDataLoading, setPriceDataLoading] = useState(false);
+  const [exchange, setExchange] = useState<string>('Binance');
+  
+  // Data info state
+  const [dataSource, setDataSource] = useState<string>('');
+  const [dateRange, setDateRange] = useState<{ start: string; end: string } | null>(null);
+  const [totalRecords, setTotalRecords] = useState<number>(0);
 
   const {
     availableIndicators,
@@ -120,7 +127,7 @@ const ValuationPage: React.FC = () => {
       // If force refresh is requested, refresh data in background (optimistic UI)
       if (forceRefresh) {
         // Don't await - let it run in background while showing cached data
-        TradingAPI.refreshData(symbol, true)
+        TradingAPI.refreshData(symbol, true, undefined, exchange)
           .catch((refreshErr) => {
             console.warn('Failed to refresh data:', refreshErr);
           });
@@ -132,6 +139,7 @@ const ValuationPage: React.FC = () => {
         indicators: [], // No indicators, just price
         start_date: startDate || undefined,
         end_date: endDate || undefined,
+        exchange: exchange,
       });
       
       if (response.success && response.data) {
@@ -144,6 +152,15 @@ const ValuationPage: React.FC = () => {
           Shares: 0,
         }));
         setPriceData(formattedData);
+        // Update data info
+        if (response.data.length > 0) {
+          setDataSource('coinglass');
+          setDateRange({
+            start: response.data[0].date,
+            end: response.data[response.data.length - 1].date,
+          });
+          setTotalRecords(response.data.length);
+        }
       }
     } catch (err) {
       console.error('Failed to load price data:', err);
@@ -152,7 +169,7 @@ const ValuationPage: React.FC = () => {
         setPriceDataLoading(false);
       }
     }
-  }, [symbol, startDate, endDate, priceData.length]);
+  }, [symbol, startDate, endDate, exchange, priceData.length]);
 
   // Auto-load Yahoo Finance data on initial page load
   useEffect(() => {
@@ -163,12 +180,12 @@ const ValuationPage: React.FC = () => {
     }
   }, []); // Only run once on mount
 
-  // Reload data when symbol, startDate, or endDate changes (but don't force refresh)
+  // Reload data when symbol, startDate, endDate, or exchange changes (but don't force refresh)
   useEffect(() => {
     if (initialLoadAttempted) {
       loadPriceData(false);
     }
-  }, [symbol, startDate, endDate, initialLoadAttempted, loadPriceData]);
+  }, [symbol, startDate, endDate, exchange, initialLoadAttempted, loadPriceData]);
 
   // Load saved valuations
   useEffect(() => {
@@ -253,8 +270,8 @@ const ValuationPage: React.FC = () => {
   const handleRefreshData = async () => {
     setPriceDataLoading(true);
     try {
-      // Force refresh from Yahoo Finance
-      await TradingAPI.refreshData(symbol, true);
+      // Force refresh from CoinGlass
+      await TradingAPI.refreshData(symbol, true, undefined, exchange);
       // Reload price data after refresh
       await loadPriceData(false);
     } catch (err: any) {
@@ -345,6 +362,25 @@ const ValuationPage: React.FC = () => {
             </div>
           )}
 
+          {/* Symbol, Exchange & Date Range Controls */}
+          <SymbolExchangeControls
+            symbol={symbol}
+            onSymbolChange={setSymbol}
+            exchange={exchange}
+            onExchangeChange={setExchange}
+            startDate={startDate}
+            onStartDateChange={setStartDate}
+            endDate={endDate}
+            onEndDateChange={setEndDate}
+            onRefreshData={handleRefreshData}
+            isRefreshingData={priceDataLoading}
+            maxDaysRange={999}
+            showDataInfo={true}
+            dataSource={dataSource}
+            dateRange={dateRange}
+            totalRecords={totalRecords}
+          />
+
           {/* Price Chart - Full Width at Top */}
           {priceData.length > 0 && (
             <div className="w-full">
@@ -413,11 +449,6 @@ const ValuationPage: React.FC = () => {
                   onTimeframeChange={setTimeframe}
                   bandIndicatorId={bandIndicatorId}
                   onBandIndicatorChange={setBandIndicatorId}
-                  symbol={symbol}
-                  onSymbolChange={setSymbol}
-                  isLoading={indicatorsLoading || zscoresLoading}
-                  onRefreshData={handleRefreshData}
-                  isRefreshingData={priceDataLoading}
                 />
               </div>
             )}

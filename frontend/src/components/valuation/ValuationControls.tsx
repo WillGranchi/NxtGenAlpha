@@ -5,8 +5,6 @@
 
 import React, { useState, useMemo } from 'react';
 import { ChevronDown, ChevronUp, Search, RefreshCw } from 'lucide-react';
-import { DateRangePicker } from '../DateRangePicker';
-import { TokenSelector } from '../TokenSelector';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { ValuationIndicator } from '../../hooks/useValuation';
@@ -35,11 +33,6 @@ interface ValuationControlsProps {
   onTimeframeChange: (timeframe: '1h' | '4h' | '6h' | '12h' | '1d' | '1w' | 'custom' | null) => void;
   bandIndicatorId: string | 'average' | null;
   onBandIndicatorChange: (indicatorId: string | 'average' | null) => void;
-  symbol: string;
-  onSymbolChange: (symbol: string) => void;
-  isLoading?: boolean;
-  onRefreshData?: () => Promise<void>;
-  isRefreshingData?: boolean;
 }
 
 export const ValuationControls: React.FC<ValuationControlsProps> = ({
@@ -66,11 +59,6 @@ export const ValuationControls: React.FC<ValuationControlsProps> = ({
   onTimeframeChange,
   bandIndicatorId,
   onBandIndicatorChange,
-  symbol,
-  onSymbolChange,
-  isLoading = false,
-  onRefreshData,
-  isRefreshingData = false,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
@@ -161,14 +149,6 @@ export const ValuationControls: React.FC<ValuationControlsProps> = ({
         <h2 className="text-xl font-semibold text-text-primary mb-4">Valuation Settings</h2>
       </div>
 
-      {/* Symbol Selector */}
-      <div>
-        <label className="block text-sm font-medium text-text-secondary mb-2">
-          Cryptocurrency
-        </label>
-        <TokenSelector selectedSymbol={symbol} onSymbolChange={onSymbolChange} />
-      </div>
-
       {/* Timeframe Presets */}
       <div>
         <label className="block text-sm font-medium text-text-secondary mb-2">
@@ -185,7 +165,7 @@ export const ValuationControls: React.FC<ValuationControlsProps> = ({
             { id: 'custom', label: 'Custom', supported: true },
           ] as const).map(({ id, label, supported }) => {
             const isActive = (timeframe === id) || (id === 'custom' && timeframe === null);
-            const isDisabled = isLoading || !supported;
+            const isDisabled = !supported;
             
             return (
               <button
@@ -225,23 +205,9 @@ export const ValuationControls: React.FC<ValuationControlsProps> = ({
 
       {/* Date Range */}
       <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-text-secondary">
-            Date Range
-          </label>
-          {onRefreshData && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={onRefreshData}
-              disabled={isRefreshingData}
-              className="flex items-center gap-2"
-            >
-              <RefreshCw className={`h-4 w-4 ${isRefreshingData ? 'animate-spin' : ''}`} />
-              {isRefreshingData ? 'Refreshing...' : 'Refresh Data'}
-            </Button>
-          )}
-        </div>
+        <label className="block text-sm font-medium text-text-secondary mb-2">
+          Date Range
+        </label>
         <DateRangePicker
           startDate={startDate}
           endDate={endDate}
@@ -346,8 +312,7 @@ export const ValuationControls: React.FC<ValuationControlsProps> = ({
           <select
             value={bandIndicatorId || ''}
             onChange={(e) => onBandIndicatorChange(e.target.value === '' ? null : (e.target.value as string | 'average'))}
-            disabled={isLoading}
-            className="w-full px-3 py-2 bg-bg-tertiary border border-border-default rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full px-3 py-2 bg-bg-tertiary border border-border-default rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           >
             {selectedIndicators.map((indicatorId) => {
               const indicator = availableIndicators.find((ind) => ind.id === indicatorId);
@@ -477,7 +442,6 @@ export const ValuationControls: React.FC<ValuationControlsProps> = ({
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => toggleIndicator(indicator.id)}
-                            disabled={isLoading}
                             className="mt-1 w-4 h-4 text-primary-500 focus:ring-primary-500 rounded border-border-default"
                           />
                           <div className="flex-1 min-w-0">
