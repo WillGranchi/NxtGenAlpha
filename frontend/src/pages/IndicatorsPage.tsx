@@ -664,8 +664,8 @@ const IndicatorsPage: React.FC = () => {
                     {error}
                   </div>
                 )}
-              </div>
-                  
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mt-6">
                   {/* Strategy Type */}
                   <div>
                     <label className="block text-sm font-medium text-text-secondary mb-2">
