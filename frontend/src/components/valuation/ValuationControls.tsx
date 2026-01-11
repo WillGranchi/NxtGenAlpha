@@ -5,6 +5,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { ChevronDown, ChevronUp, Search, RefreshCw } from 'lucide-react';
+import { DateRangePicker } from '../DateRangePicker';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { ValuationIndicator } from '../../hooks/useValuation';
@@ -211,14 +212,14 @@ export const ValuationControls: React.FC<ValuationControlsProps> = ({
         <DateRangePicker
           startDate={startDate}
           endDate={endDate}
-          onStartDateChange={(date) => {
+          onStartDateChange={(date: string) => {
             onStartDateChange(date);
             // When manually changing dates, set timeframe to custom
             if (timeframe !== null && timeframe !== 'custom') {
               onTimeframeChange(null);
             }
           }}
-          onEndDateChange={(date) => {
+          onEndDateChange={(date: string) => {
             onEndDateChange(date);
             // When manually changing dates, set timeframe to custom
             if (timeframe !== null && timeframe !== 'custom') {
