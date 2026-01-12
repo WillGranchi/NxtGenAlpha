@@ -638,8 +638,14 @@ export class TradingAPI {
     source?: string;
     error?: string;
   }> {
-    const response = await api.get('/api/data/coinglass-symbols');
-    return response.data;
+    const key = generateRequestKey('GET', '/api/data/coinglass-symbols', null, null);
+    
+    return getOrCreateRequest(key, async () => {
+      const response = await api.get('/api/data/coinglass-symbols', {
+        timeout: 30000, // 30 second timeout
+      });
+      return response.data;
+    });
   }
 
   /**
