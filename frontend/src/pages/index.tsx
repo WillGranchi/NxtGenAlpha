@@ -3,13 +3,13 @@
  */
 
 import React from 'react';
-import { Dashboard } from '../components/Dashboard';
+import { UnifiedDashboard } from '../components/dashboard/UnifiedDashboard';
 import ErrorBoundary from '../components/ErrorBoundary';
 
 const IndexPage: React.FC = () => {
   return (
     <ErrorBoundary>
-      <Dashboard />
+      <UnifiedDashboard />
     </ErrorBoundary>
   );
 };

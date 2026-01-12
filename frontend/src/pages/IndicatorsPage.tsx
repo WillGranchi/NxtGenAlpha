@@ -365,7 +365,7 @@ const IndicatorsPage: React.FC = () => {
           params: ind.parameters,
           show_on_chart: false,
         })),
-        expression: expression.trim(),
+        long_expression: expression.trim(),
         strategy_type: strategyType,
         initial_capital: initialCapital,
         start_date: startDate || undefined,

@@ -650,6 +650,7 @@ export class TradingAPI {
     start_date?: string;
     end_date?: string;
     exchange?: string;
+    interval?: string;
   }): Promise<{
     success: boolean;
     data: Array<{
