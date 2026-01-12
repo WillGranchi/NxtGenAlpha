@@ -125,7 +125,9 @@ export const UnifiedDashboard: React.FC = () => {
         // Limit cache size to prevent memory issues
         if (priceDataCacheRef.current.size > 10) {
           const firstKey = priceDataCacheRef.current.keys().next().value;
-          priceDataCacheRef.current.delete(firstKey);
+          if (firstKey !== undefined) {
+            priceDataCacheRef.current.delete(firstKey);
+          }
         }
         
         setPriceData(data);
