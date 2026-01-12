@@ -171,20 +171,13 @@ async def get_data_info(symbol: Optional[str] = Query(default="BTCUSDT", descrip
         data_info['symbol'] = symbol
         
         # Infer data source and quality from columns
-        # Full OHLCV with Volume indicates Yahoo Finance or Binance
-        # Close-only indicates CoinGecko
+        # CoinGlass provides full OHLCV data
         has_full_ohlcv = all(col in df.columns for col in ['Open', 'High', 'Low', 'Close'])
         if has_full_ohlcv and 'Volume' in df.columns:
-            # Yahoo Finance is primary source, but could also be Binance
-            # Check data range - Yahoo Finance typically has data from ~2014-2015 for BTC
-            data_start_year = df.index.min().year
-            if data_start_year >= 2014:
-                data_info['data_source'] = 'yahoo_finance'
-            else:
-                data_info['data_source'] = 'binance'
+            data_info['data_source'] = 'coinglass'
             data_info['data_quality'] = 'full_ohlcv'
         elif 'Close' in df.columns and not has_full_ohlcv:
-            data_info['data_source'] = 'coingecko'
+            data_info['data_source'] = 'coinglass'
             data_info['data_quality'] = 'close_only'
         else:
             data_info['data_source'] = 'unknown'
