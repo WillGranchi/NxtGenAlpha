@@ -220,19 +220,38 @@ export const FullCycleChart: React.FC<FullCycleChartProps> = memo(({
       });
     }
 
-    // 6. Add BTC Price last
+    // 6. Add BTC Price as candlestick chart
+    // Extract OHLC data from data points
+    const opens = data.map((d) => d.open || d.price);
+    const highs = data.map((d) => d.high || d.price);
+    const lows = data.map((d) => d.low || d.price);
+    const closes = data.map((d) => d.close || d.price);
+    
     plotData.push({
       x: dates,
-      y: prices,
-      type: 'scatter',
-      mode: 'lines',
+      open: opens,
+      high: highs,
+      low: lows,
+      close: closes,
+      type: 'candlestick',
       name: 'BTC Price',
       yaxis: 'y',
-      line: {
-        color: '#FFFFFF',
-        width: 2,
+      increasing: {
+        line: { color: '#10B981' }, // Green for bullish candles
+        fillcolor: '#10B981'
+      },
+      decreasing: {
+        line: { color: '#EF4444' }, // Red for bearish candles
+        fillcolor: '#EF4444'
       },
       showlegend: true,
+      hovertemplate: '<b>%{fullData.name}</b><br>' +
+        'Date: %{x}<br>' +
+        'Open: $%{open:,.2f}<br>' +
+        'High: $%{high:,.2f}<br>' +
+        'Low: $%{low:,.2f}<br>' +
+        'Close: $%{close:,.2f}<br>' +
+        '<extra></extra>',
     });
 
     // Add reference lines (horizontal lines at -3, -2, -1, 0, 1, 2, 3) - after all other traces

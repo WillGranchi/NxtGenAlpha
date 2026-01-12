@@ -996,6 +996,8 @@ export class TradingAPI {
     indicator_params?: Record<string, Record<string, any>>;
     start_date?: string;
     end_date?: string;
+    timeframe?: string;
+    exchange?: string;
     roc_days?: number;
     sdca_in?: number;
     sdca_out?: number;

@@ -16,6 +16,10 @@ export interface FullCycleIndicator {
 export interface FullCycleDataPoint {
   date: string;
   price: number;
+  open?: number;
+  high?: number;
+  low?: number;
+  close?: number;
   indicators: Record<string, { zscore: number }>;
 }
 
@@ -43,6 +47,12 @@ export interface UseFullCycleReturn {
   setStartDate: (date: string) => void;
   endDate: string;
   setEndDate: (date: string) => void;
+  
+  // Timeframe and exchange
+  timeframe: string;
+  setTimeframe: (timeframe: string) => void;
+  exchange: string;
+  setExchange: (exchange: string) => void;
   
   // ROC period
   rocDays: number;
@@ -132,6 +142,10 @@ export const useFullCycle = (): UseFullCycleReturn => {
   const [startDate, setStartDate] = useState<string>('2010-01-01');
   const [endDate, setEndDate] = useState<string>('');
   
+  // Timeframe and exchange
+  const [timeframe, setTimeframe] = useState<string>('1d');
+  const [exchange, setExchange] = useState<string>('Binance');
+  
   // ROC period
   const [rocDays, setRocDays] = useState<number>(7);
   
@@ -220,6 +234,8 @@ export const useFullCycle = (): UseFullCycleReturn => {
         indicator_params: Object.keys(indicatorParams).length > 0 ? indicatorParams : undefined,
         start_date: startDate || undefined,
         end_date: endDate || undefined,
+        timeframe: timeframe,
+        exchange: exchange,
         roc_days: rocDays,
         sdca_in: sdcaIn,
         sdca_out: sdcaOut,
@@ -249,7 +265,7 @@ export const useFullCycle = (): UseFullCycleReturn => {
         setZscoresLoading(false);
       }
     }
-    }, [selectedIndicators, indicatorParameters, startDate, endDate, rocDays, sdcaIn, sdcaOut, zscoreData.length]);
+    }, [selectedIndicators, indicatorParameters, startDate, endDate, timeframe, exchange, rocDays, sdcaIn, sdcaOut, zscoreData.length]);
   
   // Toggle indicator visibility
   const toggleIndicatorVisibility = useCallback((indicatorId: string) => {
@@ -358,7 +374,7 @@ export const useFullCycle = (): UseFullCycleReturn => {
       setZscoresError(errorMsg);
       // Don't clear data on error (optimistic UI: keep showing cached data)
     }
-  }, [selectedIndicators, indicatorParameters, startDate, endDate, rocDays, sdcaIn, sdcaOut]);
+  }, [selectedIndicators, indicatorParameters, startDate, endDate, timeframe, exchange, rocDays, sdcaIn, sdcaOut]);
   
   // Set default end date to today
   useEffect(() => {
@@ -414,6 +430,12 @@ export const useFullCycle = (): UseFullCycleReturn => {
     setStartDate,
     endDate,
     setEndDate,
+    
+    // Timeframe and exchange
+    timeframe,
+    setTimeframe,
+    exchange,
+    setExchange,
     
     // ROC period
     rocDays,

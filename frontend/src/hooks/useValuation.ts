@@ -15,6 +15,10 @@ export interface ValuationIndicator {
 export interface ValuationDataPoint {
   date: string;
   price: number;
+  open?: number;
+  high?: number;
+  low?: number;
+  close?: number;
   indicators: Record<string, { value: number; zscore: number }>;
 }
 

@@ -833,7 +833,8 @@ def fetch_crypto_data_from_coinglass(
     symbol: str = "BTCUSDT",
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
-    exchange: str = "Binance"
+    exchange: str = "Binance",
+    interval: str = "1d"
 ) -> pd.DataFrame:
     """
     Fetch cryptocurrency historical data from CoinGlass API.
@@ -842,6 +843,8 @@ def fetch_crypto_data_from_coinglass(
         symbol: Trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
         start_date: Start date for historical data (defaults to 5 years back or token launch)
         end_date: End date (defaults to today)
+        exchange: Exchange name (e.g., "Binance", "Coinbase", "OKX")
+        interval: Timeframe/interval (1h, 4h, 1d, 1w, 1M) - default "1d"
         
     Returns:
         DataFrame with OHLCV data (Open, High, Low, Close, Volume)
@@ -873,13 +876,13 @@ def fetch_crypto_data_from_coinglass(
             logger.warning(f"CoinGlass API connection test error: {conn_test_error}, but continuing with data fetch attempt...")
         
         # Fetch price history
-        # Use "1d" (daily) interval - CoinGlass supports this for all tiers
+        # Use provided interval (default "1d" for daily)
         # For Hobbyist tier, minimum is 4h, but 1d is fine
         df = client.get_price_history(
             symbol=symbol,
             start_date=start_date,
             end_date=end_date,
-            interval="1d",  # Daily interval for price data
+            interval=interval,
             exchange=exchange
         )
         
@@ -1329,6 +1332,7 @@ def fetch_crypto_data_smart(
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
     exchange: str = "Binance",
+    interval: str = "1d",
     use_cache: bool = True,
     cross_validate: bool = False,  # Disabled by default when using only CoinGlass
     include_additional_metrics: bool = False
@@ -1344,6 +1348,7 @@ def fetch_crypto_data_smart(
         start_date: Start date for historical data (defaults to 5 years back or token launch)
         end_date: End date (defaults to today)
         exchange: Exchange name (e.g., "Binance", "Coinbase", "OKX")
+        interval: Timeframe/interval (1h, 4h, 1d, 1w, 1M) - default "1d"
         use_cache: Whether to use cached data if fresh (not currently used, always fetches fresh)
         cross_validate: Whether to cross-validate (disabled when using only CoinGlass)
         include_additional_metrics: Whether to fetch additional metrics (funding rates, OI, etc.)
@@ -1376,7 +1381,8 @@ def fetch_crypto_data_smart(
             symbol=symbol,
             start_date=start_date,
             end_date=end_date,
-            exchange=exchange
+            exchange=exchange,
+            interval=interval
         )
         
         if df_coinglass.empty:

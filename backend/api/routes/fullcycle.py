@@ -100,6 +100,8 @@ async def calculate_fullcycle_zscores(
     ),
     start_date: Optional[str] = Body(default=None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Body(default=None, description="End date (YYYY-MM-DD)"),
+    timeframe: Optional[str] = Body(default="1d", description="Timeframe/interval (1h, 4h, 1d, 1w, 1M)"),
+    exchange: Optional[str] = Body(default="Binance", description="Exchange name (e.g., Binance, Coinbase)"),
     roc_days: int = Body(default=7, description="ROC (Rate of Change) period in days"),
     sdca_in: float = Body(default=-2.0, description="SDCA In threshold (oversold, DCA in signal)"),
     sdca_out: float = Body(default=2.0, description="SDCA Out threshold (overbought, DCA out signal)"),
@@ -129,10 +131,14 @@ async def calculate_fullcycle_zscores(
             # Fetch fresh data from CoinGlass (primary) with Yahoo Finance and CoinGecko fallbacks
             start_date_dt = pd.to_datetime(start_date) if start_date else None
             end_date_dt = pd.to_datetime(end_date) if end_date else None
+            # Map timeframe to interval for CoinGlass API
+            interval = timeframe or "1d"
             df, data_source, quality_metrics = fetch_crypto_data_smart(
                 symbol=symbol,
                 start_date=start_date_dt,
                 end_date=end_date_dt,
+                exchange=exchange or "Binance",
+                interval=interval,
                 use_cache=False,  # Force fresh fetch
                 cross_validate=False
             )
@@ -142,10 +148,14 @@ async def calculate_fullcycle_zscores(
             try:
                 start_date_dt = pd.to_datetime(start_date) if start_date else None
                 end_date_dt = pd.to_datetime(end_date) if end_date else None
+                # Map timeframe to interval for CoinGlass API
+                interval = timeframe or "1d"
                 df, data_source, quality_metrics = fetch_crypto_data_smart(
                     symbol=symbol,
                     start_date=start_date_dt,
                     end_date=end_date_dt,
+                    exchange=exchange or "Binance",
+                    interval=interval,
                     use_cache=True,  # Use cache if available
                     cross_validate=False
                 )
@@ -272,9 +282,13 @@ async def calculate_fullcycle_zscores(
             all_df = pd.DataFrame(all_series).T
             overall_avg = all_df.mean(axis=1)
         
-        # Prepare response data
+        # Prepare response data with OHLC
         dates = df.index
         prices = df['Close'].values
+        opens = df['Open'].values if 'Open' in df.columns else prices
+        highs = df['High'].values if 'High' in df.columns else prices
+        lows = df['Low'].values if 'Low' in df.columns else prices
+        closes = df['Close'].values
         
         # Validate price data
         if len(prices) == 0:
@@ -302,6 +316,10 @@ async def calculate_fullcycle_zscores(
             data_point: Dict[str, Any] = {
                 'date': date.strftime('%Y-%m-%d'),
                 'price': price,
+                'open': float(opens[i]) if i < len(opens) else price,
+                'high': float(highs[i]) if i < len(highs) else price,
+                'low': float(lows[i]) if i < len(lows) else price,
+                'close': float(closes[i]) if i < len(closes) else price,
                 'indicators': {}
             }
             

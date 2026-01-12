@@ -17,6 +17,8 @@ interface SymbolExchangeControlsProps {
   onStartDateChange: (date: string) => void;
   endDate: string;
   onEndDateChange: (date: string) => void;
+  timeframe?: string;
+  onTimeframeChange?: (timeframe: string) => void;
   onRefreshData: () => Promise<void>;
   isRefreshingData?: boolean;
   loading?: boolean;
@@ -37,6 +39,8 @@ export const SymbolExchangeControls: React.FC<SymbolExchangeControlsProps> = ({
   onStartDateChange,
   endDate,
   onEndDateChange,
+  timeframe = '1d',
+  onTimeframeChange,
   onRefreshData,
   isRefreshingData = false,
   loading = false,
@@ -138,8 +142,8 @@ export const SymbolExchangeControls: React.FC<SymbolExchangeControlsProps> = ({
         </div>
       </div>
 
-      {/* Symbol and Exchange Selectors */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      {/* Symbol, Exchange, and Timeframe Selectors */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <div>
           <label className="block text-sm font-medium text-text-secondary mb-2">
             Trading Pair (Symbol)
@@ -184,6 +188,24 @@ export const SymbolExchangeControls: React.FC<SymbolExchangeControlsProps> = ({
             </select>
           )}
         </div>
+        {onTimeframeChange && (
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-2">
+              Timeframe
+            </label>
+            <select
+              value={timeframe}
+              onChange={(e) => onTimeframeChange(e.target.value)}
+              className="w-full px-3 py-2 bg-bg-primary border border-border-default rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="1h">1 Hour</option>
+              <option value="4h">4 Hours</option>
+              <option value="1d">1 Day</option>
+              <option value="1w">1 Week</option>
+              <option value="1M">1 Month</option>
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Date Range */}

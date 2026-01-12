@@ -49,21 +49,36 @@ export const ValuationChart: React.FC<ValuationChartProps> = memo(({
     // Prepare plot data
     const plotData: any[] = [];
 
-    // Price line (right Y-axis, log scale) - Match Full Cycle Model style
+    // Price as candlestick chart (right Y-axis, log scale) - Match TradingView style
+    // Extract OHLC data from data points
+    const opens = data.map((d) => (d as any).open || d.price);
+    const highs = data.map((d) => (d as any).high || d.price);
+    const lows = data.map((d) => (d as any).low || d.price);
+    const closes = data.map((d) => (d as any).close || d.price);
+    
     plotData.push({
       x: dates,
-      y: prices,
-      type: 'scatter',
-      mode: 'lines',
+      open: opens,
+      high: highs,
+      low: lows,
+      close: closes,
+      type: 'candlestick',
       name: 'BTC Price',
       yaxis: 'y2',
-      line: {
-        color: '#FFFFFF', // White like Full Cycle Model
-        width: 2,
+      increasing: {
+        line: { color: '#10B981' }, // Green for bullish candles
+        fillcolor: '#10B981'
+      },
+      decreasing: {
+        line: { color: '#EF4444' }, // Red for bearish candles
+        fillcolor: '#EF4444'
       },
       hovertemplate: '<b>%{fullData.name}</b><br>' +
         'Date: %{x}<br>' +
-        'Price: $%{y:,.2f}<br>' +
+        'Open: $%{open:,.2f}<br>' +
+        'High: $%{high:,.2f}<br>' +
+        'Low: $%{low:,.2f}<br>' +
+        'Close: $%{close:,.2f}<br>' +
         '<extra></extra>',
     });
 
