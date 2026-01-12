@@ -10,7 +10,7 @@ import numpy as np
 from datetime import datetime
 from sqlalchemy.orm import Session
 
-from backend.core.data_loader import load_crypto_data, update_crypto_data, fetch_crypto_data_smart
+from backend.core.data_loader import load_crypto_data, update_crypto_data, fetch_crypto_data_smart, load_crypto_data_from_database
 from backend.core.fullcycle_indicators import (
     FULL_CYCLE_INDICATORS,
     get_fullcycle_indicator
@@ -124,46 +124,57 @@ async def calculate_fullcycle_zscores(
         # Load BTC data (hardcoded to BTCUSDT)
         symbol = "BTCUSDT"
         
-        # Use CoinGlass as exclusive data source
-        # Force refresh if requested, otherwise try to use smart fetch with cache
+        # Optimize data loading: Try database first (fastest), then CoinGlass API
+        start_date_dt = pd.to_datetime(start_date) if start_date else None
+        end_date_dt = pd.to_datetime(end_date) if end_date else None
+        interval = timeframe or "1d"
+        exchange_name = exchange or "Binance"
+        
         if force_refresh:
             logger.info(f"Force refreshing {symbol} data from CoinGlass API...")
-            # Fetch fresh data from CoinGlass API
-            start_date_dt = pd.to_datetime(start_date) if start_date else None
-            end_date_dt = pd.to_datetime(end_date) if end_date else None
-            # Map timeframe to interval for CoinGlass API
-            interval = timeframe or "1d"
+            # Force fresh fetch from CoinGlass API
             df, data_source, quality_metrics = fetch_crypto_data_smart(
                 symbol=symbol,
                 start_date=start_date_dt,
                 end_date=end_date_dt,
-                exchange=exchange or "Binance",
+                exchange=exchange_name,
                 interval=interval,
                 use_cache=False,  # Force fresh fetch
                 cross_validate=False
             )
             logger.info(f"Fetched data from {data_source}, quality score: {quality_metrics.get('quality_score', 'N/A')}")
         else:
-            # Try to use CoinGlass with cache, fallback to CSV if CoinGlass unavailable
-            try:
-                start_date_dt = pd.to_datetime(start_date) if start_date else None
-                end_date_dt = pd.to_datetime(end_date) if end_date else None
-                # Map timeframe to interval for CoinGlass API
-                interval = timeframe or "1d"
-                df, data_source, quality_metrics = fetch_crypto_data_smart(
-                    symbol=symbol,
-                    start_date=start_date_dt,
-                    end_date=end_date_dt,
-                    exchange=exchange or "Binance",
-                    interval=interval,
-                    use_cache=True,  # Use cache if available
-                    cross_validate=False
-                )
-                logger.info(f"Using data from {data_source} (cached if available)")
-            except Exception as e:
-                logger.warning(f"Failed to fetch from CoinGlass API, falling back to CSV: {e}")
-                # Fallback to CSV if CoinGlass API fails
-                df = load_crypto_data(symbol=symbol)
+            # Try database first for better performance
+            df = load_crypto_data_from_database(
+                symbol=symbol,
+                exchange=exchange_name,
+                start_date=start_date_dt,
+                end_date=end_date_dt
+            )
+            
+            if df is not None and len(df) > 0:
+                data_source = "database"
+                quality_metrics = {"quality_score": 1.0, "source": "database"}
+                logger.info(f"Loaded {len(df)} rows from database for {symbol} on {exchange_name}")
+            else:
+                # Fallback to CoinGlass API if database doesn't have data
+                try:
+                    df, data_source, quality_metrics = fetch_crypto_data_smart(
+                        symbol=symbol,
+                        start_date=start_date_dt,
+                        end_date=end_date_dt,
+                        exchange=exchange_name,
+                        interval=interval,
+                        use_cache=True,  # Use cache if available
+                        cross_validate=False
+                    )
+                    logger.info(f"Using data from {data_source} (cached if available)")
+                except Exception as e:
+                    logger.warning(f"Failed to fetch from CoinGlass API, falling back to CSV: {e}")
+                    # Fallback to CSV if CoinGlass API fails
+                    df = load_crypto_data(symbol=symbol, exchange=exchange_name)
+                    data_source = "csv"
+                    quality_metrics = {"quality_score": 0.8, "source": "csv"}
         
         # Determine the actual date range we have
         actual_start = df.index.min()

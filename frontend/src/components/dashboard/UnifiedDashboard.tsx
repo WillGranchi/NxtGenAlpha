@@ -59,6 +59,9 @@ export const UnifiedDashboard: React.FC = () => {
     return names;
   }, [strategySelection]);
 
+  // Cache for price data to avoid redundant fetches
+  const priceDataCacheRef = React.useRef<Map<string, EquityDataPoint[]>>(new Map());
+
   // Load price data when signals are calculated
   React.useEffect(() => {
     if (combinedSignals && combinedSignals.combined_signals.dates.length > 0) {
@@ -71,15 +74,24 @@ export const UnifiedDashboard: React.FC = () => {
       return;
     }
 
+    // Get date range from signals
+    const dates = combinedSignals.combined_signals.dates;
+    const firstDate = dates[0];
+    const lastDate = dates[dates.length - 1];
+    
+    // Check cache first
+    const cacheKey = `${firstDate}_${lastDate}`;
+    const cachedData = priceDataCacheRef.current.get(cacheKey);
+    if (cachedData && cachedData.length > 0) {
+      console.debug('[UnifiedDashboard] Using cached price data');
+      setPriceData(cachedData);
+      return;
+    }
+
     try {
       setPriceDataLoading(true);
       
-      // Get date range from signals
-      const dates = combinedSignals.combined_signals.dates;
-      const firstDate = dates[0];
-      const lastDate = dates[dates.length - 1];
-      
-      // Fetch actual price data from CoinGlass API
+      // Fetch actual price data from CoinGlass API (uses caching internally)
       const priceHistory = await TradingAPI.getPriceHistory({
         symbol: 'BTCUSDT',
         exchange: 'Binance',
@@ -107,6 +119,15 @@ export const UnifiedDashboard: React.FC = () => {
             Shares: 0
           };
         });
+        
+        // Cache the result
+        priceDataCacheRef.current.set(cacheKey, data);
+        // Limit cache size to prevent memory issues
+        if (priceDataCacheRef.current.size > 10) {
+          const firstKey = priceDataCacheRef.current.keys().next().value;
+          priceDataCacheRef.current.delete(firstKey);
+        }
+        
         setPriceData(data);
       } else {
         // Fallback if API call fails

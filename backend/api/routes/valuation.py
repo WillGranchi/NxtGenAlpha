@@ -10,7 +10,7 @@ import numpy as np
 from datetime import datetime
 from sqlalchemy.orm import Session
 
-from backend.core.data_loader import load_crypto_data, fetch_crypto_data_smart
+from backend.core.data_loader import load_crypto_data, fetch_crypto_data_smart, load_crypto_data_from_database
 from backend.core.indicators import (
     rsi, cci, stochastic, williams_r, macd, roc, momentum, chande_momentum_oscillator,
     bb_percent, tsi, ema, zscore
@@ -463,32 +463,50 @@ async def get_valuation_data(
         ValuationDataResponse: Time series data with price and indicator values
     """
     try:
-        # Load price data from CoinGlass API (primary) with fallbacks
-        try:
-            start_date_dt = pd.to_datetime(start_date) if start_date else None
-            end_date_dt = pd.to_datetime(end_date) if end_date else None
-            df, data_source, quality_metrics = fetch_crypto_data_smart(
-                symbol=symbol,
-                start_date=start_date_dt,
-                end_date=end_date_dt,
-                exchange=exchange,
-                use_cache=True,  # Use cache if available
-                cross_validate=False
-            )
-            logger.info(f"Using price data from {data_source} for valuation data endpoint")
-        except Exception as e:
-            logger.warning(f"Failed to fetch from CoinGlass API, falling back to CSV: {e}")
-            # Fallback to CSV if CoinGlass API fails
-            df = load_crypto_data(symbol=symbol, exchange=exchange)
-            
-            # Filter by date range if provided
-            if start_date:
-                start_date_dt = pd.to_datetime(start_date)
-                df = df[df.index >= start_date_dt]
-            
-            if end_date:
-                end_date_dt = pd.to_datetime(end_date)
-                df = df[df.index <= end_date_dt]
+        # Load price data - try database first (fastest), then CoinGlass API
+        start_date_dt = pd.to_datetime(start_date) if start_date else None
+        end_date_dt = pd.to_datetime(end_date) if end_date else None
+        
+        # First try database (optimized for speed)
+        df = load_crypto_data_from_database(
+            symbol=symbol,
+            exchange=exchange,
+            start_date=start_date_dt,
+            end_date=end_date_dt
+        )
+        
+        if df is not None and len(df) > 0:
+            data_source = "database"
+            quality_metrics = {"quality_score": 1.0, "source": "database"}
+            logger.info(f"Loaded {len(df)} rows from database for {symbol} on {exchange}")
+        else:
+            # Fallback to CoinGlass API if database doesn't have data
+            try:
+                df, data_source, quality_metrics = fetch_crypto_data_smart(
+                    symbol=symbol,
+                    start_date=start_date_dt,
+                    end_date=end_date_dt,
+                    exchange=exchange,
+                    interval="1d",
+                    use_cache=True,  # Use cache if available
+                    cross_validate=False
+                )
+                logger.info(f"Using price data from {data_source} for valuation data endpoint")
+            except Exception as e:
+                logger.warning(f"Failed to fetch from CoinGlass API, falling back to CSV: {e}")
+                # Fallback to CSV if CoinGlass API fails
+                df = load_crypto_data(symbol=symbol, exchange=exchange)
+                data_source = "csv"
+                quality_metrics = {"quality_score": 0.8, "source": "csv"}
+                
+                # Filter by date range if provided
+                if start_date:
+                    start_date_dt = pd.to_datetime(start_date)
+                    df = df[df.index >= start_date_dt]
+                
+                if end_date:
+                    end_date_dt = pd.to_datetime(end_date)
+                    df = df[df.index <= end_date_dt]
         
         if len(df) == 0:
             raise HTTPException(

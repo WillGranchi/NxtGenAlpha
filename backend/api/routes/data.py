@@ -10,7 +10,7 @@ from backend.core.data_loader import (
     load_btc_data, load_crypto_data, get_data_summary, validate_data, 
     update_btc_data, update_crypto_data, get_last_update_time,
     get_available_symbols, fetch_crypto_data_smart, build_full_historical_dataset,
-    ensure_full_btc_history
+    ensure_full_btc_history, load_crypto_data_from_database
 )
 from backend.core.data_quality import validate_data_quality
 from backend.core.query_optimization import verify_price_data_indexes, get_index_statistics
@@ -362,7 +362,8 @@ async def get_price_history(
     symbol: Optional[str] = Query(default="BTCUSDT", description="Trading pair symbol (e.g., BTCUSDT, ETHUSDT)"),
     start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)"),
-    exchange: Optional[str] = Query(default="Binance", description="Exchange name (e.g., Binance, Coinbase, OKX)")
+    exchange: Optional[str] = Query(default="Binance", description="Exchange name (e.g., Binance, Coinbase, OKX)"),
+    interval: Optional[str] = Query(default="1d", description="Timeframe/interval (1h, 4h, 1d, 1w, 1M)")
 ) -> Dict[str, Any]:
     """
     Get OHLC price history data from CoinGlass API.
@@ -383,15 +384,33 @@ async def get_price_history(
         end_date_dt = pd.to_datetime(end_date) if end_date else None
         
         # Fetch data from CoinGlass API (only source)
-        logger.info(f"Fetching price history for {symbol} on {exchange} from CoinGlass...")
-        df, data_source, quality_metrics = fetch_crypto_data_smart(
+        # Try database first for better performance, then CoinGlass API if needed
+        logger.info(f"Fetching price history for {symbol} on {exchange} (interval: {interval})...")
+        
+        # First try to load from database (fastest)
+        df = load_crypto_data_from_database(
             symbol=symbol,
-            start_date=start_date_dt,
-            end_date=end_date_dt,
             exchange=exchange,
-            use_cache=True,  # Use cache if available
-            cross_validate=False
+            start_date=start_date_dt,
+            end_date=end_date_dt
         )
+        
+        if df is not None and len(df) > 0:
+            data_source = "database"
+            quality_metrics = {"quality_score": 1.0, "source": "database"}
+            logger.info(f"Loaded {len(df)} rows from database for {symbol} on {exchange}")
+        else:
+            # Fallback to CoinGlass API if database doesn't have data
+            logger.info(f"Database cache miss, fetching from CoinGlass API...")
+            df, data_source, quality_metrics = fetch_crypto_data_smart(
+                symbol=symbol,
+                start_date=start_date_dt,
+                end_date=end_date_dt,
+                exchange=exchange,
+                interval=interval or "1d",
+                use_cache=True,  # Use cache if available
+                cross_validate=False
+            )
         
         if df is None or len(df) == 0:
             raise HTTPException(

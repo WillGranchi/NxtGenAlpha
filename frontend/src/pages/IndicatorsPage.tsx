@@ -153,40 +153,43 @@ const IndicatorsPage: React.FC = () => {
         }
         
         // Then load full history in background (non-blocking)
-        setTimeout(async () => {
-          try {
-            const fullResponse = await TradingAPI.getValuationData({
-              symbol: internalSymbol,
-              indicators: [],
-              start_date: startDate || undefined,
-              end_date: endDate || undefined,
-              exchange: exchange,
-            });
-            
-            if (fullResponse.success && fullResponse.data) {
-              const fullData = fullResponse.data.map((d) => ({
-                Date: d.date,
-                Price: d.price,
-                Position: 0,
-                Portfolio_Value: d.price,
-                Capital: 0,
-                Shares: 0,
-              }));
-              setBasePriceData(fullData);
-              // Update data info
-              if (fullResponse.data.length > 0) {
-                setDataSource('coinglass');
-                setDateRange({
-                  start: fullResponse.data[0].date,
-                  end: fullResponse.data[fullResponse.data.length - 1].date,
-                });
-                setTotalRecords(fullResponse.data.length);
+        // Use requestAnimationFrame to ensure UI is responsive first
+        requestAnimationFrame(() => {
+          setTimeout(async () => {
+            try {
+              const fullResponse = await TradingAPI.getValuationData({
+                symbol: internalSymbol,
+                indicators: [],
+                start_date: startDate || undefined,
+                end_date: endDate || undefined,
+                exchange: exchange,
+              });
+              
+              if (fullResponse.success && fullResponse.data) {
+                const fullData = fullResponse.data.map((d) => ({
+                  Date: d.date,
+                  Price: d.price,
+                  Position: 0,
+                  Portfolio_Value: d.price,
+                  Capital: 0,
+                  Shares: 0,
+                }));
+                setBasePriceData(fullData);
+                // Update data info
+                if (fullResponse.data.length > 0) {
+                  setDataSource('coinglass');
+                  setDateRange({
+                    start: fullResponse.data[0].date,
+                    end: fullResponse.data[fullResponse.data.length - 1].date,
+                  });
+                  setTotalRecords(fullResponse.data.length);
+                }
               }
+            } catch (fullErr) {
+              console.warn('Failed to load full history:', fullErr);
             }
-          } catch (fullErr) {
-            console.warn('Failed to load full history:', fullErr);
-          }
-        }, 100);
+          }, 500); // Increased delay to ensure recent data is displayed first
+        });
         
         return;
       }

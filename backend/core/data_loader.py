@@ -160,22 +160,28 @@ def load_crypto_data_from_database(
     
     try:
         with SessionLocal() as session:
-            # Build query
+            # Build optimized query using composite index (symbol, exchange, date)
+            # This should use idx_price_data_symbol_exchange_date index
             query = session.query(PriceData).filter(
                 PriceData.symbol == symbol,
                 PriceData.exchange == exchange
             )
             
-            # Apply date filters if provided
+            # Apply date filters if provided (these should use the composite index)
             if start_date:
                 query = query.filter(PriceData.date >= start_date)
             if end_date:
                 query = query.filter(PriceData.date <= end_date)
             
-            # Order by date
-            query = query.order_by(PriceData.date)
+            # Order by date (indexed column)
+            query = query.order_by(PriceData.date.asc())
             
-            # Execute query
+            # Use limit for very large date ranges to prevent memory issues
+            # If no date filters, limit to recent data
+            if not start_date and not end_date:
+                query = query.limit(10000)  # Limit to 10k most recent records
+            
+            # Execute query - fetch all at once for better performance
             results = query.all()
             
             if not results:

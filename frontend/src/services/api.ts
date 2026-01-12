@@ -644,6 +644,7 @@ export class TradingAPI {
 
   /**
    * Get price history (OHLC) data from CoinGlass API.
+   * Uses local storage caching for recent data to improve performance.
    */
   static async getPriceHistory(params: {
     symbol?: string;
@@ -669,11 +670,54 @@ export class TradingAPI {
     total_records: number;
     quality_metrics?: Record<string, any>;
   }> {
-    const response: AxiosResponse<any> = await api.get('/api/data/price-history', {
-      params,
-      timeout: 180000, // 3 minutes for CoinGlass API calls
+    // Generate cache key
+    const cacheKey = `price_history_${params.symbol}_${params.exchange}_${params.start_date}_${params.end_date}_${params.interval}`;
+    
+    // Check local storage cache (TTL: 5 minutes for recent data, 1 hour for historical)
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const { data, timestamp, ttl } = JSON.parse(cached);
+        const age = Date.now() - timestamp;
+        const isRecent = params.end_date && new Date(params.end_date) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // Last 7 days
+        const cacheTTL = isRecent ? 5 * 60 * 1000 : 60 * 60 * 1000; // 5 min or 1 hour
+        
+        if (age < cacheTTL) {
+          console.debug(`[API] Price history cache hit for ${cacheKey.substring(0, 50)}...`);
+          return data;
+        } else {
+          localStorage.removeItem(cacheKey);
+        }
+      }
+    } catch (e) {
+      // Ignore cache errors
+    }
+    
+    const key = generateRequestKey('GET', '/api/data/price-history', params, null);
+    
+    return getOrCreateRequest(key, async () => {
+      const response: AxiosResponse<any> = await api.get('/api/data/price-history', {
+        params,
+        timeout: 180000, // 3 minutes for CoinGlass API calls
+      });
+      
+      // Cache successful responses
+      if (response.data.success) {
+        try {
+          const isRecent = params.end_date && new Date(params.end_date) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+          const ttl = isRecent ? 5 * 60 * 1000 : 60 * 60 * 1000;
+          localStorage.setItem(cacheKey, JSON.stringify({
+            data: response.data,
+            timestamp: Date.now(),
+            ttl
+          }));
+        } catch (e) {
+          // Ignore cache errors
+        }
+      }
+      
+      return response.data;
     });
-    return response.data;
   }
 
   /**
