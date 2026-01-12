@@ -103,9 +103,9 @@ def calculate_nupl(df: pd.DataFrame) -> pd.Series:
                 logger.info(f"Using real NUPL data from Glassnode: {len(nupl_data)} data points")
                 return aligned.fillna(0.0)
             else:
-                logger.warning("Glassnode NUPL data has too many gaps, falling back to stub data")
+                raise ValueError("Glassnode NUPL data has too many gaps. Data quality insufficient.")
         else:
-            logger.warning("No NUPL data from Glassnode, falling back to stub data")
+            raise ValueError("No NUPL data returned from Glassnode API.")
     except Exception as e:
         # No fallback - require Glassnode API
         logger.error(f"Error fetching NUPL from Glassnode: {e}")
@@ -148,9 +148,9 @@ def calculate_bitcoin_thermocap(df: pd.DataFrame) -> pd.Series:
                 logger.info(f"Using real Bitcoin Thermocap data from Glassnode: {len(thermocap_data)} data points")
                 return aligned.fillna(0.0)
             else:
-                logger.warning("Glassnode Thermocap data has too many gaps, falling back to stub data")
+                raise ValueError("Glassnode Bitcoin Thermocap data has too many gaps. Data quality insufficient.")
         else:
-            logger.warning("No Thermocap data from Glassnode, falling back to stub data")
+            raise ValueError("No Bitcoin Thermocap data returned from Glassnode API.")
     except Exception as e:
         # No fallback - require Glassnode API
         logger.error(f"Error fetching Bitcoin Thermocap from Glassnode: {e}")
@@ -192,9 +192,9 @@ def calculate_cvdd(df: pd.DataFrame) -> pd.Series:
                 logger.info(f"Using real CVDD data from Glassnode: {len(cvdd_data)} data points")
                 return aligned.fillna(0.0)
             else:
-                logger.warning("Glassnode CVDD data has too many gaps, falling back to stub data")
+                raise ValueError("Glassnode CVDD data has too many gaps. Data quality insufficient.")
         else:
-            logger.warning("No CVDD data from Glassnode, falling back to stub data")
+            raise ValueError("No CVDD data returned from Glassnode API.")
     except Exception as e:
         # No fallback - require Glassnode API
         logger.error(f"Error fetching CVDD from Glassnode: {e}")
@@ -237,9 +237,9 @@ def calculate_puell_multiple(df: pd.DataFrame) -> pd.Series:
                 logger.info(f"Using real Puell Multiple data from Glassnode: {len(puell_data)} data points")
                 return aligned.fillna(1.0)
             else:
-                logger.warning("Glassnode Puell Multiple data has too many gaps, falling back to stub data")
+                raise ValueError("Glassnode Puell Multiple data has too many gaps. Data quality insufficient.")
         else:
-            logger.warning("No Puell Multiple data from Glassnode, falling back to stub data")
+            raise ValueError("No Puell Multiple data returned from Glassnode API.")
     except Exception as e:
         # No fallback - require Glassnode API
         logger.error(f"Error fetching Puell Multiple from Glassnode: {e}")
@@ -281,9 +281,9 @@ def calculate_reserve_risk(df: pd.DataFrame) -> pd.Series:
                 logger.info(f"Using real Reserve Risk data from Glassnode: {len(reserve_risk_data)} data points")
                 return aligned.fillna(0.02)
             else:
-                logger.warning("Glassnode Reserve Risk data has too many gaps, falling back to stub data")
+                raise ValueError("Glassnode Reserve Risk data has too many gaps. Data quality insufficient.")
         else:
-            logger.warning("No Reserve Risk data from Glassnode, falling back to stub data")
+            raise ValueError("No Reserve Risk data returned from Glassnode API.")
     except Exception as e:
         # No fallback - require Glassnode API
         logger.error(f"Error fetching Reserve Risk from Glassnode: {e}")
@@ -325,9 +325,9 @@ def calculate_bitcoin_days_destroyed(df: pd.DataFrame) -> pd.Series:
                 logger.info(f"Using real Bitcoin Days Destroyed data from Glassnode: {len(bdd_data)} data points")
                 return aligned.fillna(0.0)
             else:
-                logger.warning("Glassnode BDD data has too many gaps, falling back to stub data")
+                raise ValueError("Glassnode Bitcoin Days Destroyed data has too many gaps. Data quality insufficient.")
         else:
-            logger.warning("No BDD data from Glassnode, falling back to stub data")
+            raise ValueError("No Bitcoin Days Destroyed data returned from Glassnode API.")
     except Exception as e:
         # No fallback - require Glassnode API
         logger.error(f"Error fetching Bitcoin Days Destroyed from Glassnode: {e}")

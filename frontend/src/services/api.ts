@@ -303,7 +303,6 @@ export interface IndicatorConfig {
 export interface ModularBacktestRequest {
   indicators: IndicatorConfig[];
   strategy_type?: 'long_cash' | 'long_short';
-  expression?: string;  // Legacy field, use long_expression/cash_expression/short_expression instead
   long_expression?: string;  // Expression for when to go LONG
   cash_expression?: string;  // Expression for when to go to CASH (used in long_cash mode)
   short_expression?: string;  // Expression for when to go SHORT (used in long_short mode)
@@ -328,7 +327,6 @@ export interface ModularBacktestResponse {
   info: {
     indicators: IndicatorConfig[];
     strategy_type?: 'long_cash' | 'long_short';
-    expression?: string;  // Legacy or combined representation
     long_expression?: string;
     cash_expression?: string;
     short_expression?: string;
@@ -394,7 +392,6 @@ export interface SaveStrategyRequest {
   description?: string;
   indicators: IndicatorConfig[];
   expressions: {
-    expression?: string;
     long_expression?: string;
     cash_expression?: string;
     short_expression?: string;
@@ -408,7 +405,6 @@ export interface UpdateStrategyRequest {
   description?: string;
   indicators?: IndicatorConfig[];
   expressions?: {
-    expression?: string;
     long_expression?: string;
     cash_expression?: string;
     short_expression?: string;

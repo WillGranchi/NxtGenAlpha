@@ -54,9 +54,8 @@ def calculate_bitcoin_thermocap_zscore(df: pd.DataFrame, thermocaplen: int = 19,
     Returns:
         Pandas Series with Bitcoin Thermocap z-score values
         
-    Note: Currently uses stub data. Requires Glassnode API for real on-chain data.
+    Note: Uses Glassnode API for real on-chain data via fundamental_indicators module.
     """
-    logger.warning("Using stub Bitcoin Thermocap data - replace with real on-chain data source (Glassnode API recommended)")
     thermocap_data = calculate_bitcoin_thermocap(df)
     thermocap_log = np.log2(thermocap_data.clip(lower=0.1))  # Avoid log(0)
     thermocap_normalized = (thermocap_log + thermocapmn) * thermocapscl
@@ -96,9 +95,8 @@ def calculate_cvdd_zscore(df: pd.DataFrame, cvddlen: int = 19, cvddmn: float = -
     Returns:
         Pandas Series with CVDD z-score values
         
-    Note: Currently uses stub data. Requires Glassnode API for real on-chain data.
+    Note: Uses Glassnode API for real on-chain data via fundamental_indicators module.
     """
-    logger.warning("Using stub CVDD data - replace with real on-chain data source (Glassnode API recommended)")
     cvdd_data = calculate_cvdd(df)
     cvdd_log = np.log2(cvdd_data.clip(lower=0.1))  # Avoid log(0)
     cvdd_normalized = (cvdd_log + cvddmn) * cvddscl
@@ -119,9 +117,8 @@ def calculate_puell_multiple_zscore(df: pd.DataFrame, puelllen: int = 365, puell
     Returns:
         Pandas Series with Puell Multiple z-score values
         
-    Note: Currently uses stub data. Requires Glassnode API for real on-chain data.
+    Note: Uses Glassnode API for real on-chain data via fundamental_indicators module.
     """
-    logger.warning("Using stub Puell Multiple data - replace with real on-chain data source (Glassnode API recommended)")
     puell_data = calculate_puell_multiple(df)
     puell_log = np.log2(puell_data.clip(lower=0.1))  # Avoid log(0)
     puell_normalized = (puell_log + puellmn) * puellscl
@@ -142,9 +139,8 @@ def calculate_reserve_risk_zscore(df: pd.DataFrame, reserverisklen: int = 200, r
     Returns:
         Pandas Series with Reserve Risk z-score values
         
-    Note: Currently uses stub data. Requires Glassnode API for real on-chain data.
+    Note: Uses Glassnode API for real on-chain data via fundamental_indicators module.
     """
-    logger.warning("Using stub Reserve Risk data - replace with real on-chain data source (Glassnode API recommended)")
     reserve_risk_data = calculate_reserve_risk(df)
     reserve_risk_log = np.log2(reserve_risk_data.clip(lower=0.0001))  # Avoid log(0)
     reserve_risk_normalized = (reserve_risk_log + reserveriskmn) * reserveriskscl
@@ -165,9 +161,8 @@ def calculate_bdd_zscore(df: pd.DataFrame, bddlen: int = 30, bddmn: float = -0.4
     Returns:
         Pandas Series with BDD z-score values
         
-    Note: Currently uses stub data. Requires Glassnode API for real on-chain data.
+    Note: Uses Glassnode API for real on-chain data via fundamental_indicators module.
     """
-    logger.warning("Using stub Bitcoin Days Destroyed data - replace with real on-chain data source (Glassnode API recommended)")
     bdd_data = calculate_bitcoin_days_destroyed(df)
     bdd_log = np.log2(bdd_data.clip(lower=1))  # Avoid log(0)
     bdd_normalized = (bdd_log + bddmn) * bddscl
@@ -188,9 +183,8 @@ def calculate_exchange_net_position_zscore(df: pd.DataFrame, exchangenetlen: int
     Returns:
         Pandas Series with Exchange Net Position z-score values
         
-    Note: Currently uses stub data. Requires Glassnode/CryptoQuant API for real on-chain data.
+    Note: Uses Glassnode API for real on-chain data via fundamental_indicators module.
     """
-    logger.warning("Using stub Exchange Net Position data - replace with real on-chain data source (Glassnode/CryptoQuant API recommended)")
     exchange_net_data = calculate_exchange_net_position(df)
     # Normalize: divide by a typical scale value (e.g., 10000) to get reasonable range
     exchange_net_normalized = (exchange_net_data / 10000 + exchangenetmn) * exchangenetscl

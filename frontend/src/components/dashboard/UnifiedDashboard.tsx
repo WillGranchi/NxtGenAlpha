@@ -67,21 +67,72 @@ export const UnifiedDashboard: React.FC = () => {
   }, [combinedSignals]);
 
   const loadPriceData = async () => {
+    if (!combinedSignals || combinedSignals.combined_signals.dates.length === 0) {
+      return;
+    }
+
     try {
       setPriceDataLoading(true);
-      // Convert signal dates to price data format
-      // This is a simplified version - in production, fetch actual price data
+      
+      // Get date range from signals
+      const dates = combinedSignals.combined_signals.dates;
+      const firstDate = dates[0];
+      const lastDate = dates[dates.length - 1];
+      
+      // Fetch actual price data from CoinGlass API
+      const priceHistory = await TradingAPI.getPriceHistory({
+        symbol: 'BTCUSDT',
+        exchange: 'Binance',
+        start_date: firstDate,
+        end_date: lastDate,
+        interval: '1d'
+      });
+
+      if (priceHistory.success && priceHistory.data.length > 0) {
+        // Create a map of date to price for quick lookup
+        const priceMap = new Map<string, number>();
+        priceHistory.data.forEach((point) => {
+          priceMap.set(point.date, point.close);
+        });
+
+        // Build equity data points with actual prices
+        const data: EquityDataPoint[] = dates.map((date, idx) => {
+          const price = priceMap.get(date) || (idx > 0 ? data[idx - 1].Price : 50000); // Fallback to previous price or default
+          return {
+            Date: date,
+            Price: price,
+            Position: combinedSignals!.combined_signals.values[idx],
+            Portfolio_Value: price,
+            Capital: 0,
+            Shares: 0
+          };
+        });
+        setPriceData(data);
+      } else {
+        // Fallback if API call fails
+        console.warn('Failed to fetch price data, using signal dates only');
+        const data: EquityDataPoint[] = dates.map((date, idx) => ({
+          Date: date,
+          Price: 50000, // Default fallback
+          Position: combinedSignals!.combined_signals.values[idx],
+          Portfolio_Value: 50000,
+          Capital: 0,
+          Shares: 0
+        }));
+        setPriceData(data);
+      }
+    } catch (err) {
+      console.error('Error loading price data:', err);
+      // Fallback on error
       const data: EquityDataPoint[] = combinedSignals!.combined_signals.dates.map((date, idx) => ({
         Date: date,
-        Price: 50000, // Placeholder - should fetch actual prices
+        Price: 50000,
         Position: combinedSignals!.combined_signals.values[idx],
         Portfolio_Value: 50000,
         Capital: 0,
         Shares: 0
       }));
       setPriceData(data);
-    } catch (err) {
-      console.error('Error loading price data:', err);
     } finally {
       setPriceDataLoading(false);
     }

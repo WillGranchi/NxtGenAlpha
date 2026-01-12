@@ -218,7 +218,7 @@ async def refresh_data(
     include_additional_metrics: bool = Query(default=False, description="Include additional metrics from CoinGlass (funding rates, open interest, etc.)")
 ) -> Dict[str, Any]:
     """
-    Manually trigger a data refresh from CoinGlass API (primary source, with Yahoo Finance/CoinGecko fallback).
+    Manually trigger a data refresh from CoinGlass API (exclusive data source).
     
     Args:
         symbol: Trading pair symbol (default: BTCUSDT)
@@ -292,13 +292,9 @@ async def refresh_data(
     except Exception as e:
         logger.error(f"Error refreshing data: {e}", exc_info=True)
         error_msg = str(e)
-        # Provide more helpful error messages
+        # Provide helpful error messages
         if "CoinGlass" in error_msg:
-            detail_msg = f"Failed to refresh data from CoinGlass: {error_msg}. Falling back to Yahoo Finance/CoinGecko."
-        elif "Yahoo Finance" in error_msg or "yfinance" in error_msg.lower():
-            detail_msg = f"Failed to refresh data from Yahoo Finance: {error_msg}. Falling back to CoinGecko."
-        elif "CoinGecko" in error_msg:
-            detail_msg = f"Failed to refresh data from CoinGecko: {error_msg}"
+            detail_msg = f"Failed to refresh data from CoinGlass API: {error_msg}"
         else:
             detail_msg = f"Failed to refresh data: {error_msg}"
         raise HTTPException(

@@ -124,11 +124,11 @@ async def calculate_fullcycle_zscores(
         # Load BTC data (hardcoded to BTCUSDT)
         symbol = "BTCUSDT"
         
-        # Use CoinGlass as primary source (with Yahoo Finance and CoinGecko fallbacks)
+        # Use CoinGlass as exclusive data source
         # Force refresh if requested, otherwise try to use smart fetch with cache
         if force_refresh:
             logger.info(f"Force refreshing {symbol} data from CoinGlass API...")
-            # Fetch fresh data from CoinGlass (primary) with Yahoo Finance and CoinGecko fallbacks
+            # Fetch fresh data from CoinGlass API
             start_date_dt = pd.to_datetime(start_date) if start_date else None
             end_date_dt = pd.to_datetime(end_date) if end_date else None
             # Map timeframe to interval for CoinGlass API
@@ -144,7 +144,7 @@ async def calculate_fullcycle_zscores(
             )
             logger.info(f"Fetched data from {data_source}, quality score: {quality_metrics.get('quality_score', 'N/A')}")
         else:
-            # Try to use CoinGlass with cache, fallback to CSV if needed
+            # Try to use CoinGlass with cache, fallback to CSV if CoinGlass unavailable
             try:
                 start_date_dt = pd.to_datetime(start_date) if start_date else None
                 end_date_dt = pd.to_datetime(end_date) if end_date else None
