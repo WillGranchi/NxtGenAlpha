@@ -95,8 +95,8 @@ export const UnifiedDashboard: React.FC = () => {
       const priceHistory = await TradingAPI.getPriceHistory({
         symbol: 'BTCUSDT',
         exchange: 'Binance',
-        start_date: firstDate,
-        end_date: lastDate,
+        start_date: firstDate || undefined,
+        end_date: lastDate || undefined,
         interval: '1d'
       });
 
