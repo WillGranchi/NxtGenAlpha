@@ -68,17 +68,22 @@ export const SymbolExchangeControls: React.FC<SymbolExchangeControlsProps> = ({
     const fetchSymbolsAndExchanges = async () => {
       try {
         setIsLoadingSymbols(true);
+        console.log('[SymbolExchangeControls] Fetching symbols and exchanges from CoinGlass API...');
         const response = await TradingAPI.getCoinGlassSymbols();
+        console.log('[SymbolExchangeControls] API response:', response);
         
-        if (response.symbols && response.symbols.length > 0) {
+        // Check if response is successful and has symbols
+        if (response && response.success && response.symbols && Array.isArray(response.symbols) && response.symbols.length > 0) {
           // Extract unique symbols (convert from "BTC/USDT" to "BTCUSDT" for internal use)
           const uniqueSymbols = new Set<string>();
           const uniqueExchanges = new Set<string>();
           
-          response.symbols.forEach((item) => {
+          response.symbols.forEach((item: any) => {
             // Convert CoinGlass format "BTC/USDT" to internal format "BTCUSDT"
-            const internalSymbol = item.symbol.replace('/', '');
-            uniqueSymbols.add(internalSymbol);
+            if (item.symbol) {
+              const internalSymbol = item.symbol.replace('/', '');
+              uniqueSymbols.add(internalSymbol);
+            }
             
             if (item.exchange && item.exchange.trim()) {
               uniqueExchanges.add(item.exchange);
@@ -88,17 +93,20 @@ export const SymbolExchangeControls: React.FC<SymbolExchangeControlsProps> = ({
           // Sort and set symbols
           const sortedSymbols = Array.from(uniqueSymbols).sort();
           setSymbols(sortedSymbols);
+          console.log('[SymbolExchangeControls] Loaded symbols:', sortedSymbols.length);
           
           // Sort and set exchanges
           const sortedExchanges = Array.from(uniqueExchanges).sort();
           setExchanges(sortedExchanges);
+          console.log('[SymbolExchangeControls] Loaded exchanges:', sortedExchanges.length);
         } else {
+          console.warn('[SymbolExchangeControls] Invalid response or no symbols, using fallback');
           // Fallback to default symbols and exchanges
           setSymbols(['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT', 'DOTUSDT', 'MATICUSDT', 'LTCUSDT']);
           setExchanges(['Binance', 'Coinbase', 'OKX', 'Bybit', 'Kraken']);
         }
       } catch (error) {
-        console.error('Failed to fetch symbols and exchanges:', error);
+        console.error('[SymbolExchangeControls] Failed to fetch symbols and exchanges:', error);
         // Fallback to default symbols and exchanges
         setSymbols(['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT', 'DOTUSDT', 'MATICUSDT', 'LTCUSDT']);
         setExchanges(['Binance', 'Coinbase', 'OKX', 'Bybit', 'Kraken']);
