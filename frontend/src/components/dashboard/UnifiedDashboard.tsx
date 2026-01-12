@@ -79,6 +79,12 @@ export const UnifiedDashboard: React.FC = () => {
     const firstDate = dates[0];
     const lastDate = dates[dates.length - 1];
     
+    // Ensure dates are defined
+    if (!firstDate || !lastDate) {
+      console.warn('Invalid date range in combined signals');
+      return;
+    }
+    
     // Check cache first
     const cacheKey = `${firstDate}_${lastDate}`;
     const cachedData = priceDataCacheRef.current.get(cacheKey);
@@ -95,8 +101,8 @@ export const UnifiedDashboard: React.FC = () => {
       const priceHistory = await TradingAPI.getPriceHistory({
         symbol: 'BTCUSDT',
         exchange: 'Binance',
-        start_date: firstDate || undefined,
-        end_date: lastDate || undefined,
+        start_date: firstDate,
+        end_date: lastDate,
         interval: '1d'
       });
 
