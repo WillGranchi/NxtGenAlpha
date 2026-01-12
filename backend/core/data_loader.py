@@ -1379,9 +1379,23 @@ def fetch_crypto_data_smart(
         else:
             start_date, _ = calculate_historical_range(symbol, years=None)
     
-    # ONLY use CoinGlass - no fallbacks
-    logger.info(f"Fetching {symbol} data from CoinGlass ONLY ({start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')})...")
+    # Try database first for better performance, then CoinGlass API
+    logger.info(f"Fetching {symbol} data (interval: {interval}) from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}...")
     
+    # First try database (fastest)
+    df = load_crypto_data_from_database(
+        symbol=symbol,
+        exchange=exchange,
+        start_date=start_date,
+        end_date=end_date
+    )
+    
+    if df is not None and len(df) > 0:
+        logger.info(f"Loaded {len(df)} rows from database for {symbol} on {exchange}")
+        return df, "database", {"quality_score": 1.0, "source": "database"}
+    
+    # Fallback to CoinGlass API if database doesn't have data
+    logger.info(f"Database cache miss, fetching from CoinGlass API...")
     try:
         df_coinglass = fetch_crypto_data_from_coinglass(
             symbol=symbol,

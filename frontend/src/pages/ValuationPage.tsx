@@ -171,7 +171,7 @@ const ValuationPage: React.FC = () => {
     }
   }, [symbol, startDate, endDate, exchange, priceData.length]);
 
-  // Auto-load Yahoo Finance data on initial page load
+  // Auto-load CoinGlass data on initial page load
   useEffect(() => {
     if (!initialLoadAttempted) {
       setInitialLoadAttempted(true);
