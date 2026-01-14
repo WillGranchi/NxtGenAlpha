@@ -64,6 +64,12 @@ const IndicatorsPage: React.FC = () => {
     Portfolio_Value: number;
     Capital: number;
     Shares: number;
+    // Optional OHLC data for candlestick chart
+    open?: number;
+    high?: number;
+    low?: number;
+    close?: number;
+    volume?: number;
   }>>([]);
   
   // Results
