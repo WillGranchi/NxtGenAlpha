@@ -515,10 +515,16 @@ const IndicatorsPage: React.FC = () => {
         Portfolio_Value: point.Price,
         Capital: 0,
         Shares: 0,
+        // Preserve OHLC data for candlestick chart
+        open: point.open,
+        high: point.high,
+        low: point.low,
+        close: point.close,
+        volume: point.volume,
       }));
     }
     
-    // Use base price data when no indicators selected
+    // Use base price data when no indicators selected (already has OHLC data)
     return basePriceData || [];
   }, [priceData, combinedSignals, basePriceData]);
 
