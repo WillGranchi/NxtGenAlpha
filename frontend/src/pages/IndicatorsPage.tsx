@@ -404,18 +404,47 @@ const IndicatorsPage: React.FC = () => {
       const individualResults = backtestResponse.individual_results || {};
       
       // Create a map of dates to data points
+      // Start with basePriceData to preserve OHLC data
       const dateToDataPoint: Record<string, any> = {};
       
+      // First, populate with basePriceData to preserve OHLC fields
+      basePriceData.forEach((point) => {
+        dateToDataPoint[point.Date] = {
+          Date: point.Date,
+          Price: point.Price,
+          Position: 0,
+          Portfolio_Value: point.Price,
+          Capital: 0,
+          Shares: 0,
+          // Preserve OHLC data for candlestick chart
+          open: point.open,
+          high: point.high,
+          low: point.low,
+          close: point.close,
+          volume: point.volume,
+        };
+      });
+      
+      // Then merge equity curve data (which has Position signals)
       equityCurve.forEach((point: EquityDataPoint) => {
         const dateStr = point.Date;
-        dateToDataPoint[dateStr] = {
-          Date: dateStr,
-          Price: point.Price || point.Portfolio_Value || 0,
-          Position: point.Position || 0,
-          Portfolio_Value: point.Portfolio_Value || 0,
-          Capital: point.Capital || 0,
-          Shares: point.Shares || 0,
-        };
+        if (dateToDataPoint[dateStr]) {
+          // Update Position and Portfolio_Value from equity curve
+          dateToDataPoint[dateStr].Position = point.Position || 0;
+          dateToDataPoint[dateStr].Portfolio_Value = point.Portfolio_Value || dateToDataPoint[dateStr].Price;
+          dateToDataPoint[dateStr].Capital = point.Capital || 0;
+          dateToDataPoint[dateStr].Shares = point.Shares || 0;
+        } else {
+          // If date not in basePriceData, create new entry
+          dateToDataPoint[dateStr] = {
+            Date: dateStr,
+            Price: point.Price || point.Portfolio_Value || 0,
+            Position: point.Position || 0,
+            Portfolio_Value: point.Portfolio_Value || 0,
+            Capital: point.Capital || 0,
+            Shares: point.Shares || 0,
+          };
+        }
         
         // Preserve any additional fields from the combined result
         Object.keys(point).forEach((key) => {
