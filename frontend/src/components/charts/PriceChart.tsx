@@ -85,22 +85,64 @@ export const PriceChart: React.FC<PriceChartProps> = ({
       '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
     ];
 
-    const plotData = [
-    {
-      x: dates,
-      y: prices,
-      type: 'scatter' as const,
-      mode: 'lines' as const,
-      name: 'BTC Price',
-      line: {
-        color: '#FFFFFF', // White like Full Cycle Model
-        width: 2,
-      },
-      hovertemplate: '<b>%{fullData.name}</b><br>' +
-        'Date: %{x}<br>' +
-        'Price: $%{y:,.2f}<br>' +
-        '<extra></extra>',
-    },
+    // Check if we have OHLC data for candlestick chart
+    const hasOHLC = data.length > 0 && data[0].open !== undefined && data[0].high !== undefined && 
+                    data[0].low !== undefined && data[0].close !== undefined;
+
+    const plotData: any[] = [];
+    
+    // Use candlestick chart if OHLC data is available, otherwise use line chart
+    if (hasOHLC) {
+      // Extract OHLC data
+      const opens = data.map((d) => d.open!);
+      const highs = data.map((d) => d.high!);
+      const lows = data.map((d) => d.low!);
+      const closes = data.map((d) => d.close!);
+      
+      plotData.push({
+        x: dates,
+        open: opens,
+        high: highs,
+        low: lows,
+        close: closes,
+        type: 'candlestick',
+        name: 'BTC Price',
+        yaxis: 'y',
+        increasing: {
+          line: { color: '#10B981' }, // Green for bullish candles
+          fillcolor: '#10B981'
+        },
+        decreasing: {
+          line: { color: '#EF4444' }, // Red for bearish candles
+          fillcolor: '#EF4444'
+        },
+        showlegend: true,
+        hovertemplate: '<b>%{fullData.name}</b><br>' +
+          'Date: %{x}<br>' +
+          'Open: $%{open:,.2f}<br>' +
+          'High: $%{high:,.2f}<br>' +
+          'Low: $%{low:,.2f}<br>' +
+          'Close: $%{close:,.2f}<br>' +
+          '<extra></extra>',
+      });
+    } else {
+      // Fallback to line chart if no OHLC data
+      plotData.push({
+        x: dates,
+        y: prices,
+        type: 'scatter' as const,
+        mode: 'lines' as const,
+        name: 'BTC Price',
+        line: {
+          color: '#FFFFFF', // White like Full Cycle Model
+          width: 2,
+        },
+        hovertemplate: '<b>%{fullData.name}</b><br>' +
+          'Date: %{x}<br>' +
+          'Price: $%{y:,.2f}<br>' +
+          '<extra></extra>',
+      });
+    }
     {
       x: buySignals.x,
       y: buySignals.y,

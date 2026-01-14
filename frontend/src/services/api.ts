@@ -230,6 +230,12 @@ export interface EquityDataPoint {
   Position: number;
   Capital: number;
   Shares: number;
+  // Optional OHLC data for candlestick charts
+  open?: number;
+  high?: number;
+  low?: number;
+  close?: number;
+  volume?: number;
 }
 
 export interface BacktestMetrics {

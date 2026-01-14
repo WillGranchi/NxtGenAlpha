@@ -133,23 +133,29 @@ const ValuationPage: React.FC = () => {
           });
       }
 
-      // Load data (will use cached if available, or fetch fresh)
-      const response = await TradingAPI.getValuationData({
+      // Load OHLC price data using getPriceHistory for candlestick chart
+      const response = await TradingAPI.getPriceHistory({
         symbol,
-        indicators: [], // No indicators, just price
         start_date: startDate || undefined,
         end_date: endDate || undefined,
         exchange: exchange,
+        interval: '1d',
       });
       
       if (response.success && response.data) {
         const formattedData = response.data.map((d) => ({
           Date: d.date,
-          Price: d.price,
+          Price: d.close, // Use close price as main price
           Position: 0, // No signals
-          Portfolio_Value: d.price,
+          Portfolio_Value: d.close,
           Capital: 0,
           Shares: 0,
+          // Include OHLC data for candlestick chart
+          open: d.open,
+          high: d.high,
+          low: d.low,
+          close: d.close,
+          volume: d.volume,
         }));
         setPriceData(formattedData);
         // Update data info

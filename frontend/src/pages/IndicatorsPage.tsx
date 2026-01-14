@@ -117,24 +117,30 @@ const IndicatorsPage: React.FC = () => {
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const recentStartDate = thirtyDaysAgo.toISOString().split('T')[0];
         
-        // Load recent data first (optimistic UI)
+        // Load recent data first (optimistic UI) - use getPriceHistory for OHLC data
         try {
-          const recentResponse = await TradingAPI.getValuationData({
+          const recentResponse = await TradingAPI.getPriceHistory({
             symbol: internalSymbol,
-            indicators: [],
             start_date: recentStartDate,
             end_date: endDate || undefined,
             exchange: exchange,
+            interval: '1d',
           });
           
           if (recentResponse.success && recentResponse.data) {
             const recentData = recentResponse.data.map((d) => ({
               Date: d.date,
-              Price: d.price,
+              Price: d.close, // Use close price as main price
               Position: 0,
-              Portfolio_Value: d.price,
+              Portfolio_Value: d.close,
               Capital: 0,
               Shares: 0,
+              // Include OHLC data for candlestick chart
+              open: d.open,
+              high: d.high,
+              low: d.low,
+              close: d.close,
+              volume: d.volume,
             }));
             setBasePriceData(recentData);
             setError(null);
@@ -157,22 +163,28 @@ const IndicatorsPage: React.FC = () => {
         requestAnimationFrame(() => {
           setTimeout(async () => {
             try {
-              const fullResponse = await TradingAPI.getValuationData({
+              const fullResponse = await TradingAPI.getPriceHistory({
                 symbol: internalSymbol,
-                indicators: [],
                 start_date: startDate || undefined,
                 end_date: endDate || undefined,
                 exchange: exchange,
+                interval: '1d',
               });
               
               if (fullResponse.success && fullResponse.data) {
                 const fullData = fullResponse.data.map((d) => ({
                   Date: d.date,
-                  Price: d.price,
+                  Price: d.close, // Use close price as main price
                   Position: 0,
-                  Portfolio_Value: d.price,
+                  Portfolio_Value: d.close,
                   Capital: 0,
                   Shares: 0,
+                  // Include OHLC data for candlestick chart
+                  open: d.open,
+                  high: d.high,
+                  low: d.low,
+                  close: d.close,
+                  volume: d.volume,
                 }));
                 setBasePriceData(fullData);
                 // Update data info

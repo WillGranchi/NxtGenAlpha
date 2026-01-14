@@ -11,7 +11,6 @@ import { FullCycleControls } from '../components/fullcycle/FullCycleControls';
 import { CyclePhaseIndicator } from '../components/fullcycle/CyclePhaseIndicator';
 import { FullCycleHeatmap } from '../components/fullcycle/FullCycleHeatmap';
 import { ExportButton } from '../components/fullcycle/ExportButton';
-import { AlertSettings } from '../components/fullcycle/AlertSettings';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { useMobile } from '../hooks/useMobile';
 import TradingAPI from '../services/api';
@@ -370,25 +369,6 @@ const FullCyclePage: React.FC = () => {
               )}
             </div>
           </div>
-
-          {/* Alert Settings - Full Width */}
-          {zscoreData.length > 0 && (
-            <div className="min-h-[200px]">
-              {(() => {
-                const latest = zscoreData[zscoreData.length - 1];
-                const averageZScore = latest?.indicators['average']?.zscore ?? null;
-                return (
-                  <AlertSettings
-                    averageZScore={averageZScore}
-                    sdcaIn={sdcaIn}
-                    sdcaOut={sdcaOut}
-                    onSdcaInChange={setSdcaIn}
-                    onSdcaOutChange={setSdcaOut}
-                  />
-                );
-              })()}
-            </div>
-          )}
 
           {/* Controls Section - Below Chart - Always render to maintain layout */}
           <div className="relative min-h-[400px]">
