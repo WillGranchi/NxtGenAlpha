@@ -143,41 +143,50 @@ export const PriceChart: React.FC<PriceChartProps> = ({
           '<extra></extra>',
       });
     }
-    {
-      x: buySignals.x,
-      y: buySignals.y,
-      type: 'scatter' as const,
-      mode: 'markers' as const,
-      name: 'Combined Buy',
-      marker: {
-        color: '#10B981', // Green
-        size: 12,
-        symbol: 'triangle-up' as const,
-        line: { color: '#FFFFFF', width: 1 },
-      },
-      hovertemplate: '<b>Buy Signal</b><br>' +
-        'Date: %{x}<br>' +
-        'Price: $%{y:,.2f}<br>' +
-        '<extra></extra>',
-    },
-    {
-      x: sellSignals.x,
-      y: sellSignals.y,
-      type: 'scatter' as const,
-      mode: 'markers' as const,
-      name: 'Combined Sell',
-      marker: {
-        color: '#EF4444', // Red
-        size: 12,
-        symbol: 'triangle-down' as const,
-        line: { color: '#FFFFFF', width: 1 },
-      },
-      hovertemplate: '<b>Sell Signal</b><br>' +
-        'Date: %{x}<br>' +
-        'Price: $%{y:,.2f}<br>' +
-        '<extra></extra>',
-    },
-  ];
+    
+    // Add buy and sell signals if they exist
+    if (buySignals.x.length > 0) {
+      plotData.push({
+        x: buySignals.x,
+        y: buySignals.y,
+        type: 'scatter' as const,
+        mode: 'markers' as const,
+        name: 'Combined Buy',
+        marker: {
+          color: '#10B981', // Green
+          size: 12,
+          symbol: 'triangle-up' as const,
+          line: { color: '#FFFFFF', width: 1 },
+        },
+        hovertemplate: '<b>Buy Signal</b><br>' +
+          'Date: %{x}<br>' +
+          'Price: $%{y:,.2f}<br>' +
+          '<extra></extra>',
+      });
+    }
+    
+    if (sellSignals.x.length > 0) {
+      plotData.push({
+        x: sellSignals.x,
+        y: sellSignals.y,
+        type: 'scatter' as const,
+        mode: 'markers' as const,
+        name: 'Combined Sell',
+        marker: {
+          color: '#EF4444', // Red
+          size: 12,
+          symbol: 'triangle-down' as const,
+          line: { color: '#FFFFFF', width: 1 },
+        },
+        hovertemplate: '<b>Sell Signal</b><br>' +
+          'Date: %{x}<br>' +
+          'Price: $%{y:,.2f}<br>' +
+          '<extra></extra>',
+      });
+    }
+    
+    return plotData;
+  }, [data, overlaySignals]);
 
   // Add overlay signals
   Object.entries(overlaySignals).forEach(([indicatorId, signals], index) => {
