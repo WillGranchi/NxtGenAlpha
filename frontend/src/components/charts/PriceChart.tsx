@@ -185,52 +185,49 @@ export const PriceChart: React.FC<PriceChartProps> = ({
       });
     }
     
-    return plotData;
-  }, [data, overlaySignals]);
-
-  // Add overlay signals
-  Object.entries(overlaySignals).forEach(([indicatorId, signals], index) => {
-    const color = overlayColors[index % overlayColors.length];
-    
-    if (signals.buy.x.length > 0) {
-      plotData.push({
-        x: signals.buy.x,
-        y: signals.buy.y,
-        type: 'scatter' as const,
-        mode: 'markers' as const,
-        name: `${indicatorId} Buy`,
-        marker: {
-          color: color,
-          size: 8,
-          symbol: 'triangle-up' as const,
-          line: { color: '#FFFFFF', width: 1 },
-        },
-        hovertemplate: `<b>${indicatorId} Buy Signal</b><br>` +
-          'Date: %{x}<br>' +
-          'Price: $%{y:,.2f}<br>' +
-          '<extra></extra>',
-      });
-    }
-    
-    if (signals.sell.x.length > 0) {
-      plotData.push({
-        x: signals.sell.x,
-        y: signals.sell.y,
-        type: 'scatter' as const,
-        mode: 'markers' as const,
-        name: `${indicatorId} Sell`,
-        marker: {
-          color: color,
-          size: 8,
-          symbol: 'triangle-down' as const,
-          line: { color: '#FFFFFF', width: 1 },
-        },
-        hovertemplate: `<b>${indicatorId} Sell Signal</b><br>` +
-          'Date: %{x}<br>' +
-          'Price: $%{y:,.2f}<br>' +
-          '<extra></extra>',
-      });
-    }
+    // Add overlay signals
+    Object.entries(overlaySignals).forEach(([indicatorId, signals], index) => {
+      const color = overlayColors[index % overlayColors.length];
+      
+      if (signals.buy.x.length > 0) {
+        plotData.push({
+          x: signals.buy.x,
+          y: signals.buy.y,
+          type: 'scatter' as const,
+          mode: 'markers' as const,
+          name: `${indicatorId} Buy`,
+          marker: {
+            color: color,
+            size: 8,
+            symbol: 'triangle-up' as const,
+            line: { color: '#FFFFFF', width: 1 },
+          },
+          hovertemplate: `<b>${indicatorId} Buy Signal</b><br>` +
+            'Date: %{x}<br>' +
+            'Price: $%{y:,.2f}<br>' +
+            '<extra></extra>',
+        });
+      }
+      
+      if (signals.sell.x.length > 0) {
+        plotData.push({
+          x: signals.sell.x,
+          y: signals.sell.y,
+          type: 'scatter' as const,
+          mode: 'markers' as const,
+          name: `${indicatorId} Sell`,
+          marker: {
+            color: color,
+            size: 8,
+            symbol: 'triangle-down' as const,
+            line: { color: '#FFFFFF', width: 1 },
+          },
+          hovertemplate: `<b>${indicatorId} Sell Signal</b><br>` +
+            'Date: %{x}<br>' +
+            'Price: $%{y:,.2f}<br>' +
+            '<extra></extra>',
+        });
+      }
     });
 
     return { dates, prices, buySignals, sellSignals, plotData };
