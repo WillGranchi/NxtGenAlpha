@@ -7,16 +7,13 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { Layout } from './components/layout/Layout';
-import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import DashboardPage from './pages/DashboardPage';
 import IndicatorsPage from './pages/IndicatorsPage';
-import StrategyLibraryPage from './pages/StrategyLibraryPage';
 import SettingsPage from './pages/SettingsPage';
 import ValuationPage from './pages/ValuationPage';
 import FullCyclePage from './pages/FullCyclePage';
-import PriceTestPage from './pages/PriceTestPage';
 
 export const App: React.FC = () => {
   return (
@@ -24,7 +21,8 @@ export const App: React.FC = () => {
       <AuthProvider>
         <Routes>
           {/* Public routes */}
-          <Route path="/" element={<LandingPage />} />
+          {/* Start at dashboard; ProtectedRoute will redirect to /login if needed */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           
@@ -45,16 +43,6 @@ export const App: React.FC = () => {
               <ProtectedRoute>
                 <Layout>
                   <IndicatorsPage />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/library"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <StrategyLibraryPage />
                 </Layout>
               </ProtectedRoute>
             }
@@ -95,16 +83,6 @@ export const App: React.FC = () => {
               <ProtectedRoute>
                 <Layout>
                   <FullCyclePage />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/pricetest"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <PriceTestPage />
                 </Layout>
               </ProtectedRoute>
             }

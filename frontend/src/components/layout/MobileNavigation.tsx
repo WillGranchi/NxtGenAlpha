@@ -7,13 +7,11 @@ import React, { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
-  Library, 
   Settings, 
   LogOut,
   User,
   Menu,
   X,
-  ChevronRight,
   BarChart3,
   TrendingUp
 } from 'lucide-react';
@@ -49,9 +47,7 @@ export const MobileNavigation: React.FC = () => {
     { path: '/fullcycle', label: 'Full Cycle Model', icon: BarChart3 },
     { path: '/indicators', label: 'Indicators', icon: TrendingUp },
     { path: '/valuation', label: 'Valuation', icon: BarChart3 },
-    { path: '/library', label: 'My Creations', icon: Library },
     { path: '/settings', label: 'Settings', icon: Settings },
-    { path: '/pricetest', label: 'Price Test', icon: BarChart3 },
   ];
 
   const isActive = (path: string) => location.pathname === path;
