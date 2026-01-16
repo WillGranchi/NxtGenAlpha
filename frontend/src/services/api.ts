@@ -144,39 +144,6 @@ function getOrCreateRequest<T>(
 }
 
 // Types
-export interface DataInfo {
-  total_records: number;
-  date_range: {
-    start: string;
-    end: string;
-  };
-  columns: string[];
-  sample_data: Record<string, Record<string, number>>;
-  price_range: {
-    min: number;
-    max: number;
-    current: number;
-  };
-  last_update?: string;
-  hours_since_update?: number;
-  data_source?: string;  // "binance", "coingecko", "thegraph", "unknown"
-  data_quality?: string;  // "full_ohlcv", "close_only", "unknown"
-  symbol?: string;
-}
-
-export interface DataStatus {
-  success: boolean;
-  last_update: string | null;
-  is_fresh: boolean;
-  hours_since_update: number | null;
-  total_records: number;
-  date_range: {
-    start: string;
-    end: string;
-  };
-  current_price: number;
-}
-
 export interface DataRefreshResponse {
   success: boolean;
   message: string;
@@ -186,41 +153,6 @@ export interface DataRefreshResponse {
     end: string;
   };
   last_update: string | null;
-}
-
-export interface DataInfoResponse {
-  success: boolean;
-  data_info: DataInfo;
-}
-
-export interface StrategyParameter {
-  type: string;
-  min?: number;
-  max?: number;
-  default: any;
-  description?: string;
-}
-
-export interface StrategyDefinition {
-  name: string;
-  description: string;
-  parameters: Record<string, StrategyParameter>;
-  category: string;
-}
-
-export interface StrategiesResponse {
-  success: boolean;
-  strategies: Record<string, StrategyDefinition>;
-  total_count: number;
-}
-
-export interface BacktestRequest {
-  strategy: string;
-  parameters: Record<string, any>;
-  initial_capital: number;
-  start_date?: string;
-  end_date?: string;
-  symbol?: string;  // Trading pair symbol (e.g., BTCUSDT, ETHUSDT)
 }
 
 export interface EquityDataPoint {
@@ -270,18 +202,6 @@ export interface Trade {
   direction: string;
 }
 
-export interface BacktestResults {
-  metrics: BacktestMetrics;
-  equity_curve: EquityDataPoint[];
-  trades: any[];
-  trade_log: Trade[];
-}
-
-export interface BacktestResponse {
-  success: boolean;
-  results: BacktestResults;
-  message: string;
-}
 
 // Modular Backtest Types
 export interface IndicatorParameter {
@@ -392,76 +312,8 @@ export interface ThemeUpdateRequest {
   theme: 'light' | 'dark';
 }
 
-// Strategy CRUD Types
-export interface SaveStrategyRequest {
-  name: string;
-  description?: string;
-  indicators: IndicatorConfig[];
-  expressions: {
-    long_expression?: string;
-    cash_expression?: string;
-    short_expression?: string;
-    strategy_type?: 'long_cash' | 'long_short';
-  };
-  parameters?: Record<string, any>;
-}
-
-export interface UpdateStrategyRequest {
-  name?: string;
-  description?: string;
-  indicators?: IndicatorConfig[];
-  expressions?: {
-    long_expression?: string;
-    cash_expression?: string;
-    short_expression?: string;
-    strategy_type?: 'long_cash' | 'long_short';
-  };
-  parameters?: Record<string, any>;
-}
-
-export interface StrategyResponse {
-  id: number;
-  name: string;
-  description?: string;
-  indicators: IndicatorConfig[];
-  expressions: Record<string, any>;
-  parameters?: Record<string, any>;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface StrategyListItem {
-  id: number;
-  name: string;
-  description?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface StrategyListResponse {
-  success: boolean;
-  strategies: StrategyListItem[];
-}
-
 // API Methods
 export class TradingAPI {
-  /**
-   * Get information about the cryptocurrency dataset.
-   */
-  static async getDataInfo(symbol?: string): Promise<DataInfoResponse> {
-    const response: AxiosResponse<DataInfoResponse> = await api.get('/api/data/info', {
-      params: symbol ? { symbol } : {},
-    });
-    return response.data;
-  }
-
-  static async getDataStatus(symbol?: string): Promise<DataStatus> {
-    const response: AxiosResponse<DataStatus> = await api.get('/api/data/status', {
-      params: symbol ? { symbol } : {},
-    });
-    return response.data;
-  }
-
   static async refreshData(symbol?: string, force: boolean = false, start_date?: string, exchange?: string): Promise<DataRefreshResponse> {
     const params: any = { ...(symbol ? { symbol } : {}), force };
     if (start_date) {
@@ -480,46 +332,6 @@ export class TradingAPI {
       });
       return response.data;
     });
-  }
-
-  /**
-   * Get available trading strategies.
-   */
-  static async getAvailableStrategies(): Promise<StrategiesResponse> {
-    const response: AxiosResponse<StrategiesResponse> = await api.get('/api/strategies');
-    return response.data;
-  }
-
-  /**
-   * Run a backtest with the specified parameters.
-   */
-  static async runBacktest(request: BacktestRequest): Promise<BacktestResponse> {
-    const response: AxiosResponse<BacktestResponse> = await api.post('/api/backtest', request);
-    return response.data;
-  }
-
-  /**
-   * Get health status of the API.
-   */
-  static async getHealthStatus(): Promise<{ status: string; [key: string]: any }> {
-    const response = await api.get('/health');
-    return response.data;
-  }
-
-  /**
-   * Get data health status.
-   */
-  static async getDataHealthStatus(): Promise<{ status: string; [key: string]: any }> {
-    const response = await api.get('/api/data/health');
-    return response.data;
-  }
-
-  /**
-   * Get backtest health status.
-   */
-  static async getBacktestHealthStatus(): Promise<{ status: string; [key: string]: any }> {
-    const response = await api.get('/api/backtest/health');
-    return response.data;
   }
 
   /**
@@ -813,143 +625,6 @@ export class TradingAPI {
     const response: AxiosResponse<any> = await api.get('/api/data/test-coinglass', {
       timeout: 60000, // 1 minute for connection test
     });
-    return response.data;
-  }
-
-  // Strategy CRUD Methods
-
-  /**
-   * List all saved strategies for the current user.
-   */
-  static async listSavedStrategies(): Promise<StrategyListResponse> {
-    const response: AxiosResponse<StrategyListResponse> = await api.get('/api/strategies/saved/list');
-    return response.data;
-  }
-
-  /**
-   * Get a saved strategy by ID.
-   */
-  static async getSavedStrategy(strategyId: number): Promise<StrategyResponse> {
-    const response: AxiosResponse<StrategyResponse> = await api.get(`/api/strategies/saved/${strategyId}`);
-    return response.data;
-  }
-
-  /**
-   * Save a new strategy.
-   */
-  static async saveStrategy(request: SaveStrategyRequest): Promise<StrategyResponse> {
-    const response: AxiosResponse<StrategyResponse> = await api.post('/api/strategies/saved', request);
-    return response.data;
-  }
-
-  /**
-   * Update an existing strategy.
-   */
-  static async updateStrategy(strategyId: number, request: UpdateStrategyRequest): Promise<StrategyResponse> {
-    const response: AxiosResponse<StrategyResponse> = await api.put(`/api/strategies/saved/${strategyId}`, request);
-    return response.data;
-  }
-
-  /**
-   * Delete a strategy.
-   */
-  static async deleteStrategy(strategyId: number): Promise<void> {
-    await api.delete(`/api/strategies/saved/${strategyId}`);
-  }
-
-  /**
-   * Duplicate a strategy.
-   */
-  static async duplicateStrategy(strategyId: number): Promise<StrategyResponse> {
-    const response: AxiosResponse<StrategyResponse> = await api.post(`/api/strategies/saved/${strategyId}/duplicate`);
-    return response.data;
-  }
-
-  // Custom Indicators API
-
-  /**
-   * Get example custom indicator code template.
-   */
-  static async getCustomIndicatorExample(): Promise<any> {
-    const response: AxiosResponse<any> = await api.get('/api/custom-indicators/example');
-    return response.data;
-  }
-
-  /**
-   * Validate custom indicator code.
-   */
-  static async validateCustomIndicator(request: { code: string; function_name: string }): Promise<any> {
-    const response: AxiosResponse<any> = await api.post('/api/custom-indicators/validate', request);
-    return response.data;
-  }
-
-  /**
-   * Create a custom indicator.
-   */
-  static async createCustomIndicator(request: {
-    name: string;
-    description?: string;
-    code: string;
-    function_name: string;
-    parameters: Record<string, any>;
-    conditions: Record<string, string>;
-    category?: string;
-    is_public?: boolean;
-  }): Promise<any> {
-    const response: AxiosResponse<any> = await api.post('/api/custom-indicators/', request);
-    return response.data;
-  }
-
-  /**
-   * List custom indicators.
-   */
-  static async listCustomIndicators(includePublic: boolean = false): Promise<any[]> {
-    const response: AxiosResponse<any[]> = await api.get('/api/custom-indicators/', {
-      params: { include_public: includePublic },
-    });
-    return response.data;
-  }
-
-  /**
-   * Get a custom indicator by ID.
-   */
-  static async getCustomIndicator(indicatorId: number): Promise<any> {
-    const response: AxiosResponse<any> = await api.get(`/api/custom-indicators/${indicatorId}`);
-    return response.data;
-  }
-
-  /**
-   * Update a custom indicator.
-   */
-  static async updateCustomIndicator(
-    indicatorId: number,
-    request: {
-      name?: string;
-      description?: string;
-      code?: string;
-      function_name?: string;
-      parameters?: Record<string, any>;
-      conditions?: Record<string, string>;
-      category?: string;
-      is_public?: boolean;
-    }
-  ): Promise<any> {
-    const response: AxiosResponse<any> = await api.put(`/api/custom-indicators/${indicatorId}`, request);
-    return response.data;
-  }
-
-  /**
-   * Delete a custom indicator.
-   */
-  static async deleteCustomIndicator(indicatorId: number): Promise<void> {
-    await api.delete(`/api/custom-indicators/${indicatorId}`);
-  }
-
-  /**
-   * Test a custom indicator with sample data.
-   */
-  static async testCustomIndicator(indicatorId: number, params: Record<string, any>): Promise<any> {
-    const response: AxiosResponse<any> = await api.post(`/api/custom-indicators/${indicatorId}/test`, params);
     return response.data;
   }
 

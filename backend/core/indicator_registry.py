@@ -1828,88 +1828,13 @@ def evaluate_all_conditions(df: pd.DataFrame, indicators: List[Dict[str, Any]]) 
             metadata = INDICATOR_REGISTRY[indicator_id]
             conditions = metadata.evaluate_conditions_fn(df, params)
             all_conditions.update(conditions)
-        elif indicator_id.startswith('custom_'):
-            # Handle custom indicators
-            # Custom indicators are loaded dynamically from database
-            # This will be handled by the backtest route
-            pass
+        # Custom indicators feature removed during aggressive cleanup.
     
     return all_conditions
 
 
 def load_custom_indicator_from_db(indicator_id: str, db_session) -> Optional[IndicatorMetadata]:
     """
-    Load a custom indicator from the database and create IndicatorMetadata.
-    
-    Args:
-        indicator_id: Custom indicator ID (format: 'custom_{database_id}')
-        db_session: Database session
-        
-    Returns:
-        IndicatorMetadata if found, None otherwise
+    Custom indicator loading removed during aggressive cleanup.
     """
-    try:
-        # Extract database ID from indicator_id (format: 'custom_123')
-        if not indicator_id.startswith('custom_'):
-            return None
-        
-        db_id = int(indicator_id.replace('custom_', ''))
-        
-        from backend.api.models.db_models import CustomIndicator
-        custom_ind = db_session.query(CustomIndicator).filter(
-            CustomIndicator.id == db_id
-        ).first()
-        
-        if not custom_ind:
-            return None
-        
-        # Create compute function wrapper
-        def compute_custom_indicator(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
-            from backend.core.custom_indicator_executor import execute_custom_indicator
-            result = execute_custom_indicator(
-                custom_ind.code,
-                custom_ind.function_name,
-                df,
-                params
-            )
-            df[f'Custom_{custom_ind.id}'] = result
-            return df
-        
-        # Create evaluate conditions function wrapper
-        def evaluate_custom_conditions(df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, pd.Series]:
-            from backend.core.custom_indicator_executor import execute_custom_indicator
-            indicator_col = f'Custom_{custom_ind.id}'
-            
-            if indicator_col not in df.columns:
-                df = compute_custom_indicator(df, params)
-            
-            conditions = {}
-            for cond_name, cond_desc in custom_ind.conditions.items():
-                # Generate condition based on common patterns
-                if 'above' in cond_name.lower():
-                    conditions[cond_name] = df[indicator_col] > df['Close']
-                elif 'below' in cond_name.lower():
-                    conditions[cond_name] = df[indicator_col] < df['Close']
-                elif 'cross' in cond_name.lower() and 'above' in cond_name.lower():
-                    conditions[cond_name] = (df[indicator_col] > df['Close']) & (df[indicator_col].shift(1) <= df['Close'].shift(1))
-                elif 'cross' in cond_name.lower() and 'below' in cond_name.lower():
-                    conditions[cond_name] = (df[indicator_col] < df['Close']) & (df[indicator_col].shift(1) >= df['Close'].shift(1))
-                else:
-                    # Default: indicator > 0
-                    conditions[cond_name] = df[indicator_col] > 0
-            
-            return conditions
-        
-        return IndicatorMetadata(
-            name=custom_ind.name,
-            description=custom_ind.description or f"Custom indicator: {custom_ind.name}",
-            parameters=custom_ind.parameters,
-            conditions=custom_ind.conditions,
-            compute_fn=compute_custom_indicator,
-            evaluate_conditions_fn=evaluate_custom_conditions,
-            category=custom_ind.category
-        )
-        
-    except Exception as e:
-        logger.error(f"Error loading custom indicator {indicator_id}: {e}")
-        return None
+    return None
