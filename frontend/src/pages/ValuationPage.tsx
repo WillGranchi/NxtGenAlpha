@@ -368,25 +368,6 @@ const ValuationPage: React.FC = () => {
             </div>
           )}
 
-          {/* Symbol, Exchange & Date Range Controls */}
-          <SymbolExchangeControls
-            symbol={symbol}
-            onSymbolChange={setSymbol}
-            exchange={exchange}
-            onExchangeChange={setExchange}
-            startDate={startDate}
-            onStartDateChange={setStartDate}
-            endDate={endDate}
-            onEndDateChange={setEndDate}
-            onRefreshData={handleRefreshData}
-            isRefreshingData={priceDataLoading}
-            maxDaysRange={999}
-            showDataInfo={true}
-            dataSource={dataSource}
-            dateRange={dateRange}
-            totalRecords={totalRecords}
-          />
-
           {/* Price Chart - Full Width at Top */}
           {priceData.length > 0 && (
             <div className="w-full">
@@ -411,6 +392,25 @@ const ValuationPage: React.FC = () => {
               )}
             </div>
           )}
+
+          {/* Symbol, Exchange & Date Range Controls */}
+          <SymbolExchangeControls
+            symbol={symbol}
+            onSymbolChange={setSymbol}
+            exchange={exchange}
+            onExchangeChange={setExchange}
+            startDate={startDate}
+            onStartDateChange={setStartDate}
+            endDate={endDate}
+            onEndDateChange={setEndDate}
+            onRefreshData={handleRefreshData}
+            isRefreshingData={priceDataLoading}
+            maxDaysRange={999}
+            showDataInfo={true}
+            dataSource={dataSource}
+            dateRange={dateRange}
+            totalRecords={totalRecords}
+          />
 
           {/* Settings Bar (Collapsible) */}
           <div className="bg-bg-secondary border border-border-default rounded-lg relative z-10">
