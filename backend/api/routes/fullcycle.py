@@ -98,6 +98,7 @@ async def calculate_fullcycle_zscores(
         default=None,
         description="Custom parameters for each indicator (optional)"
     ),
+    symbol: str = Body(default="BTCUSDT", description="Trading pair symbol (e.g., BTCUSDT, ETHUSDT)"),
     start_date: Optional[str] = Body(default=None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Body(default=None, description="End date (YYYY-MM-DD)"),
     timeframe: Optional[str] = Body(default="1d", description="Timeframe/interval (1h, 4h, 1d, 1w, 1M)"),
@@ -121,8 +122,8 @@ async def calculate_fullcycle_zscores(
         Dict: Time series data with price and indicator z-scores, plus averages
     """
     try:
-        # Load BTC data (hardcoded to BTCUSDT)
-        symbol = "BTCUSDT"
+        # Load price data (default BTCUSDT, but supports other tokens where CoinGlass coverage exists)
+        symbol = symbol or "BTCUSDT"
         
         # Optimize data loading: Try database first (fastest), then CoinGlass API
         start_date_dt = pd.to_datetime(start_date) if start_date else None
@@ -436,6 +437,8 @@ async def create_fullcycle_preset(
     description: Optional[str] = Body(default=None, description="Preset description"),
     indicator_params: Dict[str, Dict[str, Any]] = Body(..., description="Indicator parameters"),
     selected_indicators: List[str] = Body(..., description="Selected indicator IDs"),
+    symbol: str = Body(default="BTCUSDT", description="Trading pair symbol (e.g., BTCUSDT, ETHUSDT)"),
+    exchange: str = Body(default="Binance", description="Exchange name (CoinGlass-supported)"),
     start_date: Optional[str] = Body(default=None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Body(default=None, description="End date (YYYY-MM-DD)"),
     roc_days: int = Body(default=7, description="ROC period in days"),
@@ -457,6 +460,8 @@ async def create_fullcycle_preset(
             description=description,
             indicator_params=indicator_params,
             selected_indicators=selected_indicators,
+            symbol=symbol,
+            exchange=exchange,
             start_date=start_date,
             end_date=end_date,
             roc_days=roc_days,
@@ -478,6 +483,8 @@ async def create_fullcycle_preset(
                 "description": preset.description,
                 "indicator_params": preset.indicator_params,
                 "selected_indicators": preset.selected_indicators,
+                "symbol": getattr(preset, "symbol", "BTCUSDT"),
+                "exchange": getattr(preset, "exchange", "Binance"),
                 "start_date": preset.start_date,
                 "end_date": preset.end_date,
                 "roc_days": preset.roc_days,
@@ -519,6 +526,8 @@ async def list_fullcycle_presets(
                     "id": preset.id,
                     "name": preset.name,
                     "description": preset.description,
+                    "symbol": getattr(preset, "symbol", "BTCUSDT"),
+                    "exchange": getattr(preset, "exchange", "Binance"),
                     "created_at": preset.created_at.isoformat(),
                     "updated_at": preset.updated_at.isoformat(),
                 }
@@ -563,6 +572,8 @@ async def get_fullcycle_preset(
                 "description": preset.description,
                 "indicator_params": preset.indicator_params,
                 "selected_indicators": preset.selected_indicators,
+                "symbol": getattr(preset, "symbol", "BTCUSDT"),
+                "exchange": getattr(preset, "exchange", "Binance"),
                 "start_date": preset.start_date,
                 "end_date": preset.end_date,
                 "roc_days": preset.roc_days,

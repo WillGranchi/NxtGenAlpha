@@ -42,6 +42,8 @@ const FullCyclePage: React.FC = () => {
     setStartDate,
     endDate,
     setEndDate,
+    symbol,
+    setSymbol,
     timeframe,
     setTimeframe,
     exchange,
@@ -392,6 +394,12 @@ const FullCyclePage: React.FC = () => {
                   setStartDate={setStartDate}
                   endDate={endDate}
                   setEndDate={setEndDate}
+                  symbol={symbol}
+                  setSymbol={setSymbol}
+                  exchange={exchange}
+                  setExchange={setExchange}
+                  timeframe={timeframe}
+                  setTimeframe={setTimeframe}
                   rocDays={rocDays}
                   setRocDays={setRocDays}
                   sdcaIn={sdcaIn}

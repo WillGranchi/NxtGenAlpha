@@ -10,6 +10,8 @@ interface ValuationStrategy {
   id: number;
   name: string;
   description?: string;
+  symbol?: string;
+  exchange?: string;
   created_at: string;
   updated_at: string;
   type: string;
@@ -117,6 +119,9 @@ export const ValuationStrategyList: React.FC<ValuationStrategyListProps> = ({
             {strategy.description && (
               <p className="text-sm text-text-muted mt-1 line-clamp-2">{strategy.description}</p>
             )}
+            <p className="text-xs text-text-muted mt-2">
+              {(strategy.symbol || 'BTCUSDT')} · {(strategy.exchange || 'Binance')}
+            </p>
             <p className="text-xs text-text-muted mt-2">
               Updated {new Date(strategy.updated_at).toLocaleDateString()}
             </p>

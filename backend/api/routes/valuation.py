@@ -634,6 +634,7 @@ async def get_saved_valuation(
             overbought_threshold=valuation.overbought_threshold,
             oversold_threshold=valuation.oversold_threshold,
             symbol=valuation.symbol,
+            exchange=getattr(valuation, "exchange", "Binance"),
             start_date=valuation.start_date,
             end_date=valuation.end_date,
             created_at=valuation.created_at.isoformat() if valuation.created_at else "",
@@ -683,6 +684,7 @@ async def save_valuation(
             overbought_threshold=request.overbought_threshold,
             oversold_threshold=request.oversold_threshold,
             symbol=request.symbol,
+            exchange=getattr(request, "exchange", "Binance"),
             start_date=request.start_date,
             end_date=request.end_date
         )
@@ -705,6 +707,7 @@ async def save_valuation(
             overbought_threshold=valuation.overbought_threshold,
             oversold_threshold=valuation.oversold_threshold,
             symbol=valuation.symbol,
+            exchange=getattr(valuation, "exchange", "Binance"),
             start_date=valuation.start_date,
             end_date=valuation.end_date,
             created_at=valuation.created_at.isoformat() if valuation.created_at else "",
@@ -778,6 +781,8 @@ async def update_valuation(
             valuation.oversold_threshold = request.oversold_threshold
         if request.symbol is not None:
             valuation.symbol = request.symbol
+        if getattr(request, "exchange", None) is not None:
+            valuation.exchange = request.exchange
         if request.start_date is not None:
             valuation.start_date = request.start_date
         if request.end_date is not None:
@@ -802,6 +807,7 @@ async def update_valuation(
             overbought_threshold=valuation.overbought_threshold,
             oversold_threshold=valuation.oversold_threshold,
             symbol=valuation.symbol,
+            exchange=getattr(valuation, "exchange", "Binance"),
             start_date=valuation.start_date,
             end_date=valuation.end_date,
             created_at=valuation.created_at.isoformat() if valuation.created_at else "",

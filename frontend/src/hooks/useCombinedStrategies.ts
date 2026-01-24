@@ -41,6 +41,8 @@ export const useCombinedStrategies = () => {
   const [startDate, setStartDate] = useState<string>('2020-01-01');
   const [endDate, setEndDate] = useState<string>('');
   const [symbol, setSymbol] = useState<string>('BTCUSDT');
+  const [exchange, setExchange] = useState<string>('Binance');
+  const [strategyType, setStrategyType] = useState<'long_cash' | 'long_short'>('long_cash');
 
   const calculateSignals = useCallback(async () => {
     const hasSelection = 
@@ -62,7 +64,9 @@ export const useCombinedStrategies = () => {
         combination_rule: combinationRule,
         start_date: startDate,
         end_date: endDate || undefined,
-        symbol
+        symbol,
+        exchange,
+        strategy_type: strategyType,
       });
       
       setCombinedSignals(response);
@@ -73,7 +77,7 @@ export const useCombinedStrategies = () => {
     } finally {
       setLoading(false);
     }
-  }, [strategySelection, combinationRule, startDate, endDate, symbol]);
+  }, [strategySelection, combinationRule, startDate, endDate, symbol, exchange, strategyType]);
 
   // Auto-calculate when selection or rule changes
   useEffect(() => {
@@ -98,6 +102,10 @@ export const useCombinedStrategies = () => {
     setEndDate,
     symbol,
     setSymbol,
+    exchange,
+    setExchange,
+    strategyType,
+    setStrategyType,
     calculateSignals
   };
 };

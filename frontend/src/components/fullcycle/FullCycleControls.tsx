@@ -12,6 +12,7 @@ import { IndicatorParameterControls } from './IndicatorParameterControls';
 import { PresetManager } from './PresetManager';
 import TradingAPI from '../../services/api';
 import { Loader2, CheckCircle2, XCircle, Wifi } from 'lucide-react';
+import { SymbolExchangeControls } from '../SymbolExchangeControls';
 
 interface FullCycleControlsProps {
   availableIndicators: FullCycleIndicator[];
@@ -24,6 +25,12 @@ interface FullCycleControlsProps {
   setStartDate: (date: string) => void;
   endDate: string;
   setEndDate: (date: string) => void;
+  symbol: string;
+  setSymbol: (symbol: string) => void;
+  exchange: string;
+  setExchange: (exchange: string) => void;
+  timeframe: string;
+  setTimeframe: (timeframe: string) => void;
   rocDays: number;
   setRocDays: (days: number) => void;
   sdcaIn: number;
@@ -67,6 +74,12 @@ export const FullCycleControls: React.FC<FullCycleControlsProps> = ({
   setStartDate,
   endDate,
   setEndDate,
+  symbol,
+  setSymbol,
+  exchange,
+  setExchange,
+  timeframe,
+  setTimeframe,
   rocDays,
   setRocDays,
   sdcaIn,
@@ -182,6 +195,9 @@ export const FullCycleControls: React.FC<FullCycleControlsProps> = ({
         currentConfig={{
           indicator_params: indicatorParameters,
           selected_indicators: selectedIndicators,
+          symbol,
+          exchange,
+          timeframe,
           start_date: startDate,
           end_date: endDate,
           roc_days: rocDays,
@@ -193,35 +209,9 @@ export const FullCycleControls: React.FC<FullCycleControlsProps> = ({
         }}
       />
 
-      {/* Row 1: Date Range and Refresh */}
-      <div className="bg-bg-secondary border border-border-default rounded-lg p-6">
-        <div className="flex items-center justify-between mb-3">
-          <label className="block text-sm font-medium text-text-secondary">
-            Date Range
-          </label>
-          <button
-            onClick={refreshData}
-            disabled={isLoading}
-            className="flex items-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 disabled:bg-primary-500/50 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors"
-            title="Refresh price data and recalculate indicators"
-          >
-            {isLoading ? (
-              <>
-                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Refreshing...
-              </>
-            ) : (
-              <>
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                Refresh Data
-              </>
-            )}
-          </button>
+      {/* Row 1: Market selection + Date Range */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-end gap-2">
           <button
             onClick={handleTestCoinGlass}
             disabled={testingCoinGlass}
@@ -242,9 +232,9 @@ export const FullCycleControls: React.FC<FullCycleControlsProps> = ({
           </button>
         </div>
         {coinGlassTestResult && (
-          <div className={`mt-2 p-3 rounded-lg border ${
-            coinGlassTestResult.success 
-              ? 'bg-green-500/10 border-green-500/50 text-green-400' 
+          <div className={`p-3 rounded-lg border ${
+            coinGlassTestResult.success
+              ? 'bg-green-500/10 border-green-500/50 text-green-400'
               : 'bg-red-500/10 border-red-500/50 text-red-400'
           }`}>
             <div className="flex items-start gap-2">
@@ -267,11 +257,21 @@ export const FullCycleControls: React.FC<FullCycleControlsProps> = ({
             </div>
           </div>
         )}
-        <DateRangePicker
+        <SymbolExchangeControls
+          symbol={symbol}
+          onSymbolChange={setSymbol}
+          exchange={exchange}
+          onExchangeChange={setExchange}
           startDate={startDate}
-          endDate={endDate}
           onStartDateChange={setStartDate}
+          endDate={endDate}
           onEndDateChange={setEndDate}
+          timeframe={timeframe}
+          onTimeframeChange={setTimeframe}
+          onRefreshData={refreshData}
+          isRefreshingData={isLoading}
+          maxDaysRange={999}
+          showDataInfo={false}
         />
       </div>
 

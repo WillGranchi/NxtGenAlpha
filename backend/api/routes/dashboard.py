@@ -34,6 +34,26 @@ from backend.core.indicator_registry import get_available_conditions, evaluate_a
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 logger = logging.getLogger(__name__)
 
+def _load_price_df(symbol: str, exchange: str, start_date: Optional[datetime], end_date: Optional[datetime]) -> pd.DataFrame:
+    """
+    Load price data for a specific market.
+    Prefers CoinGlass (with cache), and falls back to CSV if configured.
+    """
+    try:
+        df, _, _ = fetch_crypto_data_smart(
+            symbol=symbol,
+            start_date=start_date,
+            end_date=end_date,
+            exchange=exchange,
+            interval="1d",
+            use_cache=True,
+            cross_validate=False
+        )
+        return df
+    except Exception as e:
+        logger.warning(f"Failed to fetch {symbol} on {exchange} from CoinGlass, falling back to CSV: {e}")
+        return load_crypto_data(symbol=symbol, exchange=exchange)
+
 
 class StrategySelection(BaseModel):
     """Strategy selection for combination."""
@@ -57,6 +77,8 @@ class CombinedSignalsRequest(BaseModel):
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     symbol: str = "BTCUSDT"
+    exchange: str = "Binance"
+    strategy_type: str = "long_cash"  # "long_cash" or "long_short"
 
 
 class CombinedBacktestRequest(BaseModel):
@@ -66,6 +88,8 @@ class CombinedBacktestRequest(BaseModel):
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     symbol: str = "BTCUSDT"
+    exchange: str = "Binance"
+    strategy_type: str = "long_cash"  # "long_cash" or "long_short"
     initial_capital: float = 10000.0
 
 
@@ -91,6 +115,8 @@ async def get_all_saved_strategies(
                 "id": s.id,
                 "name": s.name,
                 "description": s.description,
+                "symbol": getattr(s, "symbol", "BTCUSDT"),
+                "exchange": getattr(s, "exchange", "Binance"),
                 "created_at": s.created_at.isoformat() if s.created_at else "",
                 "updated_at": s.updated_at.isoformat() if s.updated_at else "",
                 "type": "indicator"
@@ -108,6 +134,8 @@ async def get_all_saved_strategies(
                 "id": v.id,
                 "name": v.name,
                 "description": v.description,
+                "symbol": getattr(v, "symbol", "BTCUSDT"),
+                "exchange": getattr(v, "exchange", "Binance"),
                 "created_at": v.created_at.isoformat() if v.created_at else "",
                 "updated_at": v.updated_at.isoformat() if v.updated_at else "",
                 "type": "valuation"
@@ -125,6 +153,8 @@ async def get_all_saved_strategies(
                 "id": p.id,
                 "name": p.name,
                 "description": p.description,
+                "symbol": getattr(p, "symbol", "BTCUSDT"),
+                "exchange": getattr(p, "exchange", "Binance"),
                 "created_at": p.created_at.isoformat() if p.created_at else "",
                 "updated_at": p.updated_at.isoformat() if p.updated_at else "",
                 "type": "fullcycle"
@@ -299,26 +329,20 @@ async def calculate_combined_signals(
         # Parse date range
         start_date_dt = pd.to_datetime(request.start_date) if request.start_date else None
         end_date_dt = pd.to_datetime(request.end_date) if request.end_date else None
-        
-        # Load price data
-        df, data_source, quality_metrics = fetch_crypto_data_smart(
-            symbol=request.symbol,
-            start_date=start_date_dt,
-            end_date=end_date_dt,
-            use_cache=True,
-            cross_validate=False
-        )
-        
-        if df is None or len(df) == 0:
-            raise HTTPException(
-                status_code=400,
-                detail=f"No price data available for {request.symbol}"
-            )
+
+        # Load price data for the dashboard context (used for chart/backtest context in the frontend)
+        dashboard_symbol = request.symbol or "BTCUSDT"
+        dashboard_exchange = request.exchange or "Binance"
+        df_dashboard = _load_price_df(dashboard_symbol, dashboard_exchange, start_date_dt, end_date_dt)
+
+        if df_dashboard is None or len(df_dashboard) == 0:
+            raise HTTPException(status_code=400, detail=f"No price data available for {dashboard_symbol} on {dashboard_exchange}")
         
         # Collect signals from each selected strategy
         indicator_signals = {}
         valuation_signals = {}
         fullcycle_signals = {}
+        selected_markets = []
         
         # Get indicator strategy signals
         for strategy_id in request.strategy_selection.indicator_strategy_ids:
@@ -328,7 +352,11 @@ async def calculate_combined_signals(
             ).first()
             
             if strategy:
-                signals = _get_indicator_strategy_signals(strategy, df, start_date_dt, end_date_dt)
+                s_symbol = getattr(strategy, "symbol", "BTCUSDT") or "BTCUSDT"
+                s_exchange = getattr(strategy, "exchange", "Binance") or "Binance"
+                selected_markets.append({"type": "indicator", "id": strategy.id, "name": strategy.name, "symbol": s_symbol, "exchange": s_exchange})
+                df_s = _load_price_df(s_symbol, s_exchange, start_date_dt, end_date_dt)
+                signals = _get_indicator_strategy_signals(strategy, df_s, start_date_dt, end_date_dt)
                 if len(signals) > 0:
                     indicator_signals[f"Indicator_{strategy.name}"] = signals
         
@@ -340,7 +368,11 @@ async def calculate_combined_signals(
             ).first()
             
             if valuation:
-                signals = _get_valuation_strategy_signals(valuation, df, start_date_dt, end_date_dt)
+                v_symbol = getattr(valuation, "symbol", "BTCUSDT") or "BTCUSDT"
+                v_exchange = getattr(valuation, "exchange", "Binance") or "Binance"
+                selected_markets.append({"type": "valuation", "id": valuation.id, "name": valuation.name, "symbol": v_symbol, "exchange": v_exchange})
+                df_v = _load_price_df(v_symbol, v_exchange, start_date_dt, end_date_dt)
+                signals = _get_valuation_strategy_signals(valuation, df_v, start_date_dt, end_date_dt)
                 if len(signals) > 0:
                     valuation_signals[f"Valuation_{valuation.name}"] = signals
         
@@ -352,11 +384,27 @@ async def calculate_combined_signals(
             ).first()
             
             if preset:
-                signals = _get_fullcycle_strategy_signals(preset, df, start_date_dt, end_date_dt)
+                p_symbol = getattr(preset, "symbol", "BTCUSDT") or "BTCUSDT"
+                p_exchange = getattr(preset, "exchange", "Binance") or "Binance"
+                selected_markets.append({"type": "fullcycle", "id": preset.id, "name": preset.name, "symbol": p_symbol, "exchange": p_exchange})
+                df_p = _load_price_df(p_symbol, p_exchange, start_date_dt, end_date_dt)
+                signals = _get_fullcycle_strategy_signals(preset, df_p, start_date_dt, end_date_dt)
                 if len(signals) > 0:
                     fullcycle_signals[f"FullCycle_{preset.name}"] = signals
         
         # Combine signals
+        # Enforce strategy semantics:
+        # - long_cash: -1 means CASH (neutral), not SHORT
+        # - long_short: -1 means SHORT
+        strategy_type = request.strategy_type or "long_cash"
+        if strategy_type not in ("long_cash", "long_short"):
+            raise HTTPException(status_code=400, detail="strategy_type must be 'long_cash' or 'long_short'")
+
+        if strategy_type == "long_cash":
+            for d in (indicator_signals, valuation_signals, fullcycle_signals):
+                for k, s in list(d.items()):
+                    d[k] = s.replace(-1, 0)
+
         combination_params = {}
         if request.combination_rule.method == "weighted":
             combination_params["weights"] = request.combination_rule.weights or {}
@@ -373,6 +421,21 @@ async def calculate_combined_signals(
             request.combination_rule.method,
             combination_params
         )
+
+        # Add market metadata + warnings (warn but allow)
+        unique_markets = sorted({f"{m['symbol']}@{m['exchange']}" for m in selected_markets})
+        warnings: List[str] = []
+        if len(unique_markets) > 1:
+            warnings.append(f"Selected strategies span multiple markets: {', '.join(unique_markets)}")
+        context_market = f"{dashboard_symbol}@{dashboard_exchange}"
+        if any(f"{m['symbol']}@{m['exchange']}" != context_market for m in selected_markets):
+            warnings.append(f"Dashboard context market is {context_market}; some strategies were computed on different markets.")
+        metadata = metadata or {}
+        metadata.update({
+            "dashboard_market": {"symbol": dashboard_symbol, "exchange": dashboard_exchange},
+            "selected_strategy_markets": selected_markets,
+            "warnings": warnings or None
+        })
         
         # Prepare response
         response = {
@@ -420,26 +483,20 @@ async def run_combined_backtest(
         # Parse date range
         start_date_dt = pd.to_datetime(request.start_date) if request.start_date else None
         end_date_dt = pd.to_datetime(request.end_date) if request.end_date else None
-        
-        # Load price data
-        df, data_source, quality_metrics = fetch_crypto_data_smart(
-            symbol=request.symbol,
-            start_date=start_date_dt,
-            end_date=end_date_dt,
-            use_cache=True,
-            cross_validate=False
-        )
-        
+
+        # Load price data for the dashboard context (this is the market we backtest on)
+        dashboard_symbol = request.symbol or "BTCUSDT"
+        dashboard_exchange = request.exchange or "Binance"
+        df = _load_price_df(dashboard_symbol, dashboard_exchange, start_date_dt, end_date_dt)
+
         if df is None or len(df) == 0:
-            raise HTTPException(
-                status_code=400,
-                detail=f"No price data available for {request.symbol}"
-            )
+            raise HTTPException(status_code=400, detail=f"No price data available for {dashboard_symbol} on {dashboard_exchange}")
         
         # Collect signals from each selected strategy
         indicator_signals = {}
         valuation_signals = {}
         fullcycle_signals = {}
+        selected_markets = []
         
         # Get indicator strategy signals
         for strategy_id in request.strategy_selection.indicator_strategy_ids:
@@ -449,7 +506,11 @@ async def run_combined_backtest(
             ).first()
             
             if strategy:
-                signals = _get_indicator_strategy_signals(strategy, df, start_date_dt, end_date_dt)
+                s_symbol = getattr(strategy, "symbol", "BTCUSDT") or "BTCUSDT"
+                s_exchange = getattr(strategy, "exchange", "Binance") or "Binance"
+                selected_markets.append({"type": "indicator", "id": strategy.id, "name": strategy.name, "symbol": s_symbol, "exchange": s_exchange})
+                df_s = _load_price_df(s_symbol, s_exchange, start_date_dt, end_date_dt)
+                signals = _get_indicator_strategy_signals(strategy, df_s, start_date_dt, end_date_dt)
                 if len(signals) > 0:
                     indicator_signals[f"Indicator_{strategy.name}"] = signals
         
@@ -461,7 +522,11 @@ async def run_combined_backtest(
             ).first()
             
             if valuation:
-                signals = _get_valuation_strategy_signals(valuation, df, start_date_dt, end_date_dt)
+                v_symbol = getattr(valuation, "symbol", "BTCUSDT") or "BTCUSDT"
+                v_exchange = getattr(valuation, "exchange", "Binance") or "Binance"
+                selected_markets.append({"type": "valuation", "id": valuation.id, "name": valuation.name, "symbol": v_symbol, "exchange": v_exchange})
+                df_v = _load_price_df(v_symbol, v_exchange, start_date_dt, end_date_dt)
+                signals = _get_valuation_strategy_signals(valuation, df_v, start_date_dt, end_date_dt)
                 if len(signals) > 0:
                     valuation_signals[f"Valuation_{valuation.name}"] = signals
         
@@ -473,11 +538,24 @@ async def run_combined_backtest(
             ).first()
             
             if preset:
-                signals = _get_fullcycle_strategy_signals(preset, df, start_date_dt, end_date_dt)
+                p_symbol = getattr(preset, "symbol", "BTCUSDT") or "BTCUSDT"
+                p_exchange = getattr(preset, "exchange", "Binance") or "Binance"
+                selected_markets.append({"type": "fullcycle", "id": preset.id, "name": preset.name, "symbol": p_symbol, "exchange": p_exchange})
+                df_p = _load_price_df(p_symbol, p_exchange, start_date_dt, end_date_dt)
+                signals = _get_fullcycle_strategy_signals(preset, df_p, start_date_dt, end_date_dt)
                 if len(signals) > 0:
                     fullcycle_signals[f"FullCycle_{preset.name}"] = signals
         
         # Combine signals
+        strategy_type = request.strategy_type or "long_cash"
+        if strategy_type not in ("long_cash", "long_short"):
+            raise HTTPException(status_code=400, detail="strategy_type must be 'long_cash' or 'long_short'")
+
+        if strategy_type == "long_cash":
+            for d in (indicator_signals, valuation_signals, fullcycle_signals):
+                for k, s in list(d.items()):
+                    d[k] = s.replace(-1, 0)
+
         combination_params = {}
         if request.combination_rule.method == "weighted":
             combination_params["weights"] = request.combination_rule.weights or {}
@@ -494,14 +572,31 @@ async def run_combined_backtest(
             request.combination_rule.method,
             combination_params
         )
+
+        # Add market metadata + warnings (warn but allow)
+        unique_markets = sorted({f"{m['symbol']}@{m['exchange']}" for m in selected_markets})
+        warnings: List[str] = []
+        if len(unique_markets) > 1:
+            warnings.append(f"Selected strategies span multiple markets: {', '.join(unique_markets)}")
+        context_market = f"{dashboard_symbol}@{dashboard_exchange}"
+        if any(f"{m['symbol']}@{m['exchange']}" != context_market for m in selected_markets):
+            warnings.append(f"Backtest context market is {context_market}; some strategies were computed on different markets.")
+        metadata = metadata or {}
+        metadata.update({
+            "dashboard_market": {"symbol": dashboard_symbol, "exchange": dashboard_exchange},
+            "selected_strategy_markets": selected_markets,
+            "warnings": warnings or None
+        })
         
         # Align signals with dataframe
         aligned_signals = combined_signals.reindex(df.index, fill_value=0)
+        if strategy_type == "long_cash":
+            aligned_signals = aligned_signals.replace(-1, 0)
         
         # Create DataFrame with signals for backtest
         df_with_signals = df.copy()
         df_with_signals['Signal'] = aligned_signals
-        df_with_signals['Position'] = aligned_signals  # For long_cash strategy
+        df_with_signals['Position'] = aligned_signals
         
         # Run backtest
         engine = BacktestEngine(initial_capital=request.initial_capital)

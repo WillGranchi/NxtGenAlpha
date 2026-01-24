@@ -16,6 +16,7 @@ import { CombinedBacktest } from './CombinedBacktest';
 import { useCombinedStrategies } from '../../hooks/useCombinedStrategies';
 import { TradingAPI } from '../../services/api';
 import { EquityDataPoint } from '../../services/api';
+import { SymbolExchangeControls } from '../SymbolExchangeControls';
 
 export const UnifiedDashboard: React.FC = () => {
   const {
@@ -30,6 +31,14 @@ export const UnifiedDashboard: React.FC = () => {
     setStartDate,
     endDate,
     setEndDate
+    ,
+    strategyType,
+    setStrategyType,
+    symbol,
+    setSymbol,
+    exchange,
+    setExchange,
+    calculateSignals
   } = useCombinedStrategies();
 
   const [indicatorSectionOpen, setIndicatorSectionOpen] = useState(true);
@@ -41,23 +50,90 @@ export const UnifiedDashboard: React.FC = () => {
 
   const [priceData, setPriceData] = useState<EquityDataPoint[]>([]);
   const [priceDataLoading, setPriceDataLoading] = useState(false);
+  const [isRefreshingData, setIsRefreshingData] = useState(false);
 
-  // Get strategy names for rules builder
+  // Strategy metadata cache (ID -> backend key string + market)
+  const [strategyKeyById, setStrategyKeyById] = useState<Record<string, string>>({});
+  const [strategyMarketById, setStrategyMarketById] = useState<Record<string, { symbol: string; exchange: string }>>({});
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const resp = await TradingAPI.getAllSavedStrategies();
+        if (!resp?.success || cancelled) return;
+
+        const map: Record<string, string> = {};
+        const marketMap: Record<string, { symbol: string; exchange: string }> = {};
+        resp.indicator_strategies?.forEach((s: any) => {
+          map[`indicator:${s.id}`] = `Indicator_${s.name}`;
+          marketMap[`indicator:${s.id}`] = { symbol: s.symbol || 'BTCUSDT', exchange: s.exchange || 'Binance' };
+        });
+        resp.valuation_strategies?.forEach((s: any) => {
+          map[`valuation:${s.id}`] = `Valuation_${s.name}`;
+          marketMap[`valuation:${s.id}`] = { symbol: s.symbol || 'BTCUSDT', exchange: s.exchange || 'Binance' };
+        });
+        resp.fullcycle_presets?.forEach((s: any) => {
+          map[`fullcycle:${s.id}`] = `FullCycle_${s.name}`;
+          marketMap[`fullcycle:${s.id}`] = { symbol: s.symbol || 'BTCUSDT', exchange: s.exchange || 'Binance' };
+        });
+
+        setStrategyKeyById(map);
+        setStrategyMarketById(marketMap);
+      } catch (e) {
+        // Non-fatal: rules builder will show fallback names if this fails
+        console.warn('[UnifiedDashboard] Failed to load strategy names for rule builder', e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Get backend-consistent strategy keys for rules builder (must match backend)
   const strategyNames = useMemo(() => {
     const names: string[] = [];
-    // We'll need to fetch strategy names from the API
-    // For now, use generic names based on selection
-    strategySelection.indicator_strategy_ids.forEach((id, idx) => {
-      names.push(`Indicator_${id}`);
+    strategySelection.indicator_strategy_ids.forEach((id) => {
+      names.push(strategyKeyById[`indicator:${id}`] || `Indicator_${id}`);
     });
-    strategySelection.valuation_strategy_ids.forEach((id, idx) => {
-      names.push(`Valuation_${id}`);
+    strategySelection.valuation_strategy_ids.forEach((id) => {
+      names.push(strategyKeyById[`valuation:${id}`] || `Valuation_${id}`);
     });
-    strategySelection.fullcycle_preset_ids.forEach((id, idx) => {
-      names.push(`FullCycle_${id}`);
+    strategySelection.fullcycle_preset_ids.forEach((id) => {
+      names.push(strategyKeyById[`fullcycle:${id}`] || `FullCycle_${id}`);
     });
     return names;
-  }, [strategySelection]);
+  }, [strategySelection, strategyKeyById]);
+
+  const selectedMarkets = useMemo(() => {
+    const markets: Array<{ key: string; symbol: string; exchange: string }> = [];
+    strategySelection.indicator_strategy_ids.forEach((id) => {
+      const meta = strategyMarketById[`indicator:${id}`];
+      markets.push({ key: `indicator:${id}`, symbol: meta?.symbol || 'BTCUSDT', exchange: meta?.exchange || 'Binance' });
+    });
+    strategySelection.valuation_strategy_ids.forEach((id) => {
+      const meta = strategyMarketById[`valuation:${id}`];
+      markets.push({ key: `valuation:${id}`, symbol: meta?.symbol || 'BTCUSDT', exchange: meta?.exchange || 'Binance' });
+    });
+    strategySelection.fullcycle_preset_ids.forEach((id) => {
+      const meta = strategyMarketById[`fullcycle:${id}`];
+      markets.push({ key: `fullcycle:${id}`, symbol: meta?.symbol || 'BTCUSDT', exchange: meta?.exchange || 'Binance' });
+    });
+    return markets;
+  }, [strategySelection, strategyMarketById]);
+
+  const marketWarnings = useMemo(() => {
+    const uniques = new Set(selectedMarkets.map((m) => `${m.symbol}@${m.exchange}`));
+    const warnings: string[] = [];
+    if (uniques.size > 1) {
+      warnings.push(`You selected strategies from multiple markets: ${Array.from(uniques).join(', ')}`);
+    }
+    const ctx = `${symbol}@${exchange}`;
+    if (selectedMarkets.some((m) => `${m.symbol}@${m.exchange}` !== ctx)) {
+      warnings.push(`Dashboard context market is ${ctx}; some selected strategies were computed on other markets.`);
+    }
+    return warnings;
+  }, [selectedMarkets, symbol, exchange]);
 
   // Cache for price data to avoid redundant fetches
   const priceDataCacheRef = React.useRef<Map<string, EquityDataPoint[]>>(new Map());
@@ -86,7 +162,7 @@ export const UnifiedDashboard: React.FC = () => {
     }
     
     // Check cache first
-    const cacheKey = `${firstDate}_${lastDate}`;
+    const cacheKey = `${symbol}_${exchange}_${firstDate}_${lastDate}`;
     const cachedData = priceDataCacheRef.current.get(cacheKey);
     if (cachedData && cachedData.length > 0) {
       console.debug('[UnifiedDashboard] Using cached price data');
@@ -99,8 +175,8 @@ export const UnifiedDashboard: React.FC = () => {
       
       // Fetch actual price data from CoinGlass API (uses caching internally)
       const priceHistory = await TradingAPI.getPriceHistory({
-        symbol: 'BTCUSDT',
-        exchange: 'Binance',
+        symbol,
+        exchange,
         start_date: firstDate,
         end_date: lastDate,
         interval: '1d'
@@ -188,7 +264,40 @@ export const UnifiedDashboard: React.FC = () => {
               </p>
             </div>
           )}
+          {(combinedSignals?.metadata?.warnings || marketWarnings.length > 0) && (
+            <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+              <div className="text-sm text-yellow-300 space-y-1">
+                {(combinedSignals?.metadata?.warnings || marketWarnings).filter(Boolean).map((w: string, idx: number) => (
+                  <div key={idx}>- {w}</div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* Dashboard Market Context (symbol/exchange + date range) */}
+        <SymbolExchangeControls
+          symbol={symbol}
+          onSymbolChange={setSymbol}
+          exchange={exchange}
+          onExchangeChange={setExchange}
+          startDate={startDate}
+          onStartDateChange={setStartDate}
+          endDate={endDate || new Date().toISOString().split('T')[0]}
+          onEndDateChange={setEndDate}
+          onRefreshData={async () => {
+            setIsRefreshingData(true);
+            try {
+              await TradingAPI.refreshData(symbol, true, undefined, exchange);
+              await calculateSignals();
+            } finally {
+              setIsRefreshingData(false);
+            }
+          }}
+          isRefreshingData={isRefreshingData}
+          maxDaysRange={999}
+          showDataInfo={false}
+        />
 
         {/* Strategy Selection Sections */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -292,6 +401,34 @@ export const UnifiedDashboard: React.FC = () => {
             </button>
             {rulesSectionOpen && (
               <div className="p-6 border-t border-border-default">
+                <div className="mb-6 flex flex-wrap items-center gap-3">
+                  <div className="text-sm text-text-secondary">Strategy Mode:</div>
+                  <div className="bg-bg-tertiary border border-border-default rounded-lg p-1 inline-flex">
+                    <button
+                      onClick={() => setStrategyType('long_cash')}
+                      className={`px-3 py-1.5 rounded text-sm font-medium transition-all duration-200 ${
+                        strategyType === 'long_cash'
+                          ? 'bg-primary-500 text-white'
+                          : 'text-text-secondary hover:text-text-primary'
+                      }`}
+                    >
+                      Long / Cash
+                    </button>
+                    <button
+                      onClick={() => setStrategyType('long_short')}
+                      className={`px-3 py-1.5 rounded text-sm font-medium transition-all duration-200 ${
+                        strategyType === 'long_short'
+                          ? 'bg-primary-500 text-white'
+                          : 'text-text-secondary hover:text-text-primary'
+                      }`}
+                    >
+                      Long / Short
+                    </button>
+                  </div>
+                  <div className="text-xs text-text-muted">
+                    In Long/Cash mode, -1 is treated as Cash (neutral).
+                  </div>
+                </div>
                 <CustomRulesBuilder
                   strategyNames={strategyNames}
                   rule={combinationRule}
@@ -373,6 +510,9 @@ export const UnifiedDashboard: React.FC = () => {
                 <CombinedBacktest
                   strategySelection={strategySelection}
                   combinationRule={combinationRule}
+                  symbol={symbol}
+                  exchange={exchange}
+                  strategyType={strategyType}
                 />
               </div>
             )}

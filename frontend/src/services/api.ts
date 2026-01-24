@@ -722,6 +722,7 @@ export class TradingAPI {
   static async calculateFullCycleZScores(request: {
     indicators: string[];
     indicator_params?: Record<string, Record<string, any>>;
+    symbol?: string;
     start_date?: string;
     end_date?: string;
     timeframe?: string;
@@ -770,6 +771,8 @@ export class TradingAPI {
     description?: string;
     indicator_params: Record<string, Record<string, any>>;
     selected_indicators: string[];
+    symbol?: string;
+    exchange?: string;
     start_date?: string;
     end_date?: string;
     roc_days: number;
@@ -786,6 +789,8 @@ export class TradingAPI {
       description?: string;
       indicator_params: Record<string, Record<string, any>>;
       selected_indicators: string[];
+      symbol?: string;
+      exchange?: string;
       start_date?: string;
       end_date?: string;
       roc_days: number;
@@ -811,6 +816,8 @@ export class TradingAPI {
       id: number;
       name: string;
       description?: string;
+      symbol?: string;
+      exchange?: string;
       created_at: string;
       updated_at: string;
     }>;
@@ -831,6 +838,8 @@ export class TradingAPI {
       description?: string;
       indicator_params: Record<string, Record<string, any>>;
       selected_indicators: string[];
+      symbol?: string;
+      exchange?: string;
       start_date?: string;
       end_date?: string;
       roc_days: number;
@@ -1104,6 +1113,8 @@ export class TradingAPI {
       id: number;
       name: string;
       description?: string;
+      symbol?: string;
+      exchange?: string;
       created_at: string;
       updated_at: string;
       type: string;
@@ -1112,6 +1123,8 @@ export class TradingAPI {
       id: number;
       name: string;
       description?: string;
+      symbol?: string;
+      exchange?: string;
       created_at: string;
       updated_at: string;
       type: string;
@@ -1120,6 +1133,8 @@ export class TradingAPI {
       id: number;
       name: string;
       description?: string;
+      symbol?: string;
+      exchange?: string;
       created_at: string;
       updated_at: string;
       type: string;
@@ -1148,6 +1163,8 @@ export class TradingAPI {
     start_date?: string;
     end_date?: string;
     symbol?: string;
+    exchange?: string;
+    strategy_type?: 'long_cash' | 'long_short';
   }): Promise<{
     success: boolean;
     combined_signals: {
@@ -1182,7 +1199,9 @@ export class TradingAPI {
     start_date?: string;
     end_date?: string;
     symbol?: string;
+    exchange?: string;
     initial_capital?: number;
+    strategy_type?: 'long_cash' | 'long_short';
   }): Promise<{
     success: boolean;
     backtest_results: any;

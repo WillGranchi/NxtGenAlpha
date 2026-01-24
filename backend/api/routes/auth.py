@@ -158,7 +158,7 @@ async def signup(
         
         # Hash password (ensure it's a string, not bytes)
         password_str = str(request.password).strip()
-        
+        password_bytes_len = len(password_str.encode("utf-8"))
         if password_bytes_len > 72:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

@@ -139,6 +139,7 @@ class SaveValuationRequest(BaseModel):
     overbought_threshold: float = Field(..., description="Overbought threshold")
     oversold_threshold: float = Field(..., description="Oversold threshold")
     symbol: str = Field(..., description="Trading pair symbol", max_length=20)
+    exchange: str = Field(default="Binance", description="Exchange name", max_length=50)
     start_date: Optional[str] = Field(None, description="Start date in YYYY-MM-DD format")
     end_date: Optional[str] = Field(None, description="End date in YYYY-MM-DD format")
 
@@ -155,6 +156,7 @@ class UpdateValuationRequest(BaseModel):
     overbought_threshold: Optional[float] = Field(None, description="Overbought threshold")
     oversold_threshold: Optional[float] = Field(None, description="Oversold threshold")
     symbol: Optional[str] = Field(None, description="Trading pair symbol", max_length=20)
+    exchange: Optional[str] = Field(None, description="Exchange name", max_length=50)
     start_date: Optional[str] = Field(None, description="Start date in YYYY-MM-DD format")
     end_date: Optional[str] = Field(None, description="End date in YYYY-MM-DD format")
 
@@ -187,6 +189,7 @@ class ValuationResponse(BaseModel):
     overbought_threshold: float = Field(..., description="Overbought threshold")
     oversold_threshold: float = Field(..., description="Oversold threshold")
     symbol: str = Field(..., description="Trading pair symbol")
+    exchange: str = Field(..., description="Exchange name")
     start_date: Optional[str] = Field(None, description="Start date")
     end_date: Optional[str] = Field(None, description="End date")
     created_at: str = Field(..., description="Creation timestamp")

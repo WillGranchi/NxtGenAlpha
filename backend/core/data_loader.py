@@ -230,6 +230,10 @@ def fetch_crypto_data_from_binance(symbol: str = "BTCUSDT", days: int = 1825, st
     Raises:
         Exception: If API request fails
     """
+    raise RuntimeError(
+        "Non-CoinGlass data sources are disabled. "
+        "Binance fallback is not allowed; use CoinGlass via fetch_crypto_data_smart()/update_crypto_data()."
+    )
     logger = logging.getLogger(__name__)
     
     try:
@@ -422,6 +426,10 @@ def fetch_crypto_recent_from_coingecko(symbol: str, days: int = 365) -> pd.DataF
     Raises:
         Exception: If API request fails or symbol not supported
     """
+    raise RuntimeError(
+        "Non-CoinGlass data sources are disabled. "
+        "CoinGecko fallback is not allowed; use CoinGlass via fetch_crypto_data_smart()/update_crypto_data()."
+    )
     logger = logging.getLogger(__name__)
     
     # Get CoinGecko coin ID
@@ -550,6 +558,10 @@ def fetch_crypto_data_from_coingecko(symbol: str = "BTCUSDT", start_date: Option
     Raises:
         Exception: If API request fails or symbol not supported
     """
+    raise RuntimeError(
+        "Non-CoinGlass data sources are disabled. "
+        "CoinGecko fallback is not allowed; use CoinGlass via fetch_crypto_data_smart()/update_crypto_data()."
+    )
     logger = logging.getLogger(__name__)
     
     # Get CoinGecko coin ID
@@ -632,6 +644,10 @@ def fetch_btc_data_from_coingecko(days: int = 365, start_date: Optional[datetime
     Raises:
         Exception: If API request fails
     """
+    raise RuntimeError(
+        "Non-CoinGlass data sources are disabled. "
+        "CoinGecko fallback is not allowed; use CoinGlass via update_crypto_data()."
+    )
     if start_date:
         end_date = datetime.now()
         return fetch_crypto_data_from_coingecko("BTCUSDT", start_date=start_date, end_date=end_date)
@@ -659,6 +675,10 @@ def fetch_crypto_historical_from_coingecko(symbol: str, start_date: datetime, en
     Raises:
         Exception: If API request fails or symbol not supported
     """
+    raise RuntimeError(
+        "Non-CoinGlass data sources are disabled. "
+        "CoinGecko fallback is not allowed; use CoinGlass via fetch_crypto_data_smart()/update_crypto_data()."
+    )
     logger = logging.getLogger(__name__)
     
     # Get CoinGecko coin ID
@@ -1021,6 +1041,10 @@ def fetch_crypto_data_from_yahoo_finance(
         ValueError: If symbol not supported or yfinance not available
         Exception: If API request fails
     """
+    raise RuntimeError(
+        "Non-CoinGlass data sources are disabled. "
+        "Yahoo Finance fallback is not allowed; use CoinGlass via fetch_crypto_data_smart()/update_crypto_data()."
+    )
     logger = logging.getLogger(__name__)
     
     if not YFINANCE_AVAILABLE:
@@ -1152,6 +1176,10 @@ def fetch_crypto_data_from_cryptocompare(
     Raises:
         ValueError: If symbol not supported or API request fails
     """
+    raise RuntimeError(
+        "Non-CoinGlass data sources are disabled. "
+        "CryptoCompare fallback is not allowed; use CoinGlass via fetch_crypto_data_smart()/update_crypto_data()."
+    )
     logger = logging.getLogger(__name__)
     
     # Get CryptoCompare symbol
@@ -1663,6 +1691,10 @@ def fetch_crypto_data_hybrid(symbol: str = "BTCUSDT", days: int = 1825, start_da
     Raises:
         Exception: If CoinGecko fetch fails or symbol not supported
     """
+    raise RuntimeError(
+        "Non-CoinGlass data sources are disabled. "
+        "Hybrid/fallback data fetch is not allowed; use CoinGlass via update_crypto_data()."
+    )
     logger = logging.getLogger(__name__)
     
     # Default to 2010-01-01 (earliest CoinGecko data) if no start_date provided
@@ -1686,7 +1718,14 @@ def fetch_crypto_data_hybrid(symbol: str = "BTCUSDT", days: int = 1825, start_da
         raise Exception(f"Failed to fetch {symbol} data from CoinGecko: {str(e)}")
 
 
-def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int = 1825, start_date: Optional[datetime] = None, include_additional_metrics: bool = False) -> pd.DataFrame:
+def update_crypto_data(
+    symbol: str = "BTCUSDT",
+    force: bool = False,
+    days: int = 1825,
+    start_date: Optional[datetime] = None,
+    exchange: str = "Binance",
+    include_additional_metrics: bool = False
+) -> pd.DataFrame:
     """
     Update cryptocurrency data using ONLY CoinGlass API (no fallbacks).
     Saves to CSV and caches locally. Checks if data is fresh (updated within last 24 hours) before fetching.
@@ -1704,9 +1743,6 @@ def update_crypto_data(symbol: str = "BTCUSDT", force: bool = False, days: int =
     global _last_update_time
     
     logger = logging.getLogger(__name__)
-    
-    # Determine exchange (default to Binance)
-    exchange = "Binance"  # Can be made configurable later
     
     # Check for incremental update: if data exists in database, only fetch new data
     latest_db_date = get_latest_data_date(symbol=symbol, exchange=exchange)

@@ -22,12 +22,16 @@ interface CombinedBacktestProps {
     expression?: string;
   };
   symbol?: string;
+  exchange?: string;
+  strategyType?: 'long_cash' | 'long_short';
 }
 
 export const CombinedBacktest: React.FC<CombinedBacktestProps> = ({
   strategySelection,
   combinationRule,
-  symbol = 'BTCUSDT'
+  symbol = 'BTCUSDT',
+  exchange = 'Binance',
+  strategyType = 'long_cash'
 }) => {
   const [startDate, setStartDate] = useState<string>('2020-01-01');
   const [endDate, setEndDate] = useState<string>('');
@@ -47,7 +51,9 @@ export const CombinedBacktest: React.FC<CombinedBacktestProps> = ({
         start_date: startDate,
         end_date: endDate || undefined,
         symbol,
-        initial_capital: initialCapital
+        exchange,
+        initial_capital: initialCapital,
+        strategy_type: strategyType,
       });
       
       setResults(response);

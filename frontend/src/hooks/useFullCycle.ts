@@ -48,7 +48,9 @@ export interface UseFullCycleReturn {
   endDate: string;
   setEndDate: (date: string) => void;
   
-  // Timeframe and exchange
+  // Market, timeframe and exchange
+  symbol: string;
+  setSymbol: (symbol: string) => void;
   timeframe: string;
   setTimeframe: (timeframe: string) => void;
   exchange: string;
@@ -85,6 +87,9 @@ export interface UseFullCycleReturn {
   loadPreset: (preset: {
     indicator_params: Record<string, Record<string, number>>;
     selected_indicators: string[];
+    symbol?: string;
+    exchange?: string;
+    timeframe?: string;
     start_date?: string;
     end_date?: string;
     roc_days: number;
@@ -143,6 +148,7 @@ export const useFullCycle = (): UseFullCycleReturn => {
   const [endDate, setEndDate] = useState<string>('');
   
   // Timeframe and exchange
+  const [symbol, setSymbol] = useState<string>('BTCUSDT');
   const [timeframe, setTimeframe] = useState<string>('1d');
   const [exchange, setExchange] = useState<string>('Binance');
   
@@ -232,6 +238,7 @@ export const useFullCycle = (): UseFullCycleReturn => {
       const response = await TradingAPI.calculateFullCycleZScores({
         indicators: selectedIndicators,
         indicator_params: Object.keys(indicatorParams).length > 0 ? indicatorParams : undefined,
+        symbol,
         start_date: startDate || undefined,
         end_date: endDate || undefined,
         timeframe: timeframe,
@@ -265,7 +272,7 @@ export const useFullCycle = (): UseFullCycleReturn => {
         setZscoresLoading(false);
       }
     }
-    }, [selectedIndicators, indicatorParameters, startDate, endDate, timeframe, exchange, rocDays, sdcaIn, sdcaOut, zscoreData.length]);
+    }, [selectedIndicators, indicatorParameters, symbol, startDate, endDate, timeframe, exchange, rocDays, sdcaIn, sdcaOut, zscoreData.length]);
   
   // Toggle indicator visibility
   const toggleIndicatorVisibility = useCallback((indicatorId: string) => {
@@ -307,6 +314,9 @@ export const useFullCycle = (): UseFullCycleReturn => {
   const loadPreset = useCallback((preset: {
     indicator_params: Record<string, Record<string, number>>;
     selected_indicators: string[];
+    symbol?: string;
+    exchange?: string;
+    timeframe?: string;
     start_date?: string;
     end_date?: string;
     roc_days: number;
@@ -320,6 +330,9 @@ export const useFullCycle = (): UseFullCycleReturn => {
     setSelectedIndicators(preset.selected_indicators || []);
     // Only show average by default, or use preset visibility if available
     setVisibleIndicators(new Set(['average']));
+    if (preset.symbol) setSymbol(preset.symbol);
+    if (preset.exchange) setExchange(preset.exchange);
+    if (preset.timeframe) setTimeframe(preset.timeframe);
     if (preset.start_date) setStartDate(preset.start_date);
     if (preset.end_date) setEndDate(preset.end_date);
     setRocDays(preset.roc_days);
@@ -353,8 +366,11 @@ export const useFullCycle = (): UseFullCycleReturn => {
       const response = await TradingAPI.calculateFullCycleZScores({
         indicators: selectedIndicators,
         indicator_params: Object.keys(indicatorParams).length > 0 ? indicatorParams : undefined,
+        symbol,
         start_date: startDate || undefined,
         end_date: endDate || undefined,
+        timeframe,
+        exchange,
         roc_days: rocDays,
         sdca_in: sdcaIn,
         sdca_out: sdcaOut,
@@ -374,7 +390,7 @@ export const useFullCycle = (): UseFullCycleReturn => {
       setZscoresError(errorMsg);
       // Don't clear data on error (optimistic UI: keep showing cached data)
     }
-  }, [selectedIndicators, indicatorParameters, startDate, endDate, timeframe, exchange, rocDays, sdcaIn, sdcaOut]);
+  }, [selectedIndicators, indicatorParameters, symbol, startDate, endDate, timeframe, exchange, rocDays, sdcaIn, sdcaOut]);
   
   // Set default end date to today
   useEffect(() => {
@@ -431,7 +447,9 @@ export const useFullCycle = (): UseFullCycleReturn => {
     endDate,
     setEndDate,
     
-    // Timeframe and exchange
+    // Market, timeframe and exchange
+    symbol,
+    setSymbol,
     timeframe,
     setTimeframe,
     exchange,

@@ -10,6 +10,8 @@ interface FullCyclePreset {
   id: number;
   name: string;
   description?: string;
+  symbol?: string;
+  exchange?: string;
   created_at: string;
   updated_at: string;
   type: string;
@@ -117,6 +119,9 @@ export const FullCyclePresetList: React.FC<FullCyclePresetListProps> = ({
             {preset.description && (
               <p className="text-sm text-text-muted mt-1 line-clamp-2">{preset.description}</p>
             )}
+            <p className="text-xs text-text-muted mt-2">
+              {(preset.symbol || 'BTCUSDT')} · {(preset.exchange || 'Binance')}
+            </p>
             <p className="text-xs text-text-muted mt-2">
               Updated {new Date(preset.updated_at).toLocaleDateString()}
             </p>

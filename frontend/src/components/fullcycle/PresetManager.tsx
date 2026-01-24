@@ -19,6 +19,9 @@ interface PresetManagerProps {
   onLoadPreset: (preset: {
     indicator_params: Record<string, Record<string, number>>;
     selected_indicators: string[];
+    symbol?: string;
+    exchange?: string;
+    timeframe?: string;
     start_date?: string;
     end_date?: string;
     roc_days: number;
@@ -31,6 +34,9 @@ interface PresetManagerProps {
   currentConfig: {
     indicator_params: Record<string, Record<string, number>>;
     selected_indicators: string[];
+    symbol?: string;
+    exchange?: string;
+    timeframe?: string;
     start_date: string;
     end_date: string;
     roc_days: number;
@@ -85,6 +91,8 @@ export const PresetManager: React.FC<PresetManagerProps> = ({
         description: presetDescription || undefined,
         indicator_params: currentConfig.indicator_params,
         selected_indicators: currentConfig.selected_indicators,
+        symbol: currentConfig.symbol,
+        exchange: currentConfig.exchange,
         start_date: currentConfig.start_date || undefined,
         end_date: currentConfig.end_date || undefined,
         roc_days: currentConfig.roc_days,
@@ -115,6 +123,8 @@ export const PresetManager: React.FC<PresetManagerProps> = ({
         onLoadPreset({
           indicator_params: response.preset.indicator_params,
           selected_indicators: response.preset.selected_indicators,
+          symbol: response.preset.symbol,
+          exchange: response.preset.exchange,
           start_date: response.preset.start_date,
           end_date: response.preset.end_date,
           roc_days: response.preset.roc_days,

@@ -40,6 +40,10 @@ class Strategy(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
+
+    # Market metadata (so users don't accidentally combine strategies across different markets)
+    symbol = Column(String(20), nullable=False, default="BTCUSDT")
+    exchange = Column(String(50), nullable=False, default="Binance")
     
     # Strategy configuration stored as JSON
     indicators = Column(JSON, nullable=False)  # List of IndicatorConfig
@@ -79,6 +83,7 @@ class Valuation(Base):
     overbought_threshold = Column(Float, nullable=False)
     oversold_threshold = Column(Float, nullable=False)
     symbol = Column(String(20), nullable=False)
+    exchange = Column(String(50), nullable=False, default="Binance")
     start_date = Column(String(20), nullable=True)
     end_date = Column(String(20), nullable=True)
     
@@ -102,6 +107,9 @@ class FullCyclePreset(Base):
     # Preset configuration stored as JSON
     indicator_params = Column(JSON, nullable=False)  # {indicator_id: {param_name: value}}
     selected_indicators = Column(JSON, nullable=False)  # List of indicator IDs
+    # Market metadata (defaults to BTC, but supports other tokens as CoinGlass coverage expands)
+    symbol = Column(String(20), nullable=False, default="BTCUSDT")
+    exchange = Column(String(50), nullable=False, default="Binance")
     start_date = Column(String(20), nullable=True)
     end_date = Column(String(20), nullable=True)
     roc_days = Column(Integer, nullable=False, default=7)

@@ -100,16 +100,16 @@ export const SymbolExchangeControls: React.FC<SymbolExchangeControlsProps> = ({
           setExchanges(sortedExchanges);
           console.log('[SymbolExchangeControls] Loaded exchanges:', sortedExchanges.length);
         } else {
-          console.warn('[SymbolExchangeControls] Invalid response or no symbols, using fallback');
-          // Fallback to default symbols and exchanges
-          setSymbols(['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT', 'DOTUSDT', 'MATICUSDT', 'LTCUSDT']);
-          setExchanges(['Binance', 'Coinbase', 'OKX', 'Bybit', 'Kraken']);
+          console.warn('[SymbolExchangeControls] Invalid response or no symbols from CoinGlass');
+          // No hardcoded fallbacks (to avoid misleading users); keep current selections as the only options.
+          setSymbols([symbol]);
+          setExchanges([exchange]);
         }
       } catch (error) {
         console.error('[SymbolExchangeControls] Failed to fetch symbols and exchanges:', error);
-        // Fallback to default symbols and exchanges
-        setSymbols(['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT', 'DOTUSDT', 'MATICUSDT', 'LTCUSDT']);
-        setExchanges(['Binance', 'Coinbase', 'OKX', 'Bybit', 'Kraken']);
+        // No hardcoded fallbacks (to avoid misleading users); keep current selections as the only options.
+        setSymbols([symbol]);
+        setExchanges([exchange]);
       } finally {
         setIsLoadingSymbols(false);
       }
