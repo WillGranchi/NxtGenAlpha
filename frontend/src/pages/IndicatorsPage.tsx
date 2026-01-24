@@ -51,8 +51,8 @@ const IndicatorsPage: React.FC = () => {
     return new Date().toISOString().split('T')[0];
   });
   const [startDate, setStartDate] = useState<string>(() => {
-    const today = new Date().toISOString().split('T')[0];
-    return calculateMaxStartDate(today);
+    // Match Valuation default: request full history and let backend clamp to available range
+    return '2010-01-01';
   });
   const [strategyType, setStrategyType] = useState<'long_cash' | 'long_short'>('long_cash');
   const [initialCapital, setInitialCapital] = useState<number>(10000);
@@ -673,7 +673,7 @@ const IndicatorsPage: React.FC = () => {
                   <>
                     <PriceChart
                       data={chartData}
-                      title={hasResults ? "Overall Strategy - Combined Trading Signals" : "BTC Price Chart"}
+                      title={hasResults ? "Overall Strategy - Combined Trading Signals" : `${symbol} Price Chart`}
                       height={isMobile ? 400 : 600}
                       overlaySignals={hasResults ? { ...overlaySignals, ...combinedOverlaySignals } : {}}
                       showOverlayLegend={hasResults}
