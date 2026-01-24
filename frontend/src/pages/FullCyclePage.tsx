@@ -348,33 +348,33 @@ const FullCyclePage: React.FC = () => {
                       </div>
                     </div>
                   ) : (
-                  {viewMode === 'chart' ? (
-                    <div ref={chartRef}>
-                      <FullCycleChart
+                    viewMode === 'chart' ? (
+                      <div ref={chartRef}>
+                        <FullCycleChart
+                          data={zscoreData}
+                          availableIndicators={availableIndicators}
+                          selectedIndicators={selectedIndicators}
+                          visibleIndicators={visibleIndicators}
+                          showFundamentalAverage={showFundamentalAverage}
+                          showTechnicalAverage={showTechnicalAverage}
+                          showOverallAverage={showOverallAverage}
+                          sdcaIn={sdcaIn}
+                          sdcaOut={sdcaOut}
+                          height={isMobile ? 400 : 600}
+                          selectedIndicatorId={selectedIndicatorId}
+                          onIndicatorSelect={setSelectedIndicatorId}
+                        />
+                      </div>
+                    ) : (
+                      <FullCycleHeatmap
                         data={zscoreData}
                         availableIndicators={availableIndicators}
                         selectedIndicators={selectedIndicators}
-                        visibleIndicators={visibleIndicators}
                         showFundamentalAverage={showFundamentalAverage}
                         showTechnicalAverage={showTechnicalAverage}
                         showOverallAverage={showOverallAverage}
-                        sdcaIn={sdcaIn}
-                        sdcaOut={sdcaOut}
-                        height={isMobile ? 400 : 600}
-                        selectedIndicatorId={selectedIndicatorId}
-                        onIndicatorSelect={setSelectedIndicatorId}
                       />
-                    </div>
-                  ) : (
-                    <FullCycleHeatmap
-                      data={zscoreData}
-                      availableIndicators={availableIndicators}
-                      selectedIndicators={selectedIndicators}
-                      showFundamentalAverage={showFundamentalAverage}
-                      showTechnicalAverage={showTechnicalAverage}
-                      showOverallAverage={showOverallAverage}
-                    />
-                  )}
+                    )
                   )}
                 </div>
               )}
