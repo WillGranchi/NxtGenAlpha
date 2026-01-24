@@ -38,6 +38,7 @@ const IndicatorsPage: React.FC = () => {
   const [dataSource, setDataSource] = useState<string>('');
   const [dateRange, setDateRange] = useState<{ start: string; end: string } | null>(null);
   const [totalRecords, setTotalRecords] = useState<number>(0);
+  const [basePriceLoading, setBasePriceLoading] = useState<boolean>(false);
   // Calculate max start date (999 days back from end date)
   const calculateMaxStartDate = (endDateStr: string): string => {
     const end = new Date(endDateStr);
@@ -114,6 +115,10 @@ const IndicatorsPage: React.FC = () => {
   // Load base price data for default chart display with optimistic UI and progressive loading
   const loadBasePriceData = useCallback(async (forceRefresh: boolean = false, progressive: boolean = false) => {
     try {
+      const shouldShowLoading = basePriceData.length === 0;
+      if (shouldShowLoading) {
+        setBasePriceLoading(true);
+      }
       // Symbol is already in internal format (BTCUSDT)
       const internalSymbol = symbol;
       
@@ -265,8 +270,10 @@ const IndicatorsPage: React.FC = () => {
       } catch (err) {
         console.error('Failed to load base price data:', err);
         setError('Failed to load price data. Click "Refresh Data" to fetch from CoinGlass.');
+      } finally {
+        setBasePriceLoading(false);
       }
-  }, [symbol, startDate, endDate]);
+  }, [symbol, exchange, startDate, endDate, basePriceData.length]);
 
   // Auto-load CoinGlass data on initial page load with progressive loading
   useEffect(() => {
@@ -644,46 +651,62 @@ const IndicatorsPage: React.FC = () => {
             </div>
           )}
 
-          {/* Chart Area - Full Width at Top */}
-          {hasPriceData && (
-            <div className="w-full space-y-4">
-              {isLoading ? (
-                <div className="bg-bg-secondary border border-border-default rounded-lg p-12">
-                  <div className="text-center text-text-muted">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mb-4"></div>
-                    <p>Generating signals...</p>
-                  </div>
+          {/* Chart Area - Full Width at Top (always render to avoid blank space) */}
+          <div className="w-full space-y-4">
+            {basePriceLoading && !hasPriceData ? (
+              <div className="bg-bg-secondary border border-border-default rounded-lg p-12">
+                <div className="text-center text-text-muted">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mb-4"></div>
+                  <p>Loading BTC price data...</p>
                 </div>
-              ) : (
-                <>
-                  <PriceChart
-                    data={chartData}
-                    title={hasResults ? "Overall Strategy - Combined Trading Signals" : "BTC Price Chart"}
-                    height={isMobile ? 400 : 600}
-                    overlaySignals={hasResults ? { ...overlaySignals, ...combinedOverlaySignals } : {}}
-                    showOverlayLegend={hasResults}
-                    useLogScale={useLogScale}
-                    onLogScaleToggle={(useLog) => {
-                      setUseLogScale(useLog);
-                      localStorage.setItem('indicatorsChart_useLogScale', String(useLog));
-                    }}
-                  />
-                  
-                  {/* Indicator Signal Panel - Show when indicators are selected and signals are generated */}
-                  {selectedIndicators.length > 0 && hasResults && priceData.length > 0 && (
-                    <IndicatorSignalPanel
-                      indicators={selectedIndicators.map((ind) => ({
-                        id: ind.id,
-                        name: availableIndicators?.[ind.id]?.name || ind.id,
-                      }))}
-                      priceData={priceData}
-                      height={isMobile ? 150 : 200}
+              </div>
+            ) : hasPriceData ? (
+              <>
+                {isLoading ? (
+                  <div className="bg-bg-secondary border border-border-default rounded-lg p-12">
+                    <div className="text-center text-text-muted">
+                      <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mb-4"></div>
+                      <p>Generating signals...</p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <PriceChart
+                      data={chartData}
+                      title={hasResults ? "Overall Strategy - Combined Trading Signals" : "BTC Price Chart"}
+                      height={isMobile ? 400 : 600}
+                      overlaySignals={hasResults ? { ...overlaySignals, ...combinedOverlaySignals } : {}}
+                      showOverlayLegend={hasResults}
+                      useLogScale={useLogScale}
+                      onLogScaleToggle={(useLog) => {
+                        setUseLogScale(useLog);
+                        localStorage.setItem('indicatorsChart_useLogScale', String(useLog));
+                      }}
                     />
-                  )}
-                </>
-              )}
-            </div>
-          )}
+                    
+                    {/* Indicator Signal Panel - Show when indicators are selected and signals are generated */}
+                    {selectedIndicators.length > 0 && hasResults && priceData.length > 0 && (
+                      <IndicatorSignalPanel
+                        indicators={selectedIndicators.map((ind) => ({
+                          id: ind.id,
+                          name: availableIndicators?.[ind.id]?.name || ind.id,
+                        }))}
+                        priceData={priceData}
+                        height={isMobile ? 150 : 200}
+                      />
+                    )}
+                  </>
+                )}
+              </>
+            ) : (
+              <div className="bg-bg-secondary border border-border-default rounded-lg p-12">
+                <div className="text-center text-text-muted">
+                  <p className="mb-2">No price data loaded yet.</p>
+                  <p className="text-sm">Use the “Refresh Data” button in Settings to fetch from CoinGlass.</p>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Settings Bar (Collapsible) */}
           <div className="bg-bg-secondary border border-border-default rounded-lg relative z-10">

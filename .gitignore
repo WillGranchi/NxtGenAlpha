@@ -22,6 +22,9 @@ ENV/
 *.swo
 *~
 
+# Local SSH keys (never commit)
+.ssh/
+
 # OS
 .DS_Store
 Thumbs.db

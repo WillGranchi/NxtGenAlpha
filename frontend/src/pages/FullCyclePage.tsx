@@ -340,6 +340,14 @@ const FullCyclePage: React.FC = () => {
                 </div>
               ) : (
                 <div className={`transition-opacity duration-300 ${zscoresLoading ? 'opacity-50' : 'opacity-100'}`}>
+                  {zscoreData.length === 0 ? (
+                    <div className="bg-bg-secondary border border-border-default rounded-lg p-12">
+                      <div className="text-center text-text-muted">
+                        <p className="mb-2">No data loaded yet.</p>
+                        <p className="text-sm">Use the “Refresh Data” button to fetch and calculate.</p>
+                      </div>
+                    </div>
+                  ) : (
                   {viewMode === 'chart' ? (
                     <div ref={chartRef}>
                       <FullCycleChart
@@ -366,6 +374,7 @@ const FullCyclePage: React.FC = () => {
                       showTechnicalAverage={showTechnicalAverage}
                       showOverallAverage={showOverallAverage}
                     />
+                  )}
                   )}
                 </div>
               )}
