@@ -13,6 +13,7 @@ import { FullCycleHeatmap } from '../components/fullcycle/FullCycleHeatmap';
 import { ExportButton } from '../components/fullcycle/ExportButton';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { useMobile } from '../hooks/useMobile';
+import TradingAPI from '../services/api';
 
 const FullCyclePage: React.FC = () => {
   const { isMobile } = useMobile();
@@ -70,7 +71,7 @@ const FullCyclePage: React.FC = () => {
     const presetId = (location.state as any)?.presetId;
     if (presetId) {
       TradingAPI.getFullCyclePreset(presetId)
-        .then((response) => {
+        .then((response: any) => {
           if (response.success) {
             loadPreset({
               indicator_params: response.preset.indicator_params,
@@ -86,7 +87,7 @@ const FullCyclePage: React.FC = () => {
             });
           }
         })
-        .catch((err) => {
+        .catch((err: any) => {
           console.error('Failed to load preset:', err);
         });
       // Clear the state to prevent reloading on re-render
