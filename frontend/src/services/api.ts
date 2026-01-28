@@ -652,6 +652,7 @@ export class TradingAPI {
   static async calculateValuationZScores(request: {
     indicators: string[];
     symbol?: string;
+    exchange?: string;
     zscore_method?: 'rolling' | 'all_time';
     rolling_window?: number;
     show_average?: boolean;

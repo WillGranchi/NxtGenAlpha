@@ -33,6 +33,10 @@ class ValuationZScoreRequest(BaseModel):
         default="BTCUSDT",
         description="Trading pair symbol"
     )
+    exchange: str = Field(
+        default="Binance",
+        description="Exchange name (e.g., Binance, Coinbase, OKX)"
+    )
     zscore_method: Literal["rolling", "all_time"] = Field(
         default="rolling",
         description="Method for calculating z-scores"

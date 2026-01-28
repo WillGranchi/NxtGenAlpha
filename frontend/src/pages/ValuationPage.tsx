@@ -55,8 +55,6 @@ const ValuationPage: React.FC = () => {
   const [priceDataLoading, setPriceDataLoading] = useState(false);
   // Persist market controls per-page (across full refresh)
   const market = useMarketControls('valuation');
-  const exchange = market.exchange;
-  const setExchange = market.setExchange;
   
   // Data info state
   const [dataSource, setDataSource] = useState<string>('');
@@ -89,23 +87,27 @@ const ValuationPage: React.FC = () => {
     setTimeframe,
     symbol,
     setSymbol,
+    exchange,
+    setExchange,
   } = useValuation();
 
   // Keep valuation hook's symbol/date in sync with persisted market controls
   useEffect(() => {
     if (market.symbol !== symbol) setSymbol(market.symbol);
+    if (market.exchange !== exchange) setExchange(market.exchange);
     if (market.startDate !== startDate) setStartDate(market.startDate);
     if (market.endDate !== endDate) setEndDate(market.endDate);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [market.symbol, market.startDate, market.endDate]);
+  }, [market.symbol, market.exchange, market.startDate, market.endDate]);
 
   // When valuation page changes symbol/date, persist them back
   useEffect(() => {
     if (symbol && symbol !== market.symbol) market.setSymbol(symbol);
+    if (exchange && exchange !== market.exchange) market.setExchange(exchange);
     if (startDate && startDate !== market.startDate) market.setStartDate(startDate);
     if (endDate && endDate !== market.endDate) market.setEndDate(endDate);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [symbol, startDate, endDate]);
+  }, [symbol, exchange, startDate, endDate]);
 
   // Set default band indicator when selected indicators change
   useEffect(() => {

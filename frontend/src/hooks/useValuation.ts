@@ -65,6 +65,10 @@ export interface UseValuationReturn {
   // Symbol
   symbol: string;
   setSymbol: (symbol: string) => void;
+
+  // Exchange
+  exchange: string;
+  setExchange: (exchange: string) => void;
   
   // Actions
   fetchAvailableIndicators: () => Promise<void>;
@@ -100,6 +104,9 @@ export const useValuation = (): UseValuationReturn => {
   
   // Symbol
   const [symbol, setSymbol] = useState<string>('BTCUSDT');
+
+  // Exchange (CoinGlass market)
+  const [exchange, setExchange] = useState<string>('Binance');
   
   // Fetch available indicators
   const fetchAvailableIndicators = useCallback(async () => {
@@ -137,6 +144,7 @@ export const useValuation = (): UseValuationReturn => {
       const response = await TradingAPI.calculateValuationZScores({
         indicators: selectedIndicators,
         symbol,
+        exchange,
         zscore_method: zscoreMethod,
         rolling_window: rollingWindow,
         show_average: showAverage,
@@ -152,7 +160,18 @@ export const useValuation = (): UseValuationReturn => {
         throw new Error('Failed to calculate z-scores');
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to calculate z-scores';
+      // Prefer backend validation details (FastAPI -> {"detail": "..."}), otherwise use generic message
+      const maybeAxios = error as any;
+      const detail =
+        maybeAxios?.response?.data?.detail ||
+        maybeAxios?.response?.data?.message ||
+        maybeAxios?.response?.data?.error;
+      const errorMessage =
+        typeof detail === 'string'
+          ? detail
+          : error instanceof Error
+            ? error.message
+            : 'Failed to calculate z-scores';
       setZscoresError(errorMessage);
       console.error('Error calculating z-scores:', error);
       setZscoreData([]);
@@ -160,7 +179,7 @@ export const useValuation = (): UseValuationReturn => {
     } finally {
       setZscoresLoading(false);
     }
-  }, [selectedIndicators, symbol, zscoreMethod, rollingWindow, showAverage, averageWindow, startDate, endDate]);
+  }, [selectedIndicators, symbol, exchange, zscoreMethod, rollingWindow, showAverage, averageWindow, startDate, endDate]);
   
   // Refresh data (recalculate z-scores)
   const refreshData = useCallback(async () => {
@@ -255,6 +274,10 @@ export const useValuation = (): UseValuationReturn => {
     // Symbol
     symbol,
     setSymbol,
+
+    // Exchange
+    exchange,
+    setExchange,
     
     // Actions
     fetchAvailableIndicators,

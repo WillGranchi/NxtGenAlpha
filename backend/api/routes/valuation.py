@@ -278,6 +278,7 @@ async def calculate_valuation_zscores(request: ValuationZScoreRequest) -> Valuat
                 symbol=request.symbol,
                 start_date=start_date_dt,
                 end_date=end_date_dt,
+                exchange=request.exchange,
                 use_cache=True,  # Use cache if available
                 cross_validate=False
             )
@@ -285,7 +286,7 @@ async def calculate_valuation_zscores(request: ValuationZScoreRequest) -> Valuat
         except Exception as e:
             logger.warning(f"Failed to fetch from CoinGlass API, falling back to CSV: {e}")
             # Fallback to CSV if CoinGlass API fails
-            df = load_crypto_data(symbol=request.symbol)
+            df = load_crypto_data(symbol=request.symbol, exchange=request.exchange)
             
             # Filter by date range if provided
             if request.start_date:
