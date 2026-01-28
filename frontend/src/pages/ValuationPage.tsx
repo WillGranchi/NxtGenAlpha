@@ -17,6 +17,7 @@ import { useAuth } from '../hooks/useAuth';
 import TradingAPI from '../services/api';
 import { Button } from '../components/ui/Button';
 import { Save, Loader2, ChevronDown, ChevronUp, Settings, RefreshCw } from 'lucide-react';
+import { getPagePriceCache, makePagePriceCacheKey, setPagePriceCache } from '../utils/pagePriceCache';
 
 const ValuationPage: React.FC = () => {
   const { isMobile } = useMobile();
@@ -116,6 +117,29 @@ const ValuationPage: React.FC = () => {
 
   // Load price data for the top chart with optimistic UI
   const loadPriceData = useCallback(async (forceRefresh: boolean = false) => {
+    const cacheKey = makePagePriceCacheKey({
+      page: 'valuation',
+      symbol,
+      exchange,
+      startDate: startDate || '',
+      endDate: endDate || '',
+      interval: '1d',
+    });
+
+    // Hydrate from in-memory cache (prevents blank flashes on navigation)
+    const cached = getPagePriceCache<{
+      priceData: any[];
+      dataSource?: string;
+      dateRange?: { start: string; end: string } | null;
+      totalRecords?: number;
+    }>(cacheKey);
+    if (cached?.value?.priceData?.length && priceData.length === 0) {
+      setPriceData(cached.value.priceData as any);
+      if (cached.value.dataSource) setDataSource(cached.value.dataSource);
+      if (cached.value.dateRange) setDateRange(cached.value.dateRange);
+      if (typeof cached.value.totalRecords === 'number') setTotalRecords(cached.value.totalRecords);
+    }
+
     // Optimistic UI: Don't set loading immediately if we have cached data
     // Only show loading on initial load or if no data exists
     const shouldShowLoading = priceData.length === 0;
@@ -158,6 +182,12 @@ const ValuationPage: React.FC = () => {
           volume: d.volume,
         }));
         setPriceData(formattedData);
+        setPagePriceCache(cacheKey, {
+          priceData: formattedData,
+          dataSource: 'coinglass',
+          dateRange: response.data.length > 0 ? { start: response.data[0].date, end: response.data[response.data.length - 1].date } : null,
+          totalRecords: response.data.length,
+        });
         // Update data info
         if (response.data.length > 0) {
           setDataSource('coinglass');

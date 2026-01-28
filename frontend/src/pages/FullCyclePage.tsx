@@ -13,8 +13,6 @@ import { FullCycleHeatmap } from '../components/fullcycle/FullCycleHeatmap';
 import { ExportButton } from '../components/fullcycle/ExportButton';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { useMobile } from '../hooks/useMobile';
-import TradingAPI from '../services/api';
-import { BTCHistoryStatus } from '../components/fullcycle/BTCHistoryStatus';
 
 const FullCyclePage: React.FC = () => {
   const { isMobile } = useMobile();
@@ -22,8 +20,6 @@ const FullCyclePage: React.FC = () => {
   const [viewMode, setViewMode] = useState<'chart' | 'heatmap'>('chart');
   const chartRef = useRef<HTMLDivElement>(null);
   const [selectedIndicatorId, setSelectedIndicatorId] = useState<string | null>(null);
-  const [btcHistoryComplete, setBtcHistoryComplete] = useState<boolean>(true);
-  const [isCheckingHistory, setIsCheckingHistory] = useState<boolean>(true);
   
   const {
     availableIndicators,
@@ -68,41 +64,6 @@ const FullCyclePage: React.FC = () => {
     loadPreset,
     refreshData,
   } = useFullCycle();
-
-  // Check BTC history status on page load (non-blocking)
-  useEffect(() => {
-    const checkHistoryStatus = async () => {
-      try {
-        setIsCheckingHistory(true);
-        const status = await TradingAPI.checkBTCHistoryStatus();
-        
-        setBtcHistoryComplete(status.is_complete || false);
-        
-        // If incomplete, trigger build in background (non-blocking)
-        // Don't wait for it to complete - let it run in background
-        if (!status.is_complete) {
-          // Trigger build but don't await - let it run in background
-          TradingAPI.ensureBTCHistory({ exchange: 'Binance', force_rebuild: false })
-            .then((result) => {
-              if (result.is_complete) {
-                setBtcHistoryComplete(true);
-                // Refresh data after build completes
-                refreshData().catch(err => console.error('Failed to refresh data:', err));
-              }
-            })
-            .catch((buildError) => {
-              console.error('Failed to build BTC history:', buildError);
-            });
-        }
-      } catch (error) {
-        console.error('Failed to check BTC history status:', error);
-      } finally {
-        setIsCheckingHistory(false);
-      }
-    };
-    
-    checkHistoryStatus();
-  }, []); // Only run once on mount, don't depend on refreshData
 
   // Load preset if navigating from My Creations
   useEffect(() => {
@@ -159,15 +120,7 @@ const FullCyclePage: React.FC = () => {
             </div>
           )}
           
-          {/* BTC History Status */}
-          {!isCheckingHistory && (
-            <BTCHistoryStatus onStatusChange={setBtcHistoryComplete} />
-          )}
           
-          {/* BTC History Status */}
-          {!isCheckingHistory && (
-            <BTCHistoryStatus onStatusChange={setBtcHistoryComplete} />
-          )}
 
           {/* Data Warnings */}
           {dataWarnings && dataWarnings.length > 0 && (

@@ -19,6 +19,7 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import { useMobile } from '../hooks/useMobile';
 import { Loader2, ChevronDown, ChevronUp, Settings, Play, RefreshCw } from 'lucide-react';
 import type { IndicatorMetadata, BacktestResult, IndicatorConfig, EquityDataPoint } from '../services/api';
+import { getPagePriceCache, makePagePriceCacheKey, setPagePriceCache } from '../utils/pagePriceCache';
 
 const IndicatorsPage: React.FC = () => {
   const { isMobile } = useMobile();
@@ -115,6 +116,29 @@ const IndicatorsPage: React.FC = () => {
   // Load base price data for default chart display with optimistic UI and progressive loading
   const loadBasePriceData = useCallback(async (forceRefresh: boolean = false, progressive: boolean = false) => {
     try {
+      const cacheKey = makePagePriceCacheKey({
+        page: 'indicators',
+        symbol,
+        exchange,
+        startDate: startDate || '',
+        endDate: endDate || '',
+        interval: '1d',
+      });
+
+      // Hydrate from in-memory cache (prevents blank flashes on navigation)
+      const cached = getPagePriceCache<{
+        basePriceData: any[];
+        dataSource?: string;
+        dateRange?: { start: string; end: string } | null;
+        totalRecords?: number;
+      }>(cacheKey);
+      if (cached?.value?.basePriceData?.length && basePriceData.length === 0) {
+        setBasePriceData(cached.value.basePriceData as any);
+        if (cached.value.dataSource) setDataSource(cached.value.dataSource);
+        if (cached.value.dateRange) setDateRange(cached.value.dateRange);
+        if (typeof cached.value.totalRecords === 'number') setTotalRecords(cached.value.totalRecords);
+      }
+
       const shouldShowLoading = basePriceData.length === 0;
       if (shouldShowLoading) {
         setBasePriceLoading(true);
@@ -154,6 +178,12 @@ const IndicatorsPage: React.FC = () => {
               volume: d.volume,
             }));
             setBasePriceData(recentData);
+            setPagePriceCache(cacheKey, {
+              basePriceData: recentData,
+              dataSource: 'coinglass',
+              dateRange: recentResponse.data.length > 0 ? { start: recentResponse.data[0].date, end: recentResponse.data[recentResponse.data.length - 1].date } : null,
+              totalRecords: recentResponse.data.length,
+            });
             setError(null);
             // Update data info
             if (recentResponse.data.length > 0) {
@@ -198,6 +228,12 @@ const IndicatorsPage: React.FC = () => {
                   volume: d.volume,
                 }));
                 setBasePriceData(fullData);
+                setPagePriceCache(cacheKey, {
+                  basePriceData: fullData,
+                  dataSource: 'coinglass',
+                  dateRange: fullResponse.data.length > 0 ? { start: fullResponse.data[0].date, end: fullResponse.data[fullResponse.data.length - 1].date } : null,
+                  totalRecords: fullResponse.data.length,
+                });
                 // Update data info
                 if (fullResponse.data.length > 0) {
                   setDataSource('coinglass');
@@ -256,6 +292,12 @@ const IndicatorsPage: React.FC = () => {
           volume: d.volume,
         }));
         setBasePriceData(formattedData);
+        setPagePriceCache(cacheKey, {
+          basePriceData: formattedData,
+          dataSource: 'coinglass',
+          dateRange: response.data.length > 0 ? { start: response.data[0].date, end: response.data[response.data.length - 1].date } : null,
+          totalRecords: response.data.length,
+        });
         setError(null);
         // Update data info
         if (response.data.length > 0) {
