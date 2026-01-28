@@ -18,6 +18,7 @@ import TradingAPI from '../services/api';
 import { Button } from '../components/ui/Button';
 import { Save, Loader2, ChevronDown, ChevronUp, Settings, RefreshCw } from 'lucide-react';
 import { getPagePriceCache, makePagePriceCacheKey, setPagePriceCache } from '../utils/pagePriceCache';
+import { useMarketControls } from '../hooks/useMarketControls';
 
 const ValuationPage: React.FC = () => {
   const { isMobile } = useMobile();
@@ -52,7 +53,10 @@ const ValuationPage: React.FC = () => {
     Shares: number;
   }>>([]);
   const [priceDataLoading, setPriceDataLoading] = useState(false);
-  const [exchange, setExchange] = useState<string>('Binance');
+  // Persist market controls per-page (across full refresh)
+  const market = useMarketControls('valuation');
+  const exchange = market.exchange;
+  const setExchange = market.setExchange;
   
   // Data info state
   const [dataSource, setDataSource] = useState<string>('');
@@ -86,6 +90,22 @@ const ValuationPage: React.FC = () => {
     symbol,
     setSymbol,
   } = useValuation();
+
+  // Keep valuation hook's symbol/date in sync with persisted market controls
+  useEffect(() => {
+    if (market.symbol !== symbol) setSymbol(market.symbol);
+    if (market.startDate !== startDate) setStartDate(market.startDate);
+    if (market.endDate !== endDate) setEndDate(market.endDate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [market.symbol, market.startDate, market.endDate]);
+
+  // When valuation page changes symbol/date, persist them back
+  useEffect(() => {
+    if (symbol && symbol !== market.symbol) market.setSymbol(symbol);
+    if (startDate && startDate !== market.startDate) market.setStartDate(startDate);
+    if (endDate && endDate !== market.endDate) market.setEndDate(endDate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [symbol, startDate, endDate]);
 
   // Set default band indicator when selected indicators change
   useEffect(() => {

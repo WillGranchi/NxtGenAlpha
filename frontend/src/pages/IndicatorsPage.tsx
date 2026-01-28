@@ -20,6 +20,7 @@ import { useMobile } from '../hooks/useMobile';
 import { Loader2, ChevronDown, ChevronUp, Settings, Play, RefreshCw } from 'lucide-react';
 import type { IndicatorMetadata, BacktestResult, IndicatorConfig, EquityDataPoint } from '../services/api';
 import { getPagePriceCache, makePagePriceCacheKey, setPagePriceCache } from '../utils/pagePriceCache';
+import { useMarketControls } from '../hooks/useMarketControls';
 
 const IndicatorsPage: React.FC = () => {
   const { isMobile } = useMobile();
@@ -31,9 +32,8 @@ const IndicatorsPage: React.FC = () => {
   const [availableConditions, setAvailableConditions] = useState<Record<string, string>>({});
   
   // Settings
-  // Store symbol in internal format (BTCUSDT) for API calls
-  const [symbol, setSymbol] = useState<string>('BTCUSDT');
-  const [exchange, setExchange] = useState<string>('Binance');
+  // Persist market controls per-page (across full refresh)
+  const { symbol, setSymbol, exchange, setExchange, startDate, setStartDate, endDate, setEndDate } = useMarketControls('indicators');
   
   // Data info state
   const [dataSource, setDataSource] = useState<string>('');
@@ -48,13 +48,7 @@ const IndicatorsPage: React.FC = () => {
     return maxStart.toISOString().split('T')[0];
   };
 
-  const [endDate, setEndDate] = useState<string>(() => {
-    return new Date().toISOString().split('T')[0];
-  });
-  const [startDate, setStartDate] = useState<string>(() => {
-    // Match Valuation default: request full history and let backend clamp to available range
-    return '2010-01-01';
-  });
+  // startDate/endDate now come from useMarketControls
   const [strategyType, setStrategyType] = useState<'long_cash' | 'long_short'>('long_cash');
   const [initialCapital, setInitialCapital] = useState<number>(10000);
   

@@ -3,7 +3,9 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { TradingAPI } from '../services/api';
+import TradingAPI from '../services/api';
+import { useMarketControls } from './useMarketControls';
+import { usePersistedState } from './usePersistedState';
 
 export interface StrategySelection {
   indicator_strategy_ids: number[];
@@ -25,24 +27,40 @@ export interface CombinedSignalsData {
 }
 
 export const useCombinedStrategies = () => {
-  const [strategySelection, setStrategySelection] = useState<StrategySelection>({
-    indicator_strategy_ids: [],
-    valuation_strategy_ids: [],
-    fullcycle_preset_ids: []
-  });
+  // Persist dashboard selections/rules so users don't lose their setup on navigation/refresh
+  const [strategySelection, setStrategySelection] = usePersistedState<StrategySelection>(
+    'dashboard:strategySelection:v1',
+    {
+      indicator_strategy_ids: [],
+      valuation_strategy_ids: [],
+      fullcycle_preset_ids: [],
+    },
+    { version: 1 }
+  );
   
-  const [combinationRule, setCombinationRule] = useState<CombinationRule>({
-    method: 'weighted'
-  });
+  const [combinationRule, setCombinationRule] = usePersistedState<CombinationRule>(
+    'dashboard:combinationRule:v1',
+    { method: 'weighted' },
+    { version: 1 }
+  );
   
   const [combinedSignals, setCombinedSignals] = useState<CombinedSignalsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [startDate, setStartDate] = useState<string>('2020-01-01');
-  const [endDate, setEndDate] = useState<string>('');
-  const [symbol, setSymbol] = useState<string>('BTCUSDT');
-  const [exchange, setExchange] = useState<string>('Binance');
-  const [strategyType, setStrategyType] = useState<'long_cash' | 'long_short'>('long_cash');
+  const market = useMarketControls('dashboard');
+  const startDate = market.startDate;
+  const setStartDate = market.setStartDate;
+  const endDate = market.endDate;
+  const setEndDate = market.setEndDate;
+  const symbol = market.symbol;
+  const setSymbol = market.setSymbol;
+  const exchange = market.exchange;
+  const setExchange = market.setExchange;
+  const [strategyType, setStrategyType] = usePersistedState<'long_cash' | 'long_short'>(
+    'dashboard:strategyType:v1',
+    'long_cash',
+    { version: 1 }
+  );
 
   const calculateSignals = useCallback(async () => {
     const hasSelection = 

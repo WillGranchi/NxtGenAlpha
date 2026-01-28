@@ -8,6 +8,9 @@ import { DateRangePicker } from './DateRangePicker';
 import { RefreshCw, Loader2 } from 'lucide-react';
 import TradingAPI from '../services/api';
 
+const COINGLASS_LIST_CACHE_KEY = 'coinglass:symbols_and_exchanges:v1';
+const COINGLASS_LIST_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+
 interface SymbolExchangeControlsProps {
   symbol: string;
   onSymbolChange: (symbol: string) => void;
@@ -67,6 +70,22 @@ export const SymbolExchangeControls: React.FC<SymbolExchangeControlsProps> = ({
   useEffect(() => {
     const fetchSymbolsAndExchanges = async () => {
       try {
+        // Try localStorage cache first (prevents reload flash on navigation)
+        try {
+          const raw = localStorage.getItem(COINGLASS_LIST_CACHE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw) as { ts: number; symbols: string[]; exchanges: string[] };
+            if (parsed?.ts && Date.now() - parsed.ts < COINGLASS_LIST_CACHE_TTL_MS) {
+              if (Array.isArray(parsed.symbols) && parsed.symbols.length > 0) setSymbols(parsed.symbols);
+              if (Array.isArray(parsed.exchanges) && parsed.exchanges.length > 0) setExchanges(parsed.exchanges);
+              setIsLoadingSymbols(false);
+              return;
+            }
+          }
+        } catch {
+          // ignore cache parse errors
+        }
+
         setIsLoadingSymbols(true);
         console.log('[SymbolExchangeControls] Fetching symbols and exchanges from CoinGlass API...');
         const response = await TradingAPI.getCoinGlassSymbols();
@@ -99,6 +118,16 @@ export const SymbolExchangeControls: React.FC<SymbolExchangeControlsProps> = ({
           const sortedExchanges = Array.from(uniqueExchanges).sort();
           setExchanges(sortedExchanges);
           console.log('[SymbolExchangeControls] Loaded exchanges:', sortedExchanges.length);
+
+          // Store cache
+          try {
+            localStorage.setItem(
+              COINGLASS_LIST_CACHE_KEY,
+              JSON.stringify({ ts: Date.now(), symbols: sortedSymbols, exchanges: sortedExchanges })
+            );
+          } catch {
+            // ignore storage quota errors
+          }
         } else {
           console.warn('[SymbolExchangeControls] Invalid response or no symbols from CoinGlass');
           // No hardcoded fallbacks (to avoid misleading users); keep current selections as the only options.
@@ -116,7 +145,7 @@ export const SymbolExchangeControls: React.FC<SymbolExchangeControlsProps> = ({
     };
 
     fetchSymbolsAndExchanges();
-  }, []);
+  }, [symbol, exchange]);
 
   // Handler to set start date to maximum allowed
   const handleSetMaxRange = () => {

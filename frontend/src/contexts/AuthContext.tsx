@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { TradingAPI } from '../services/api';
+import TradingAPI from '../services/api';
 
 interface User {
   id: number;

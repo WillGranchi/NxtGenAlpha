@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import TradingAPI from '../services/api';
+import { useMarketControls } from './useMarketControls';
 
 export interface FullCycleIndicator {
   id: string;
@@ -143,14 +144,18 @@ export const useFullCycle = (): UseFullCycleReturn => {
   // Selection state
   const [selectedIndicators, setSelectedIndicators] = useState<string[]>([]);
   
-  // Date range (default to full history)
-  const [startDate, setStartDate] = useState<string>('2010-01-01');
-  const [endDate, setEndDate] = useState<string>('');
-  
-  // Timeframe and exchange
-  const [symbol, setSymbol] = useState<string>('BTCUSDT');
-  const [timeframe, setTimeframe] = useState<string>('1d');
-  const [exchange, setExchange] = useState<string>('Binance');
+  // Market controls (persisted per-page across full refresh)
+  const market = useMarketControls('fullcycle');
+  const symbol = market.symbol;
+  const setSymbol = market.setSymbol;
+  const startDate = market.startDate;
+  const setStartDate = market.setStartDate;
+  const endDate = market.endDate;
+  const setEndDate = market.setEndDate;
+  const timeframe = market.timeframe || '1d';
+  const setTimeframe = market.setTimeframe;
+  const exchange = market.exchange;
+  const setExchange = market.setExchange;
   
   // ROC period
   const [rocDays, setRocDays] = useState<number>(7);
